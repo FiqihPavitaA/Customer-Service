@@ -89,7 +89,20 @@ npx create-next-app@latest web --typescript --tailwind --app
 - [x] **Tambahan Step 13:** `template jawaban.md` ikut dimuat ke system prompt (disalin sebagai `web/content/template-jawaban.md`). Berisi aturan konsultasi tanaman, aturan membaca foto, dan contoh balasan per ACTION. Menambah ~2.200 karakter; system prompt kini 82.599 karakter.
 - [x] **Perubahan perilaku yang disengaja:** `sop.md` kini ikut dimuat ke system prompt. `backend/knowledge.js` lama tidak pernah memuatnya, padahal MIGRATION.md §4 Fase 2 mensyaratkannya. Aturan di dalam `sop.md` sendiri tidak diubah sama sekali (§5 poin 6).
 - [x] **Tambahan hemat biaya:** system prompt ditandai `cache_control: ephemeral` (prompt caching). Isinya tidak berubah antar permintaan, jadi prefix yang sama tidak dibayar penuh berulang kali. Pantau lewat `usage.cache_read_input_tokens` di Step 5.
-- [ ] Uji endpoint ini **berdiri sendiri** (Postman/curl) sebelum disambungkan ke UI apa pun → **Step 5, menunggu `ANTHROPIC_API_KEY`**.
+- [x] **Uji endpoint berdiri sendiri — SELESAI (Step 5, 31 Agu 2026).** Empat pesan, satu per klasifikasi; **keempat ACTION keluar sesuai harapan**. Waktu balas 3,9–8,9 detik.
+
+  | # | Pesan uji | ACTION | Token keluar | Biaya |
+  |---|---|---|---|---|
+  | 1 | Dosis POC Buah buat tomat | AUTO_REPLY | 108 | Rp 2.090 *(menulis cache)* |
+  | 2 | Daun cabai menguning | ASK_INFORMATION | 124 | Rp 197 |
+  | 3 | Paket 7 hari, mau refund | HANDOVER_TO_CS | 337 | Rp 250 |
+  | 4 | Resi 240620 sudah update? | CHECK_ORDER_SYSTEM | 169 | Rp 208 |
+
+  - **System prompt = 33.321 token** (82.599 karakter). Prompt caching terbukti bekerja: permintaan 2–4 membacanya dari cache, biaya turun ±90% dibanding permintaan pertama.
+  - **⚠️ Temuan penting — TTL cache 5 menit.** Diskon 90% itu hanya berlaku bila ada permintaan lain dalam 5 menit terakhir. Pada trafik jarang (mis. 1.000 chat/bulan ≈ 1 chat tiap 43 menit), **mayoritas chat justru membayar tarif tulis-cache Rp 2.090**, bukan Rp 218. Proyeksi biaya karena itu bisa berbeda hampir 10×:
+    - trafik padat (jarak antar chat < 5 menit) → ±Rp 218/chat
+    - trafik jarang (jarak > 5 menit) → ±Rp 2.090/chat
+  - Kesimpulan: pengungkit terbesar bukan caching, melainkan **memperkecil apa yang dikirim**. Susunan system prompt: `faq-cs.md` 46%, `claude.md` 25%, ringkasan produk 24%, sisanya SOP + template.
   - Sudah diuji tanpa key (Step 4): `/api/health` melaporkan 4 berkas KB terbaca; `/api/chat` membalas 503 informatif tanpa key, 400 untuk body cacat, 405 untuk metode salah.
 - [ ] `ANTHROPIC_API_KEY` → `.env.local` (lokal, contoh ada di `web/.env.example`) dan **Vercel Project Settings → Environment Variables** (produksi). Tidak pernah ditaruh di kode/commit.
 
@@ -191,8 +204,8 @@ Claude**, bukan kelengkapan halaman. Konsekuensinya:
 
 Rencana asli tidak dihapus — hanya diurutkan ulang.
 
-### ⏸ Dua hal yang tertahan menunggu pemilik proyek
-1. **Step 5 — uji AI engine sungguhan:** butuh `ANTHROPIC_API_KEY` di `web/.env.local`.
+### ⏸ Yang tertahan menunggu pemilik proyek
+1. ~~**Step 5 — uji AI engine sungguhan**~~ ✅ selesai 31 Agu 2026.
 2. **Step 6 (sisa) — jalankan skema:** butuh project Supabase + jalankan `supabase/schema.sql`, lalu URL & anon key di `web/.env.local`. **DITUNDA** atas permintaan pemilik proyek.
 
 Nomor 1 adalah penghalang mutlak bagi demo: efektivitas token tidak bisa diukur tanpa API key. Halaman `/ai` sudah siap menerima angkanya begitu key terpasang.
