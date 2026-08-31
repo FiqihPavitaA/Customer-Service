@@ -93,10 +93,16 @@ npx create-next-app@latest web --typescript --tailwind --app
 - [ ] `ANTHROPIC_API_KEY` → `.env.local` (lokal, contoh ada di `web/.env.example`) dan **Vercel Project Settings → Environment Variables** (produksi). Tidak pernah ditaruh di kode/commit.
 
 ### Fase 3 — Supabase (Database & Auth)
-- [ ] Buat tabel sesuai skema di `claude.md` bagian Tech Stack:
-  - `conversations` (id, platform, customer_id, order_id, messages JSONB, action, handover_summary, timestamps)
-  - `escalations` (id, conversation_id, reason, status, assigned_to, created_at)
-- [ ] Aktifkan **Supabase Realtime** pada kedua tabel (dasar untuk sinkronisasi multi-admin).
+- [x] **Skema ditulis (Step 6)** di `supabase/schema.sql` — idempoten, siap ditempel ke SQL Editor. Panduan langkah demi langkah: `supabase/README.md`.
+  - `conversations` — sesuai `claude.md`, **plus 7 kolom** yang memang ditampilkan `dashboard.html` lama (`customer_name`, `shop_name`, `unread`, `tracking_no`, `ai_suggestion`, `handover_detail`, `last_message_at`). Tanpa kolom ini, Step 14 butuh migrasi skema kedua.
+  - `escalations` — persis `claude.md`, tanpa tambahan.
+  - `settings` — satu baris, menggantikan `localStorage` di `settings.js`.
+  - `ai_flags` — menggantikan `localStorage` di `flag-store.js` (Flag Koreksi). Tidak tercantum di rencana awal, tetapi masalahnya sama persis: data terpisah per browser.
+  - `profiles` — nama & peran (`cs`/`admin`), terisi otomatis lewat trigger saat pengguna Auth dibuat. Wajib ada karena `auth.users` tidak boleh diubah langsung.
+  - **RLS aktif di kelima tabel** + 10 kebijakan akses. Tanpa ini, `anon key` yang dipakai browser bisa membaca dan menulis seluruh isi tabel.
+  - **Koreksi terhadap `claude.md`:** komentar SQL di sana menulis nilai `action` sebagai `ASK_INFO | HANDOVER | CHECK_ORDER`, padahal yang benar-benar dikirim `/api/chat` adalah `ASK_INFORMATION | HANDOVER_TO_CS | CHECK_ORDER_SYSTEM`. Skema memakai nilai yang nyata.
+- [x] **Supabase Realtime** dinyalakan untuk `conversations`, `escalations`, `settings`, dan `ai_flags` (dasar sinkronisasi multi-admin).
+- [ ] **Menunggu pemilik proyek:** buat project Supabase, jalankan `schema.sql`, buat admin pertama, lalu salin URL + anon key ke `web/.env.local`. Skema di atas belum pernah dijalankan pada database sungguhan.
 - [ ] Ganti login hardcode → **Supabase Auth** (email/password untuk tiap admin).
 - [ ] Pindahkan pengaturan AI (Settings) dari `localStorage` → tabel `settings` (1 baris, dibaca semua admin).
 
@@ -164,7 +170,14 @@ _Terakhir diperbarui: 31 Agustus 2026 (akhir Step 1)._
 - [ ] Project Vercel dihubungkan
 - [x] **Fase 0 selesai**
 - [x] **Fase 1 SELESAI** — scaffold (Step 2) + token warna & kerangka layout (Step 3).
-- [x] **Fase 2 sebagian:** AI engine sudah diport ke `/api/chat` + `/api/health` (Step 4). Berikutnya Step 5: uji sungguhan ke Claude API — **menunggu `ANTHROPIC_API_KEY` dari pemilik proyek**.
+- [x] **Fase 2 sebagian:** AI engine sudah diport ke `/api/chat` + `/api/health` (Step 4).
+- [x] **Fase 3 sebagian:** skema database ditulis (Step 6).
+
+### ⏸ Dua hal yang tertahan menunggu pemilik proyek
+1. **Step 5 — uji AI engine sungguhan:** butuh `ANTHROPIC_API_KEY` di `web/.env.local`.
+2. **Step 6 (sisa) — jalankan skema:** butuh project Supabase + jalankan `supabase/schema.sql`, lalu URL & anon key di `web/.env.local`.
+
+Step 7 (Auth) dan Step 8 (Pengaturan) tidak bisa dimulai sebelum nomor 2 selesai.
 
 ### Keputusan arsitektur yang disepakati
 1. App Next.js baru tinggal di subfolder `web/` pada repo yang sama (bukan repo terpisah); Vercel Root Directory = `web`.
