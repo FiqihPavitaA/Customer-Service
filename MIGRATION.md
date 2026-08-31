@@ -86,6 +86,7 @@ npx create-next-app@latest web --typescript --tailwind --app
   - Kembalikan `{ action, reply, model, usage }` — kontrak sama persis dengan versi Express
 - [x] `app/api/health/route.ts` ikut diport: memastikan KB terbaca & API key terpasang tanpa memanggil (dan membayar) Claude API.
 - [x] Berkas KB disalin ke `web/content/` dan didaftarkan di `outputFileTracingIncludes` (`next.config.ts`). **Wajib**: tanpa itu build Vercel tetap lolos tetapi `/api/chat` gagal membaca KB di produksi.
+- [x] **Tambahan Step 13:** `template jawaban.md` ikut dimuat ke system prompt (disalin sebagai `web/content/template-jawaban.md`). Berisi aturan konsultasi tanaman, aturan membaca foto, dan contoh balasan per ACTION. Menambah ~2.200 karakter; system prompt kini 82.599 karakter.
 - [x] **Perubahan perilaku yang disengaja:** `sop.md` kini ikut dimuat ke system prompt. `backend/knowledge.js` lama tidak pernah memuatnya, padahal MIGRATION.md §4 Fase 2 mensyaratkannya. Aturan di dalam `sop.md` sendiri tidak diubah sama sekali (§5 poin 6).
 - [x] **Tambahan hemat biaya:** system prompt ditandai `cache_control: ephemeral` (prompt caching). Isinya tidak berubah antar permintaan, jadi prefix yang sama tidak dibayar penuh berulang kali. Pantau lewat `usage.cache_read_input_tokens` di Step 5.
 - [ ] Uji endpoint ini **berdiri sendiri** (Postman/curl) sebelum disambungkan ke UI apa pun → **Step 5, menunggu `ANTHROPIC_API_KEY`**.
@@ -114,7 +115,7 @@ npx create-next-app@latest web --typescript --tailwind --app
 3. **Settings** — form + toggle, state sederhana
 4. **Broadcast** — form + tabel per marketplace
 5. **Pesanan** — 3 sub-tab + aksi massal (checklist, approve/reject)
-6. **AI Chatbot** — panel uji coba yang sudah manggil `/api/chat`
+6. **AI Chatbot** — panel uji coba yang sudah manggil `/api/chat` — ✅ **SELESAI (Step 13, dikerjakan lebih awal)**
 7. **Dashboard (Chat)** — paling kompleks: realtime, pencarian massal, modal integrasi toko → dikerjakan **terakhir**
 
 Setiap halaman dianggap selesai migrasi bila:
@@ -173,11 +174,28 @@ _Terakhir diperbarui: 31 Agustus 2026 (akhir Step 1)._
 - [x] **Fase 2 sebagian:** AI engine sudah diport ke `/api/chat` + `/api/health` (Step 4).
 - [x] **Fase 3 sebagian:** skema database ditulis (Step 6).
 
+### 🔀 Perubahan urutan: demo dulu, Supabase belakangan (31 Agu 2026)
+
+Atas permintaan pemilik proyek, urutan Fase 3–4 diubah. Prioritas
+sekarang adalah **demo untuk mengukur efektivitas penggunaan token
+Claude**, bukan kelengkapan halaman. Konsekuensinya:
+
+- **Halaman AI Chatbot (`/ai`) dikerjakan lebih dulu** — satu-satunya
+  halaman yang benar-benar memanggil Claude, jadi satu-satunya yang
+  menghasilkan angka token. Data selain hasil AI tetap hardcode.
+- **Supabase (Step 6 sisa, 7, 8) ditunda.** Skema sudah siap di
+  `supabase/schema.sql` dan tinggal dijalankan kapan pun.
+- Halaman lain (Statistik, Beranda, Broadcast, Pesanan, Chat) belum
+  dikerjakan; semuanya tidak memanggil AI sehingga tidak menambah
+  angka apa pun ke pengukuran.
+
+Rencana asli tidak dihapus — hanya diurutkan ulang.
+
 ### ⏸ Dua hal yang tertahan menunggu pemilik proyek
 1. **Step 5 — uji AI engine sungguhan:** butuh `ANTHROPIC_API_KEY` di `web/.env.local`.
-2. **Step 6 (sisa) — jalankan skema:** butuh project Supabase + jalankan `supabase/schema.sql`, lalu URL & anon key di `web/.env.local`.
+2. **Step 6 (sisa) — jalankan skema:** butuh project Supabase + jalankan `supabase/schema.sql`, lalu URL & anon key di `web/.env.local`. **DITUNDA** atas permintaan pemilik proyek.
 
-Step 7 (Auth) dan Step 8 (Pengaturan) tidak bisa dimulai sebelum nomor 2 selesai.
+Nomor 1 adalah penghalang mutlak bagi demo: efektivitas token tidak bisa diukur tanpa API key. Halaman `/ai` sudah siap menerima angkanya begitu key terpasang.
 
 ### Keputusan arsitektur yang disepakati
 1. App Next.js baru tinggal di subfolder `web/` pada repo yang sama (bukan repo terpisah); Vercel Root Directory = `web`.

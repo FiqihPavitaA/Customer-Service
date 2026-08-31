@@ -20,6 +20,7 @@ export const KB_FILES = [
   "sop.md",
   "faq-cs.md",
   "products.json",
+  "template-jawaban.md",
 ] as const;
 
 function safeRead(file: string): string {
@@ -93,6 +94,10 @@ export function getKnowledge(): Kb {
   const claudeMd = safeRead("claude.md");
   const sop = safeRead("sop.md");
   const faq = safeRead("faq-cs.md");
+  // Salinan dari "template jawaban.md" di root (nama tanpa spasi).
+  // Berisi aturan konsultasi tanaman, aturan membaca foto, dan contoh
+  // balasan per ACTION. Versi Express tidak pernah memuatnya.
+  const templates = safeRead("template-jawaban.md");
   const productsRaw = safeRead("products.json");
   const products = buildProductSummary(productsRaw);
 
@@ -101,6 +106,7 @@ export function getKnowledge(): Kb {
     "\n\n---\n# ATURAN OPERASIONAL (SOP)\n" + sop,
     "\n\n---\n# KNOWLEDGE BASE — DAFTAR PRODUK (RINGKAS)\n" + products,
     "\n\n---\n# KNOWLEDGE BASE — FAQ CS\n" + faq,
+    "\n\n---\n# ATURAN KONSULTASI & CONTOH TEMPLATE JAWABAN\n" + templates,
     OUTPUT_CONTRACT,
   ].join("\n");
 
@@ -112,6 +118,7 @@ export function getKnowledge(): Kb {
         "sop.md": sop.length,
         "faq-cs.md": faq.length,
         "products.json": productsRaw.length,
+        "template-jawaban.md": templates.length,
       },
       systemPromptChars: systemPrompt.length,
     },
