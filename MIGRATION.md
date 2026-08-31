@@ -38,21 +38,23 @@ Satu aplikasi Next.js menggantikan dua bagian terpisah yang ada sekarang (halama
 
 ## 3. Prasyarat Sebelum Mulai
 
-- [ ] **Install Node.js LTS** (belum terpasang — cek dengan `node -v`)
+- [x] **Node.js terpasang** — `v24.16.0`, npm `11.13.0` (diverifikasi 31 Agu 2026)
 - [x] Git sudah terpasang (`git version 2.54.0`)
-- [ ] Buat akun & repo **GitHub**
+- [x] Repo **GitHub** aktif: `github.com/infarmsales/Customer-Service` (branch `master`)
 - [ ] Buat project **Supabase** (gratis) — catat `Project URL` + `anon key`
 - [ ] Buat akun **Vercel**, hubungkan ke GitHub
-- [ ] API key **Anthropic** (`ANTHROPIC_API_KEY`) — sudah ada saldo $5 di console.anthropic.com
+- [ ] API key **Anthropic** (`ANTHROPIC_API_KEY`) — saldo $5 tersedia, tetapi `backend/.env` belum pernah dibuat sehingga backend Express belum pernah dijalankan dengan key
 
 ---
 
 ## 4. Tahapan Migrasi
 
-### Fase 0 — Checkpoint Aman
-- [ ] `git init` di root proyek → commit kondisi sekarang apa adanya (rollback point).
-- [ ] Push ke repo GitHub baru.
-- [ ] **Jangan hapus file HTML/CSS/JS lama** sampai migrasi selesai — dipakai sebagai referensi visual & fallback yang tetap bisa dibuka manual.
+### Fase 0 — Checkpoint Aman ✅ SELESAI (31 Agu 2026)
+- [x] `git init` di root proyek → commit kondisi sekarang apa adanya (rollback point). Riwayat commit sudah ada sejak sebelum dokumen ini dibuat.
+- [x] Push ke repo GitHub (`infarmsales/Customer-Service`).
+- [x] Branch kerja migrasi dibuat: `migrasi-nextjs`; `master` tetap utuh sebagai fallback.
+- [x] `.gitignore` root ditambahkan — `.env*`, `node_modules/`, `web/.next/`, `.vercel/` tidak akan ikut ter-commit.
+- [x] **Jangan hapus file HTML/CSS/JS lama** sampai migrasi selesai — dipakai sebagai referensi visual & fallback yang tetap bisa dibuka manual.
 
 ### Fase 1 — Scaffold Next.js
 ```bash
@@ -138,11 +140,20 @@ Setiap halaman dianggap selesai migrasi bila:
 
 ## 7. Status Saat Ini
 
-- [ ] Node.js terinstall di mesin pengembangan
-- [ ] Repo GitHub dibuat
+_Terakhir diperbarui: 31 Agustus 2026 (akhir Step 1)._
+
+- [x] Node.js terinstall di mesin pengembangan — `v24.16.0`
+- [x] Repo GitHub dibuat — `infarmsales/Customer-Service`
+- [x] Branch migrasi dibuat — `migrasi-nextjs`
+- [x] `.gitignore` root melindungi rahasia & artefak build
 - [ ] Project Supabase dibuat
 - [ ] Project Vercel dihubungkan
-- [ ] Fase 0 dimulai
+- [x] **Fase 0 selesai** — berikutnya Fase 1: scaffold Next.js di folder `web/`
+
+### Keputusan arsitektur yang disepakati
+1. App Next.js baru tinggal di subfolder `web/` pada repo yang sama (bukan repo terpisah); Vercel Root Directory = `web`.
+2. Semua pekerjaan migrasi di branch `migrasi-nextjs`; `master` tetap bisa dibuka manual sebagai fallback sampai cutover.
+3. `backend/` Express dibiarkan apa adanya sampai halaman AI Chatbot lulus uji, lalu diarsipkan ke `legacy/` bersama file HTML lama.
 
 ---
 

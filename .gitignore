@@ -1,0 +1,19 @@
+# ===== Rahasia — JANGAN PERNAH di-commit =====
+.env
+.env.*
+!.env.example
+
+# ===== Dependensi =====
+node_modules/
+
+# ===== Build Next.js (Fase 1 ke atas) =====
+web/.next/
+web/out/
+web/node_modules/
+.vercel/
+
+# ===== Sistem & editor =====
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
