@@ -80,12 +80,17 @@ npx create-next-app@latest web --typescript --tailwind --app
   | `/settings` | `settings.html` | Step 8 |
 
 ### Fase 2 — Pindahkan AI Engine Lebih Dulu (paling kritikal, dikerjakan sedini mungkin)
-- [ ] `app/api/chat/route.ts` — port logika dari `backend/server.js` + `backend/knowledge.js`:
-  - Muat `claude.md` + `sop.md` + ringkasan `products.json` + `faq-cs.md` sebagai system prompt
-  - Panggil Claude API (`@anthropic-ai/sdk`)
-  - Kembalikan `{ action, reply, usage }`
-- [ ] Uji endpoint ini **berdiri sendiri** (Postman/curl) sebelum disambungkan ke UI apa pun.
-- [ ] `ANTHROPIC_API_KEY` → `.env.local` (lokal) dan **Vercel Project Settings → Environment Variables** (produksi). Tidak pernah ditaruh di kode/commit.
+- [x] `app/api/chat/route.ts` + `lib/knowledge.ts` + `lib/claude.ts` — port dari `backend/server.js` + `backend/knowledge.js` (Step 4):
+  - Muat `claude.md` + `sop.md` + ringkasan `products.json` + `faq-cs.md` sebagai system prompt (80.373 karakter)
+  - Panggil Claude API (`@anthropic-ai/sdk` `^0.122.0`)
+  - Kembalikan `{ action, reply, model, usage }` — kontrak sama persis dengan versi Express
+- [x] `app/api/health/route.ts` ikut diport: memastikan KB terbaca & API key terpasang tanpa memanggil (dan membayar) Claude API.
+- [x] Berkas KB disalin ke `web/content/` dan didaftarkan di `outputFileTracingIncludes` (`next.config.ts`). **Wajib**: tanpa itu build Vercel tetap lolos tetapi `/api/chat` gagal membaca KB di produksi.
+- [x] **Perubahan perilaku yang disengaja:** `sop.md` kini ikut dimuat ke system prompt. `backend/knowledge.js` lama tidak pernah memuatnya, padahal MIGRATION.md §4 Fase 2 mensyaratkannya. Aturan di dalam `sop.md` sendiri tidak diubah sama sekali (§5 poin 6).
+- [x] **Tambahan hemat biaya:** system prompt ditandai `cache_control: ephemeral` (prompt caching). Isinya tidak berubah antar permintaan, jadi prefix yang sama tidak dibayar penuh berulang kali. Pantau lewat `usage.cache_read_input_tokens` di Step 5.
+- [ ] Uji endpoint ini **berdiri sendiri** (Postman/curl) sebelum disambungkan ke UI apa pun → **Step 5, menunggu `ANTHROPIC_API_KEY`**.
+  - Sudah diuji tanpa key (Step 4): `/api/health` melaporkan 4 berkas KB terbaca; `/api/chat` membalas 503 informatif tanpa key, 400 untuk body cacat, 405 untuk metode salah.
+- [ ] `ANTHROPIC_API_KEY` → `.env.local` (lokal, contoh ada di `web/.env.example`) dan **Vercel Project Settings → Environment Variables** (produksi). Tidak pernah ditaruh di kode/commit.
 
 ### Fase 3 — Supabase (Database & Auth)
 - [ ] Buat tabel sesuai skema di `claude.md` bagian Tech Stack:
@@ -158,7 +163,8 @@ _Terakhir diperbarui: 31 Agustus 2026 (akhir Step 1)._
 - [ ] Project Supabase dibuat
 - [ ] Project Vercel dihubungkan
 - [x] **Fase 0 selesai**
-- [x] **Fase 1 SELESAI** — scaffold (Step 2) + token warna & kerangka layout (Step 3). Berikutnya Fase 2/Step 4: port AI engine ke `app/api/chat/route.ts`.
+- [x] **Fase 1 SELESAI** — scaffold (Step 2) + token warna & kerangka layout (Step 3).
+- [x] **Fase 2 sebagian:** AI engine sudah diport ke `/api/chat` + `/api/health` (Step 4). Berikutnya Step 5: uji sungguhan ke Claude API — **menunggu `ANTHROPIC_API_KEY` dari pemilik proyek**.
 
 ### Keputusan arsitektur yang disepakati
 1. App Next.js baru tinggal di subfolder `web/` pada repo yang sama (bukan repo terpisah); Vercel Root Directory = `web`.
