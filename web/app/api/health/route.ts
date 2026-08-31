@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
 import { getKnowledge } from "@/lib/knowledge";
+import { templateStats } from "@/lib/templates";
 
 /* ===========================================================
    GET /api/health — port dari app.get('/api/health') di server.js.
@@ -26,5 +27,6 @@ export function GET() {
     systemPromptChars: stats.systemPromptChars,
     kbFiles: stats.files,
     missingKbFiles: missing,
+    templates: templateStats(),
   });
 }

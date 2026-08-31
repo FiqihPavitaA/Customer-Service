@@ -3,25 +3,35 @@
 import { useCallback, useEffect, useState } from "react";
 import { useToast } from "@/components/Toast";
 import { actionTagClass } from "./actionTag";
-import CostMeter, { type SessionTotals } from "./CostMeter";
-import { computeCost, type CostBreakdown, type Usage } from "@/lib/pricing";
+import CostMeter, {
+  EMPTY_SESSION,
+  type LastResult,
+  type SessionTotals,
+} from "./CostMeter";
+import { computeCost, type Usage } from "@/lib/pricing";
 
 /* ===========================================================
-   Halaman AI Chatbot — port sub-tab "Coba Balasan AI" di ai.html.
+   Halaman AI Chatbot — port sub-tab "Coba Balasan AI" di ai.html,
+   ditambah dua hal yang tidak ada di versi lama:
+   1. Pengukur token & biaya per balasan.
+   2. Saklar lapisan template, supaya biaya dengan dan tanpa
+      lapisan itu bisa dibandingkan langsung dalam satu demo.
 
-   Beda penting dari ai.js versi lama: TIDAK ADA mockClassify.
-   Versi lama diam-diam mengarang balasan contoh saat backend
-   mati, lengkap dengan label ACTION. Untuk demo yang tujuannya
-   mengukur token, itu berbahaya — jawaban palsu berbiaya nol
-   bisa terbaca seolah hasil Claude. Sekarang galatnya
-   ditampilkan apa adanya.
+   Beda penting dari ai.js lama: TIDAK ADA mockClassify. Versi lama
+   diam-diam mengarang balasan contoh saat backend mati, lengkap
+   dengan label ACTION. Untuk demo yang tujuannya mengukur token,
+   jawaban palsu berbiaya nol bisa terbaca seolah hasil Claude.
    =========================================================== */
 
-const SAMPLES = [
-  "Dosis POC Buah buat tomat berapa ya kak?",
-  "Paket saya belum sampai, sudah 7 hari",
-  "Daun cabai saya menguning kenapa ya?",
-  "Resi pesanan 240620 sudah update belum?",
+/** Dua kelompok contoh: yang dicegat template, dan yang perlu AI. */
+const SAMPLES: { pesan: string; catatan: string }[] = [
+  { pesan: "Halo kak", catatan: "template" },
+  { pesan: "Cara pakai POC gimana ya kak?", catatan: "template" },
+  { pesan: "Harga produk ini berapa ya?", catatan: "template" },
+  { pesan: "Paket saya rusak pas sampai", catatan: "template" },
+  { pesan: "Daun cabai saya menguning kenapa ya?", catatan: "perlu AI" },
+  { pesan: "POC Buah cocok nggak buat anggrek?", catatan: "perlu AI" },
+  { pesan: "Paket saya sudah 7 hari belum sampai, saya mau refund", catatan: "perlu AI" },
 ];
 
 const STATS = [
@@ -37,16 +47,17 @@ type Health = {
   systemPromptChars: number;
   kbFiles: Record<string, number>;
   missingKbFiles: string[];
+  templates?: { rules: number; templates: number };
 };
 
-type ChatOk = { action: string; reply: string; model: string; usage: Usage };
-
-const EMPTY_SESSION: SessionTotals = {
-  messages: 0,
-  usd: 0,
-  usdWithoutCache: 0,
-  inputTokens: 0,
-  outputTokens: 0,
+type ChatResponse = {
+  action: string;
+  reply: string;
+  model: string | null;
+  usage: Usage | null;
+  source?: "ai" | "template";
+  templateCode?: string;
+  templateWhy?: string;
 };
 
 export default function AiChatbot() {
@@ -57,11 +68,12 @@ export default function AiChatbot() {
   const [healthFailed, setHealthFailed] = useState(false);
 
   const [aiOn, setAiOn] = useState(true);
+  const [useTemplates, setUseTemplates] = useState(true);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const [result, setResult] = useState<ChatOk | null>(null);
-  const [cost, setCost] = useState<CostBreakdown | null>(null);
+  const [result, setResult] = useState<ChatResponse | null>(null);
+  const [last, setLast] = useState<LastResult>(null);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<SessionTotals>(EMPTY_SESSION);
 
@@ -73,7 +85,7 @@ export default function AiChatbot() {
       .catch(() => setHealthFailed(true));
   }, []);
 
-  // ---------- Minta balasan AI ----------
+  // ---------- Minta balasan ----------
   const askAI = useCallback(async () => {
     const msg = message.trim();
     if (!msg) {
@@ -93,41 +105,50 @@ export default function AiChatbot() {
         headers: { "Content-Type": "application/json" },
         // history sengaja kosong: tiap pengujian berdiri sendiri supaya
         // angka token bisa dibandingkan antar percobaan.
-        body: JSON.stringify({ message: msg, history: [] }),
+        body: JSON.stringify({ message: msg, history: [], useTemplates }),
       });
       const data = await r.json();
 
       if (!r.ok) {
         setResult(null);
-        setCost(null);
+        setLast(null);
         setError(data?.error ?? `Permintaan gagal (HTTP ${r.status}).`);
-        toast("Gagal meminta balasan AI");
+        toast("Gagal meminta balasan");
         return;
       }
 
-      const ok = data as ChatOk;
-      const breakdown = computeCost(ok.model, ok.usage ?? {});
+      const ok = data as ChatResponse;
       setResult(ok);
-      setCost(breakdown);
-      setSession((s) => ({
-        messages: s.messages + 1,
-        usd: s.usd + breakdown.usd,
-        usdWithoutCache: s.usdWithoutCache + breakdown.usdWithoutCache,
-        inputTokens: s.inputTokens + breakdown.totalInputTokens,
-        outputTokens: s.outputTokens + breakdown.outputTokens,
-      }));
-      toast("Balasan dari Claude siap ✨");
+
+      if (ok.source === "template") {
+        setLast({ source: "template", code: ok.templateCode ?? "?" });
+        setSession((s) => ({
+          ...s,
+          messages: s.messages + 1,
+          templateMessages: s.templateMessages + 1,
+        }));
+        toast(`Dijawab template [${ok.templateCode}] — Rp 0 ⚡`);
+      } else {
+        const cost = computeCost(ok.model ?? "", ok.usage ?? {});
+        setLast({ source: "ai", cost, model: ok.model ?? "?" });
+        setSession((s) => ({
+          messages: s.messages + 1,
+          aiMessages: s.aiMessages + 1,
+          templateMessages: s.templateMessages,
+          usd: s.usd + cost.usd,
+          usdWithoutCache: s.usdWithoutCache + cost.usdWithoutCache,
+        }));
+        toast("Balasan dari Claude siap ✨");
+      }
     } catch (e) {
       setResult(null);
-      setCost(null);
-      setError(
-        "Tidak bisa menghubungi /api/chat: " + (e as Error).message,
-      );
+      setLast(null);
+      setError("Tidak bisa menghubungi /api/chat: " + (e as Error).message);
       toast("Gagal menghubungi server");
     } finally {
       setBusy(false);
     }
-  }, [aiOn, message, toast]);
+  }, [aiOn, message, toast, useTemplates]);
 
   // ---------- Status ringkas di kanan atas ----------
   let statusText = "memeriksa…";
@@ -179,9 +200,9 @@ export default function AiChatbot() {
           <h2 className="mt-0 mb-2 text-xl font-bold">🚩 Flag Koreksi Jawaban AI</h2>
           <p className="m-0 text-text-2">
             Belum dimigrasi. Sub-tab ini menunggu tabel <code>ai_flags</code> di
-            Supabase (Step 6) — versi lamanya menyimpan data di{" "}
-            <code>localStorage</code>, sehingga daftar flag tiap admin berbeda
-            dan hasil review tidak terlihat oleh siapa pun.
+            Supabase — versi lamanya menyimpan data di <code>localStorage</code>,
+            sehingga daftar flag tiap admin berbeda dan hasil review tidak
+            terlihat oleh siapa pun.
           </p>
         </div>
       ) : (
@@ -210,12 +231,18 @@ export default function AiChatbot() {
             </p>
             {health && (
               <p className="mt-3 mb-0 text-[0.86rem] text-muted">
-                Knowledge base aktif: {Object.keys(health.kbFiles).length} berkas
-                ·{" "}
+                Knowledge base: {Object.keys(health.kbFiles).length} berkas ·{" "}
                 <span className="font-mono">
                   {health.systemPromptChars.toLocaleString("id-ID")}
                 </span>{" "}
                 karakter system prompt
+                {health.templates && (
+                  <>
+                    {" "}
+                    · lapisan template: {health.templates.templates} balasan baku,{" "}
+                    {health.templates.rules} aturan pencocokan
+                  </>
+                )}
                 {health.missingKbFiles.length > 0 && (
                   <span className="text-[#b91c1c]">
                     {" "}
@@ -232,26 +259,47 @@ export default function AiChatbot() {
               <div className="mb-3">
                 <h2 className="m-0 text-lg font-bold">🤖 Coba Balasan AI</h2>
                 <p className="mt-1 mb-0 text-[0.9rem] text-muted">
-                  Ketik pesan pelanggan → AI mengklasifikasikan tindakan &amp;
-                  menyusun balasan sesuai <b>claude.md</b>.
+                  Ketik pesan pelanggan → dicocokkan dulu ke template baku;
+                  kalau tidak tertangani, baru diteruskan ke Claude.
                 </p>
               </div>
 
-              <label className="mb-2 flex items-center gap-2 text-[0.9rem] font-semibold text-text-2">
-                <input
-                  type="checkbox"
-                  checked={aiOn}
-                  onChange={(e) => {
-                    setAiOn(e.target.checked);
-                    toast(
-                      e.target.checked
-                        ? "Rekomendasi Balasan AI aktif"
-                        : "Rekomendasi Balasan AI dimatikan",
-                    );
-                  }}
-                />
-                Rekomendasi Balasan AI
-              </label>
+              <div className="mb-3 flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-[0.9rem] font-semibold text-text-2">
+                  <input
+                    type="checkbox"
+                    checked={aiOn}
+                    onChange={(e) => {
+                      setAiOn(e.target.checked);
+                      toast(
+                        e.target.checked
+                          ? "Rekomendasi Balasan AI aktif"
+                          : "Rekomendasi Balasan AI dimatikan",
+                      );
+                    }}
+                  />
+                  Rekomendasi Balasan AI
+                </label>
+
+                <label className="flex items-center gap-2 text-[0.9rem] font-semibold text-text-2">
+                  <input
+                    type="checkbox"
+                    checked={useTemplates}
+                    onChange={(e) => {
+                      setUseTemplates(e.target.checked);
+                      toast(
+                        e.target.checked
+                          ? "Lapisan template aktif — pertanyaan baku tidak dikirim ke Claude"
+                          : "Lapisan template dimatikan — semua pertanyaan dikirim ke Claude",
+                      );
+                    }}
+                  />
+                  Lapisan template
+                  <span className="text-xs font-normal text-muted">
+                    (matikan untuk membandingkan biaya)
+                  </span>
+                </label>
+              </div>
 
               <textarea
                 rows={4}
@@ -267,12 +315,23 @@ export default function AiChatbot() {
               <div className="my-2.5 flex flex-wrap gap-2">
                 {SAMPLES.map((s) => (
                   <button
-                    key={s}
+                    key={s.pesan}
                     type="button"
-                    onClick={() => setMessage(s)}
-                    className="cursor-pointer rounded-lg border border-line bg-white px-2.5 py-1.5 text-left text-xs text-text-2"
+                    onClick={() => setMessage(s.pesan)}
+                    title={
+                      s.catatan === "template"
+                        ? "Contoh yang seharusnya dicegat template (Rp 0)"
+                        : "Contoh yang memang perlu Claude"
+                    }
+                    className={[
+                      "cursor-pointer rounded-lg border px-2.5 py-1.5 text-left text-xs",
+                      s.catatan === "template"
+                        ? "border-green/40 bg-green-mint text-green-dark"
+                        : "border-line bg-white text-text-2",
+                    ].join(" ")}
                   >
-                    {s}
+                    {s.catatan === "template" ? "⚡ " : "🤖 "}
+                    {s.pesan}
                   </button>
                 ))}
               </div>
@@ -300,7 +359,7 @@ export default function AiChatbot() {
               {result && !error && (
                 <div className="mt-4 rounded-xl border border-line bg-green-soft p-4">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="text-[0.86rem] text-text-2">Tindakan AI:</span>
+                    <span className="text-[0.86rem] text-text-2">Tindakan:</span>
                     <span
                       className={`rounded-md px-1.5 py-0.5 text-[0.6rem] font-extrabold ${actionTagClass(
                         result.action,
@@ -308,11 +367,24 @@ export default function AiChatbot() {
                     >
                       {result.action}
                     </span>
-                    <span className="text-xs text-muted">
-                      Claude · {result.model}
-                    </span>
+                    {result.source === "template" ? (
+                      <span className="rounded-md bg-green-mint px-1.5 py-0.5 text-[0.6rem] font-extrabold text-green-dark">
+                        ⚡ TEMPLATE [{result.templateCode}] · Rp 0
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted">
+                        🤖 Claude · {result.model}
+                      </span>
+                    )}
                   </div>
                   <div className="whitespace-pre-wrap">{result.reply}</div>
+
+                  {result.templateWhy && (
+                    <p className="mt-3 mb-0 rounded-lg bg-white px-3 py-2 text-xs text-muted">
+                      <b>Kenapa aman tanpa AI:</b> {result.templateWhy}
+                    </p>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => {
@@ -329,14 +401,13 @@ export default function AiChatbot() {
               {!result && !error && (
                 <div className="mt-4 rounded-xl border border-dashed border-line py-8 text-center text-muted">
                   <div className="text-3xl">💬</div>
-                  <p className="mt-2 mb-0">Balasan AI akan muncul di sini.</p>
+                  <p className="mt-2 mb-0">Balasan akan muncul di sini.</p>
                 </div>
               )}
             </section>
 
             <CostMeter
-              cost={cost}
-              model={result?.model ?? health?.model ?? null}
+              last={last}
               session={session}
               onReset={() => {
                 setSession(EMPTY_SESSION);

@@ -2,14 +2,20 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
 import { getKnowledge, parseAction } from "@/lib/knowledge";
+import { matchTemplate } from "@/lib/templates";
 
 /* ===========================================================
    POST /api/chat — port dari app.post('/api/chat') di server.js.
 
-   Kontrak masuk : { message: string, history?: [{role, content}] }
-   Kontrak keluar: { action, reply, model, usage }
-   Sengaja dijaga sama persis supaya UI lama (ai.js, dashboard.js)
-   maupun halaman React baru bisa memakai endpoint yang sama.
+   Kontrak masuk : { message, history?, useTemplates? }
+   Kontrak keluar: { action, reply, model, usage, source, ... }
+   Bidang lama (action, reply, model, usage) dijaga sama persis
+   supaya UI lama (ai.js, dashboard.js) tetap jalan; bidang baru
+   hanya tambahan.
+
+   Dua lapisan:
+   1. Template baku dari faq-cs.md — tanpa memanggil Claude, Rp 0.
+   2. Claude, untuk apa pun yang tidak tertangani lapisan 1.
    =========================================================== */
 
 export const runtime = "nodejs";
@@ -18,18 +24,37 @@ export const dynamic = "force-dynamic";
 type IncomingMessage = { role?: string; content?: string };
 
 export async function POST(req: Request) {
-  let body: { message?: unknown; history?: unknown };
+  let body: { message?: unknown; history?: unknown; useTemplates?: unknown };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Body harus JSON yang valid." }, { status: 400 });
   }
 
-  const { message, history } = body ?? {};
+  const { message, history, useTemplates } = body ?? {};
   if (!message || typeof message !== "string") {
     return NextResponse.json({ error: 'Field "message" wajib diisi.' }, { status: 400 });
   }
 
+  // ---------- Lapisan 1: template baku ----------
+  // Dilewati bila pemanggil mengirim useTemplates:false — dipakai
+  // panel demo untuk membandingkan biaya dengan dan tanpa lapisan ini.
+  if (useTemplates !== false) {
+    const hit = matchTemplate(message);
+    if (hit) {
+      return NextResponse.json({
+        action: hit.action,
+        reply: hit.reply,
+        model: null,
+        usage: null,
+        source: "template",
+        templateCode: hit.code,
+        templateWhy: hit.why,
+      });
+    }
+  }
+
+  // ---------- Lapisan 2: Claude ----------
   const client = getClient();
   if (!client) {
     return NextResponse.json(
@@ -82,6 +107,7 @@ export async function POST(req: Request) {
       reply, // teks balasan untuk pelanggan
       model: MODEL,
       usage: response.usage, // jumlah token (untuk estimasi biaya)
+      source: "ai",
     });
   } catch (err) {
     // Kelas error spesifik dulu, baru yang umum.

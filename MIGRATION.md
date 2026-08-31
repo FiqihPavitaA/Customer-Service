@@ -204,6 +204,46 @@ Claude**, bukan kelengkapan halaman. Konsekuensinya:
 
 Rencana asli tidak dihapus — hanya diurutkan ulang.
 
+### 🧱 Lapisan template sebelum AI (Step 15, 31 Agu 2026)
+
+Ditambahkan atas usul pemilik proyek: pesan pelanggan dicocokkan
+dulu ke balasan baku; hanya yang tidak tertangani diteruskan ke
+Claude.
+
+- **Sumber template:** `content/faq-cs.md` — ternyata bukan sekadar
+  FAQ, melainkan pustaka **152 balasan baku** tim CS berkode
+  `### [KODE]`. Berkas yang sama tetap ikut ke system prompt, jadi
+  tidak ada penggandaan isi.
+- **Modul:** `web/lib/templates.ts` — 12 aturan pencocokan, tiap
+  aturan mencatat alasan mengapa aman ditangani tanpa AI.
+- **Tiga pengaman**, karena salah balas lebih mahal daripada biaya AI:
+  1. Kata yang menuntut penilaian (`kenapa`, `boleh nggak`, `cocok
+     nggak`, `bagusnya`, `campur`, …) **selalu** dilempar ke AI.
+  2. Pesan lebih dari 180 karakter dilempar ke AI — biasanya
+     bercerita atau berlapis, bukan pertanyaan baku.
+  3. Aturan `unless`: mis. "lacak" cocok, tetapi bila ada kata
+     "belum sampai/refund/komplain" pencocokan dibatalkan.
+- **Endpoint:** `/api/chat` menerima `useTemplates` (default true).
+  Bila cocok → `{ source: "template", templateCode, usage: null }`
+  tanpa memanggil Claude. Bidang lama (`action`, `reply`, `model`,
+  `usage`) tetap ada supaya UI lama tidak rusak.
+- **Halaman /ai** dapat saklar "Lapisan template" untuk
+  membandingkan biaya menyala vs mati dalam satu demo, dan panel
+  pengukur kini melaporkan berapa persen pertanyaan yang dicegat.
+
+**Hasil uji.** Pencocok diuji terhadap 21 kasus — 14 seharusnya
+dicegat, 7 seharusnya lolos ke AI — **21/21 benar**. Uji A/B lewat
+HTTP dengan pertanyaan sama ("Cara pakai POC gimana ya kak?"):
+
+| | Sumber | Waktu | Biaya |
+|---|---|---|---|
+| Lapisan template menyala | `[PAKAI POC]` | 0,1 detik | **Rp 0** |
+| Lapisan template dimatikan | Claude | 5,9 detik | Rp 2.083 |
+
+Isi jawabannya setara — keduanya menyebut dosis 2 pump per liter,
+siram merata, seminggu sekali — karena template memang sumber yang
+sama dengan yang dibaca AI.
+
 ### ⏸ Yang tertahan menunggu pemilik proyek
 1. ~~**Step 5 — uji AI engine sungguhan**~~ ✅ selesai 31 Agu 2026.
 2. **Step 6 (sisa) — jalankan skema:** butuh project Supabase + jalankan `supabase/schema.sql`, lalu URL & anon key di `web/.env.local`. **DITUNDA** atas permintaan pemilik proyek.
