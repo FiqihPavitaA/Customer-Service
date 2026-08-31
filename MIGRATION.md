@@ -60,15 +60,12 @@ Satu aplikasi Next.js menggantikan dua bagian terpisah yang ada sekarang (halama
 ```bash
 npx create-next-app@latest web --typescript --tailwind --app
 ```
-- [ ] Struktur folder: `web/app/`, `web/app/api/`, `web/lib/`, `web/components/`
-- [ ] Isi `tailwind.config.ts` dengan palet hijau dari `claude.md`:
-  ```ts
-  colors: {
-    green: { DEFAULT: '#16a34a', hover: '#128a3e', dark: '#15803d', soft: '#f4fbf6', mint: '#ecfdf3' },
-    page: '#eef7f0',
-  }
-  ```
-- [ ] Buat komponen layout bersama: `<TopBar>`, `<Rail>` (sidebar ikon), `<Toast>` — dipakai di semua halaman via `app/(dashboard)/layout.tsx`.
+- [x] **Scaffold selesai (31 Agu 2026)** — Next.js `16.3.3`, React `19.2.8`, TypeScript, App Router, Turbopack, ESLint. Build produksi & dev server sudah diverifikasi hijau.
+- [x] **Port dev dikunci ke 3100** (`next dev -p 3100`). Alasan: port 3000 di mesin ini sudah dipakai proyek Next.js lain (website infarm.id), dan 3000 juga port default `backend/server.js`. Dengan 3100, app lama dan app baru bisa hidup berdampingan untuk perbandingan sisi-bersisi di Fase 6.
+- [ ] Struktur folder: `web/app/`, `web/app/api/`, `web/lib/`, `web/components/` — dilanjutkan di Step 3
+- [ ] Palet hijau dari `claude.md` (`#16a34a`, hover `#128a3e`, dark `#15803d`, soft `#f4fbf6`, mint `#ecfdf3`, page `#eef7f0`) — dilanjutkan di Step 3.
+  > ⚠️ **Koreksi rencana:** `create-next-app` sekarang memasang **Tailwind v4**, yang **tidak lagi memakai `tailwind.config.ts`**. Palet didefinisikan sebagai CSS custom properties di blok `@theme` dalam `app/globals.css`. Hasil akhirnya sama (`bg-green`, `text-green-dark`, dst.), hanya lokasinya berbeda dari yang tertulis di rencana awal.
+- [ ] Buat komponen layout bersama: `<TopBar>`, `<Rail>` (sidebar ikon), `<Toast>` — dipakai di semua halaman via `app/(dashboard)/layout.tsx` — dilanjutkan di Step 3
 
 ### Fase 2 — Pindahkan AI Engine Lebih Dulu (paling kritikal, dikerjakan sedini mungkin)
 - [ ] `app/api/chat/route.ts` — port logika dari `backend/server.js` + `backend/knowledge.js`:
@@ -148,7 +145,8 @@ _Terakhir diperbarui: 31 Agustus 2026 (akhir Step 1)._
 - [x] `.gitignore` root melindungi rahasia & artefak build
 - [ ] Project Supabase dibuat
 - [ ] Project Vercel dihubungkan
-- [x] **Fase 0 selesai** — berikutnya Fase 1: scaffold Next.js di folder `web/`
+- [x] **Fase 0 selesai**
+- [x] **Fase 1 sebagian:** scaffold Next.js di `web/` sudah berdiri (Step 2). Berikutnya Step 3: token warna + layout bersama.
 
 ### Keputusan arsitektur yang disepakati
 1. App Next.js baru tinggal di subfolder `web/` pada repo yang sama (bukan repo terpisah); Vercel Root Directory = `web`.
