@@ -62,10 +62,22 @@ npx create-next-app@latest web --typescript --tailwind --app
 ```
 - [x] **Scaffold selesai (31 Agu 2026)** — Next.js `16.3.3`, React `19.2.8`, TypeScript, App Router, Turbopack, ESLint. Build produksi & dev server sudah diverifikasi hijau.
 - [x] **Port dev dikunci ke 3100** (`next dev -p 3100`). Alasan: port 3000 di mesin ini sudah dipakai proyek Next.js lain (website infarm.id), dan 3000 juga port default `backend/server.js`. Dengan 3100, app lama dan app baru bisa hidup berdampingan untuk perbandingan sisi-bersisi di Fase 6.
-- [ ] Struktur folder: `web/app/`, `web/app/api/`, `web/lib/`, `web/components/` — dilanjutkan di Step 3
-- [ ] Palet hijau dari `claude.md` (`#16a34a`, hover `#128a3e`, dark `#15803d`, soft `#f4fbf6`, mint `#ecfdf3`, page `#eef7f0`) — dilanjutkan di Step 3.
+- [x] Struktur folder: `web/app/`, `web/lib/`, `web/components/` (Step 3). `web/app/api/` dibuat di Step 4 bersama endpoint chat.
+- [x] Palet hijau dari `claude.md` (`#16a34a`, hover `#128a3e`, dark `#15803d`, soft `#f4fbf6`, mint `#ecfdf3`, page `#eef7f0`) + warna teks/garis + warna marketplace, semuanya di blok `@theme` pada `app/globals.css` (Step 3). Breakpoint baku claude.md (480/760/980/1180px) ikut didaftarkan sebagai varian `max-mini`/`max-mobile`/`max-tablet`/`max-wide`.
   > ⚠️ **Koreksi rencana:** `create-next-app` sekarang memasang **Tailwind v4**, yang **tidak lagi memakai `tailwind.config.ts`**. Palet didefinisikan sebagai CSS custom properties di blok `@theme` dalam `app/globals.css`. Hasil akhirnya sama (`bg-green`, `text-green-dark`, dst.), hanya lokasinya berbeda dari yang tertulis di rencana awal.
-- [ ] Buat komponen layout bersama: `<TopBar>`, `<Rail>` (sidebar ikon), `<Toast>` — dipakai di semua halaman via `app/(dashboard)/layout.tsx` — dilanjutkan di Step 3
+- [x] Komponen layout bersama `<TopBar>`, `<Rail>`, `<Toast>` dipakai semua halaman via `app/(dashboard)/layout.tsx` (Step 3). Rail otomatis menandai menu aktif dari URL; `<Toast>` memakai React context (`useToast()`) menggantikan helper `toast()` global di `dashboard.js`.
+- [x] Tujuh route placeholder dibuat supaya rail sudah bisa diklik dan tiap halaman jujur menyebut step migrasinya:
+
+  | Route baru | Halaman lama | Dimigrasi pada |
+  |---|---|---|
+  | `/` | `index.html` | Step 7 (Supabase Auth) |
+  | `/beranda` | `beranda.html` | Step 10 |
+  | `/chat` | `dashboard.html` | Step 14 |
+  | `/pesanan` | `pesanan.html` | Step 12 |
+  | `/ai` | `ai.html` | Step 13 |
+  | `/broadcast` | `broadcast.html` | Step 11 |
+  | `/statistik` | `statistik.html` | Step 9 |
+  | `/settings` | `settings.html` | Step 8 |
 
 ### Fase 2 — Pindahkan AI Engine Lebih Dulu (paling kritikal, dikerjakan sedini mungkin)
 - [ ] `app/api/chat/route.ts` — port logika dari `backend/server.js` + `backend/knowledge.js`:
@@ -146,7 +158,7 @@ _Terakhir diperbarui: 31 Agustus 2026 (akhir Step 1)._
 - [ ] Project Supabase dibuat
 - [ ] Project Vercel dihubungkan
 - [x] **Fase 0 selesai**
-- [x] **Fase 1 sebagian:** scaffold Next.js di `web/` sudah berdiri (Step 2). Berikutnya Step 3: token warna + layout bersama.
+- [x] **Fase 1 SELESAI** — scaffold (Step 2) + token warna & kerangka layout (Step 3). Berikutnya Fase 2/Step 4: port AI engine ke `app/api/chat/route.ts`.
 
 ### Keputusan arsitektur yang disepakati
 1. App Next.js baru tinggal di subfolder `web/` pada repo yang sama (bukan repo terpisah); Vercel Root Directory = `web`.
