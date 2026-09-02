@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RAIL_FOOT, RAIL_MAIN, type RailItem } from "@/lib/nav";
+import { useUnreadCount } from "@/lib/db";
 
 /* ===========================================================
    Rail ikon — pengganti <nav class="rail"> + rail.js.
@@ -10,11 +11,12 @@ import { RAIL_FOOT, RAIL_MAIN, type RailItem } from "@/lib/nav";
    ≤760px : bilah navigasi horizontal yang bisa digeser
             (claude.md → "Rail navigasi → bottom nav di mobile").
 
-   TODO Fase 3: angka badge masih dummy (sama seperti rail.js),
-   diganti query realtime Supabase saat halaman Chat dimigrasi.
+   Step 6b: angka badge tidak lagi dummy. Dihitung dari jumlah
+   percakapan belum dibaca di store (lib/db/store.ts), yang
+   bentuknya sudah sama dengan kolom `conversations.unread`.
+   Begitu Supabase menyala, useUnreadCount() tinggal diganti
+   menjadi langganan realtime — komponen ini tidak berubah.
    =========================================================== */
-
-const UNREAD_DUMMY = 2;
 
 function formatUnread(n: number) {
   return n > 99 ? "99+" : String(n);
@@ -54,20 +56,25 @@ function RailLink({
 
 export default function Rail() {
   const pathname = usePathname();
+  const unread = useUnreadCount();
+
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (
     <nav
       aria-label="Navigasi utama"
-      className="flex w-16 shrink-0 flex-col items-center gap-1.5 bg-green py-3.5 max-mobile:w-full max-mobile:flex-row max-mobile:justify-start max-mobile:gap-1 max-mobile:overflow-x-auto max-mobile:px-2 max-mobile:py-1.5"
+      /* order-2 di mobile: rail turun ke BAWAH konten, bukan menyisip
+         di antara topbar dan halaman (claude.md → "rail berubah jadi
+         bilah navigasi bawah"). */
+      className="flex w-16 shrink-0 flex-col items-center gap-1.5 bg-green py-3.5 max-mobile:order-2 max-mobile:w-full max-mobile:flex-row max-mobile:justify-start max-mobile:gap-1 max-mobile:overflow-x-auto max-mobile:px-2 max-mobile:py-1.5"
     >
       {RAIL_MAIN.map((item) => (
         <RailLink
           key={item.href}
           item={item}
           active={isActive(item.href)}
-          unread={UNREAD_DUMMY}
+          unread={unread}
         />
       ))}
 
@@ -78,7 +85,7 @@ export default function Rail() {
           key={item.href}
           item={item}
           active={isActive(item.href)}
-          unread={UNREAD_DUMMY}
+          unread={unread}
         />
       ))}
     </nav>

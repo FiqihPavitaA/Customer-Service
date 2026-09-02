@@ -43,7 +43,7 @@ Satu aplikasi Next.js menggantikan dua bagian terpisah yang ada sekarang (halama
 - [x] Repo **GitHub** aktif: `github.com/infarmsales/Customer-Service` (branch `master`)
 - [ ] Buat project **Supabase** (gratis) — catat `Project URL` + `anon key`
 - [ ] Buat akun **Vercel**, hubungkan ke GitHub
-- [ ] API key **Anthropic** (`ANTHROPIC_API_KEY`) — saldo $5 tersedia, tetapi `backend/.env` belum pernah dibuat sehingga backend Express belum pernah dijalankan dengan key
+- [x] API key **Anthropic** (`ANTHROPIC_API_KEY`) — sudah terpasang di `web/.env.local` dan terbukti dipakai pada Step 5 (31 Agu 2026). Belum dipasang di Vercel (menunggu Fase 5).
 
 ---
 
@@ -104,10 +104,11 @@ npx create-next-app@latest web --typescript --tailwind --app
     - trafik jarang (jarak > 5 menit) → ±Rp 2.090/chat
   - Kesimpulan: pengungkit terbesar bukan caching, melainkan **memperkecil apa yang dikirim**. Susunan system prompt: `faq-cs.md` 46%, `claude.md` 25%, ringkasan produk 24%, sisanya SOP + template.
   - Sudah diuji tanpa key (Step 4): `/api/health` melaporkan 4 berkas KB terbaca; `/api/chat` membalas 503 informatif tanpa key, 400 untuk body cacat, 405 untuk metode salah.
-- [ ] `ANTHROPIC_API_KEY` → `.env.local` (lokal, contoh ada di `web/.env.example`) dan **Vercel Project Settings → Environment Variables** (produksi). Tidak pernah ditaruh di kode/commit.
+- [x] `ANTHROPIC_API_KEY` → `web/.env.local` (lokal, contoh ada di `web/.env.example`) — terpasang & terpakai di Step 5. Tidak pernah ditaruh di kode/commit.
+- [ ] `ANTHROPIC_API_KEY` → **Vercel Project Settings → Environment Variables** (produksi) — dikerjakan bersama Fase 5.
 
 ### Fase 3 — Supabase (Database & Auth)
-- [x] **Skema ditulis (Step 6)** di `supabase/schema.sql` — idempoten, siap ditempel ke SQL Editor. Panduan langkah demi langkah: `supabase/README.md`.
+- [x] **Skema ditulis (Step 6a)** di `supabase/schema.sql` — idempoten, siap ditempel ke SQL Editor. Panduan langkah demi langkah: `supabase/README.md`.
   - `conversations` — sesuai `claude.md`, **plus 7 kolom** yang memang ditampilkan `dashboard.html` lama (`customer_name`, `shop_name`, `unread`, `tracking_no`, `ai_suggestion`, `handover_detail`, `last_message_at`). Tanpa kolom ini, Step 14 butuh migrasi skema kedua.
   - `escalations` — persis `claude.md`, tanpa tambahan.
   - `settings` — satu baris, menggantikan `localStorage` di `settings.js`.
@@ -174,7 +175,7 @@ Setiap halaman dianggap selesai migrasi bila:
 
 ## 7. Status Saat Ini
 
-_Terakhir diperbarui: 31 Agustus 2026 (akhir Step 1)._
+_Terakhir diperbarui: 2 September 2026 (setelah Step 6b mode demo). Rekap per-step ada di tabel di bawah._
 
 - [x] Node.js terinstall di mesin pengembangan — `v24.16.0`
 - [x] Repo GitHub dibuat — `infarmsales/Customer-Service`
@@ -184,8 +185,48 @@ _Terakhir diperbarui: 31 Agustus 2026 (akhir Step 1)._
 - [ ] Project Vercel dihubungkan
 - [x] **Fase 0 selesai**
 - [x] **Fase 1 SELESAI** — scaffold (Step 2) + token warna & kerangka layout (Step 3).
-- [x] **Fase 2 sebagian:** AI engine sudah diport ke `/api/chat` + `/api/health` (Step 4).
-- [x] **Fase 3 sebagian:** skema database ditulis (Step 6).
+- [x] **Fase 2 hampir selesai:** AI engine diport ke `/api/chat` + `/api/health` (Step 4) dan sudah diuji dengan API key sungguhan (Step 5). Sisa: pasang `ANTHROPIC_API_KEY` di Vercel (Fase 5).
+- [x] **Fase 3 sebagian:** skema ditulis (Step 6a) + lapisan data mode demo yang sudah berbentuk skema itu (Step 6b-demo); belum dijalankan di database nyata (Step 6b).
+- [x] **Fase 4 SELESAI (mode demo):** ketujuh halaman console sudah dimigrasi ke React; datanya masih seed di memori.
+
+### 📋 Rekap Step 1–15 (diverifikasi 2 Sep 2026)
+
+Daftar tunggal semua step bernomor beserta buktinya. Nomor step
+mengacu pada penamaan commit; step yang belum dikerjakan memakai
+nomor yang sudah dijanjikan di tabel route (§4 Fase 1).
+
+| Step | Isi | Fase | Bukti / commit | Status |
+|---|---|---|---|---|
+| 1 | Checkpoint aman: `git init`, push GitHub, branch `migrasi-nextjs`, `.gitignore` root | 0 | `102bbfc` | ✅ Selesai |
+| 2 | Scaffold Next.js di `web/` — Next 16.3.3, React 19, TS, Tailwind v4, port dev 3100 | 1 | `e815f7e` | ✅ Selesai |
+| 3 | Token warna hijau di `@theme` + layout bersama (`TopBar`/`Rail`/`Toast`) + 7 route placeholder | 1 | `ac3e599` | ✅ Selesai |
+| 4 | Port AI engine: `app/api/chat/route.ts`, `/api/health`, `lib/knowledge.ts`, `lib/claude.ts`, KB → `web/content/` | 2 | `ed0ae7e`, `12aaeba` | ✅ Selesai |
+| 5 | Uji AI engine sungguhan: 4 pesan → 4 ACTION benar, ukur token & biaya, temuan TTL cache 5 menit | 2 | `edf4989` | ✅ Selesai |
+| 6a | **Tulis** skema `supabase/schema.sql` (5 tabel + RLS + Realtime) + `supabase/README.md` | 3 | `4a07318` | ✅ Selesai |
+| 6b-demo | Lapisan data `web/lib/db/` — tipe TS dari `schema.sql` + seed dari mock lama + satu titik tukar ke Supabase | 3 | `lib/db/` | ✅ Selesai |
+| 6b | **Jalankan** skema di project Supabase nyata + isi URL & anon key di `web/.env.local` | 3 | — | ⛔ Ditunda — menunggu pemilik proyek |
+| 7 | Login hardcode → Supabase Auth (route `/`) | 3 | — | ⛔ Belum |
+| 8 | Halaman Settings; pengaturan AI pindah dari `localStorage` → store berbentuk tabel `settings` | 3 & 4 | `components/settings/` | ✅ Selesai (mode demo) |
+| 9 | Migrasi halaman Statistik | 4 | `components/statistik/` | ✅ Selesai (mode demo) |
+| 10 | Migrasi halaman Beranda | 4 | `components/beranda/` | ✅ Selesai (mode demo) |
+| 11 | Migrasi halaman Broadcast | 4 | `components/broadcast/` | ✅ Selesai (mode demo) |
+| 12 | Migrasi halaman Pesanan (+ Quick Chat) | 4 | `components/pesanan/` | ✅ Selesai (mode demo) |
+| 13 | Halaman AI Chatbot `/ai` + pengukur token & biaya — **dikerjakan lebih awal** | 4 | `cfc98f2` | ✅ Selesai |
+| 14 | Migrasi halaman Chat/Dashboard (paling kompleks, dikerjakan terakhir) | 4 | `components/chat/` | ✅ Selesai (mode demo) |
+| 15 | Lapisan template sebelum AI (`lib/templates.ts`, 12 aturan, uji 21/21) | Tambahan | `abd8d37` | ✅ Selesai |
+
+**Ringkasan:** 14 step selesai (1, 2, 3, 4, 5, 6a, 6b-demo, 8, 9, 10, 11,
+12, 13, 15) — 2 step belum (6b, 7), keduanya butuh project Supabase
+nyata. Ketujuh halaman console sudah jadi; tidak ada lagi placeholder.
+
+> "Selesai (mode demo)" berarti tampilan & interaksi halaman sudah
+> setara versi HTML lama dan datanya sudah berbentuk baris
+> `schema.sql`, tetapi masih dari seed di memori. Yang tersisa untuk
+> halaman-halaman itu hanya menukar sumber data di `lib/db/index.ts`.
+
+**Belum bernomor step** (dicatat di §4 sebagai fase, bukan step):
+Fase 5 (GitHub → Vercel) dan Fase 6 (uji `TEST-PLAN-SINKRONISASI.md`
++ cutover + arsip `legacy/`) — keduanya belum dikerjakan.
 
 ### 🔀 Perubahan urutan: demo dulu, Supabase belakangan (31 Agu 2026)
 
@@ -196,7 +237,7 @@ Claude**, bukan kelengkapan halaman. Konsekuensinya:
 - **Halaman AI Chatbot (`/ai`) dikerjakan lebih dulu** — satu-satunya
   halaman yang benar-benar memanggil Claude, jadi satu-satunya yang
   menghasilkan angka token. Data selain hasil AI tetap hardcode.
-- **Supabase (Step 6 sisa, 7, 8) ditunda.** Skema sudah siap di
+- **Supabase (Step 6b, 7, 8) ditunda.** Skema sudah siap di
   `supabase/schema.sql` dan tinggal dijalankan kapan pun.
 - Halaman lain (Statistik, Beranda, Broadcast, Pesanan, Chat) belum
   dikerjakan; semuanya tidak memanggil AI sehingga tidak menambah
@@ -244,11 +285,89 @@ Isi jawabannya setara — keduanya menyebut dosis 2 pump per liter,
 siram merata, seminggu sekali — karena template memang sumber yang
 sama dengan yang dibaca AI.
 
+### 🧩 Step 6b mode demo: semua halaman jadi, Supabase belakangan (2 Sep 2026)
+
+Atas permintaan pemilik proyek: **demo dulu, koneksi database
+setelah disetujui**. Step 6b aslinya berarti "jalankan `schema.sql`
+di project Supabase"; yang dikerjakan di sini adalah versi
+tanpa-koneksinya — bentuk datanya sudah mengikuti skema, isinya
+masih dari mock halaman lama.
+
+**Lapisan data baru — `web/lib/db/`**
+
+| Berkas | Isi |
+|---|---|
+| `types.ts` | Tipe TS salinan persis tiap tabel `schema.sql`. Field yang dipakai UI lama tapi belum ada kolomnya dipisah ke tipe `*Extra` supaya kelihatan mana yang masih perlu kolom/API baru. |
+| `seed.ts` | Isi awal, dipindahkan apa adanya dari `dashboard.js`, `pesanan.js`, `broadcast.js`, `settings.js`. |
+| `store.ts` | "Database" di memori + hook React (`useConversations`, `useSettings`, `decideCancels`, dst). |
+| `analytics.ts` | Angka agregat Statistik & Beranda — bukan tabel; nanti hasil `COUNT/GROUP BY`. |
+| `index.ts` | **Satu titik tukar.** Berisi peta lengkap fungsi → panggilan Supabase yang akan menggantikannya. |
+
+**Tujuh halaman console selesai** (Step 8–14 dikerjakan sekaligus):
+Beranda, Chat, Pesanan, AI Chatbot, Broadcast, Statistik, Pengaturan.
+Tidak ada lagi halaman placeholder — `components/PlaceholderPage.tsx`
+dihapus.
+
+**Yang sudah tidak lagi dummy**, karena kini membaca store yang sama:
+- Badge 💬 di rail = jumlah `conversations.unread` sungguhan; membuka
+  percakapan menurunkannya.
+- Kartu "Membutuhkan balasan" & "Perlu Handover ke CS" di Beranda ikut
+  menghitung `conversations` + `escalations` (ditandai label `live`).
+- Pengaturan AI tidak lagi di `localStorage` per browser, melainkan
+  satu baris berbentuk tabel `settings`.
+- Pencarian topbar (5 lingkup + pencarian massal) benar-benar menyaring
+  daftar percakapan; sebelumnya berhenti di kotaknya sendiri.
+
+**Perubahan yang disengaja:**
+- Isi pesan dirender sebagai teks (`whitespace-pre-line`), bukan
+  `innerHTML` seperti `dashboard.js` — menutup jalur XSS dari isi chat
+  pelanggan. Karena itu `messages` di seed memakai `\n`, bukan `<br>`.
+- Waktu disimpan ISO 8601 (bentuk `timestamptz`), formatnya dihitung di
+  `lib/format.ts`.
+- Katalog 373 SKU dibaca lewat `/api/products` dari `content/products.json`
+  — berkas yang sama dengan system prompt, tidak digandakan, dan tidak
+  ikut membengkakkan bundel JavaScript.
+- Kontrol yang belum punya kolom di `schema.sql` (gaya bahasa,
+  notifikasi, keamanan) diberi label **"belum tersimpan"** supaya
+  tidak terlihat seolah sudah tersimpan.
+- Rail mobile diperbaiki: sebelumnya menyisip di antara topbar dan
+  konten; sekarang benar-benar di bawah layar sesuai claude.md.
+
+**Batasan mode demo — sengaja tidak disembunyikan.** Tiap halaman
+memasang penanda "Mode demo — data contoh, belum tersambung Supabase".
+Data hidup di memori satu tab: refresh mengembalikannya ke seed, dan
+belum ada sinkronisasi antar admin (justru itu yang akan diuji
+`TEST-PLAN-SINKRONISASI.md` setelah Supabase menyala).
+
+**Hasil uji (2 Sep 2026).** `tsc --noEmit` bersih, `eslint` bersih,
+`next build` hijau (12 route). Delapan pemeriksaan interaksi lewat
+Playwright — semuanya lulus, tanpa error JavaScript di konsol:
+
+| # | Yang diuji | Hasil |
+|---|---|---|
+| 1 | Membuka percakapan menurunkan badge unread (2 → 1) | ✅ |
+| 2 | Filter "Perlu CS" hanya menyisakan HANDOVER_TO_CS | ✅ |
+| 3 | Pencarian topbar lingkup Nomor Resi menyaring daftar | ✅ |
+| 4 | Pesan terkirim muncul di aliran chat | ✅ |
+| 5 | Setujui massal mengurangi chip "Menunggu Diproses" (6 → 5) | ✅ |
+| 6 | Quick Chat terbuka dengan pesan awal dari ulasan | ✅ |
+| 7 | Model Claude tersimpan & tetap ada saat pindah panel | ✅ |
+| 8 | Tugas broadcast baru muncul di tabel | ✅ |
+
+Tangkapan layar desktop (1440×900) dan mobile (390×844) diperiksa untuk
+Beranda, Statistik, Pengaturan, Broadcast, Pesanan, dan Chat.
+
+**Sisa pekerjaan untuk menyambungkan Supabase** (Step 6b + 7): jalankan
+`schema.sql`, isi dua baris env, `npm i @supabase/supabase-js`, lalu
+tulis `lib/db/supabase.ts` dengan nama fungsi yang sama dan ganti satu
+baris re-export di `lib/db/index.ts`. Tidak ada komponen halaman yang
+perlu diubah.
+
 ### ⏸ Yang tertahan menunggu pemilik proyek
 1. ~~**Step 5 — uji AI engine sungguhan**~~ ✅ selesai 31 Agu 2026.
-2. **Step 6 (sisa) — jalankan skema:** butuh project Supabase + jalankan `supabase/schema.sql`, lalu URL & anon key di `web/.env.local`. **DITUNDA** atas permintaan pemilik proyek.
+2. **Step 6b — jalankan skema:** butuh project Supabase + jalankan `supabase/schema.sql`, lalu URL & anon key di `web/.env.local`. **DITUNDA** atas permintaan pemilik proyek — demo dijalankan lebih dulu dengan lapisan data mode demo (lihat bagian Step 6b di atas).
 
-Nomor 1 adalah penghalang mutlak bagi demo: efektivitas token tidak bisa diukur tanpa API key. Halaman `/ai` sudah siap menerima angkanya begitu key terpasang.
+Sisa penghalang tinggal nomor 2. Pengukuran token sudah bisa dilakukan sekarang: halaman `/ai` menampilkan angka nyata sejak Step 13, dan Step 15 menambahkan pembanding biaya template vs AI.
 
 ### Keputusan arsitektur yang disepakati
 1. App Next.js baru tinggal di subfolder `web/` pada repo yang sama (bukan repo terpisah); Vercel Root Directory = `web`.

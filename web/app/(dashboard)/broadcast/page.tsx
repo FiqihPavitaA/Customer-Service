@@ -1,15 +1,8 @@
 import type { Metadata } from "next";
-import PlaceholderPage from "@/components/PlaceholderPage";
+import Broadcast from "@/components/broadcast/Broadcast";
 
 export const metadata: Metadata = { title: "Broadcast" };
 
 export default function Page() {
-  return (
-    <PlaceholderPage
-      title="Broadcast"
-      legacyFile="broadcast.html"
-      step="Step 11"
-      note="Formulir dan tabel pesan broadcast per marketplace."
-    />
-  );
+  return <Broadcast />;
 }
