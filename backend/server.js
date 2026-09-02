@@ -10,6 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { buildSystemPrompt, parseAction } from './knowledge.js';
+import { routeToCategory, logRouting } from '../knowledge-base/router.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -30,6 +31,8 @@ const apiKey = process.env.ANTHROPIC_API_KEY;
 const client = apiKey ? new Anthropic({ apiKey }) : null;
 
 // System prompt disusun sekali saat start (Opsi A: inject KB)
+// Prompt penuh hanya dipakai untuk laporan /api/health. Permintaan
+// nyata memakai hasil routeToCategory() — lihat handler /api/chat.
 const SYSTEM_PROMPT = buildSystemPrompt();
 
 // ---------- Health check ----------
@@ -62,10 +65,28 @@ app.post('/api/chat', async (req, res) => {
       { role: 'user', content: message },
     ];
 
+    // Router memilih berkas FAQ yang relevan; hanya itu yang
+    // ikut ke system prompt (bukan keempat berkas sekaligus).
+    const keputusan = routeToCategory(message);
+
+    if (keputusan.jenis === 'template') {
+      logRouting(keputusan);
+      return res.json({
+        action: keputusan.action,
+        reply: keputusan.teks,
+        model: null,
+        usage: null,
+        source: 'template',
+        templateCode: keputusan.kode,
+      });
+    }
+
+    logRouting(keputusan);
+
     const resp = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(keputusan.berkas),
       messages,
     });
 
@@ -77,6 +98,9 @@ app.post('/api/chat', async (req, res) => {
       reply,                  // teks balasan untuk pelanggan
       model: MODEL,
       usage: resp.usage,      // jumlah token (untuk estimasi biaya)
+      source: 'ai',
+      kategori: keputusan.kategori,
+      berkasKb: keputusan.berkas,
     });
   } catch (err) {
     console.error('[chat] error:', err);

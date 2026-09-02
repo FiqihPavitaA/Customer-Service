@@ -1,8 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
-import { getKnowledge, parseAction } from "@/lib/knowledge";
-import { matchTemplate } from "@/lib/templates";
+import { buildFaqBlock, getInvariantBlock, parseAction } from "@/lib/knowledge";
+// Router dipakai lewat pembungkus bertipe di lib/templates supaya
+// setKbDir() sudah dijalankan sebelum berkas KB dibaca.
+import "@/lib/templates";
+import {
+  bacaBerkasFaq,
+  logRouting,
+  routeToCategory,
+} from "@/content/knowledge-base/router.js";
 
 /* ===========================================================
    POST /api/chat — port dari app.post('/api/chat') di server.js.
@@ -13,9 +20,10 @@ import { matchTemplate } from "@/lib/templates";
    supaya UI lama (ai.js, dashboard.js) tetap jalan; bidang baru
    hanya tambahan.
 
-   Dua lapisan:
-   1. Template baku dari faq-cs.md — tanpa memanggil Claude, Rp 0.
-   2. Claude, untuk apa pun yang tidak tertangani lapisan 1.
+   Tiga lapisan (knowledge-base/router.js yang memutuskan):
+   1. Template baku dari berkas FAQ — Claude tidak dipanggil, Rp 0.
+   2. Kategori jelas  -> kirim claude-core + SATU berkas FAQ.
+   3. Kategori kabur  -> kirim keempat berkas FAQ (jaring pengaman).
    =========================================================== */
 
 export const runtime = "nodejs";
@@ -39,19 +47,21 @@ export async function POST(req: Request) {
   // ---------- Lapisan 1: template baku ----------
   // Dilewati bila pemanggil mengirim useTemplates:false — dipakai
   // panel demo untuk membandingkan biaya dengan dan tanpa lapisan ini.
-  if (useTemplates !== false) {
-    const hit = matchTemplate(message);
-    if (hit) {
-      return NextResponse.json({
-        action: hit.action,
-        reply: hit.reply,
-        model: null,
-        usage: null,
-        source: "template",
-        templateCode: hit.code,
-        templateWhy: hit.why,
-      });
-    }
+  // Satu panggilan router memutuskan ketiga lapisan sekaligus.
+  const keputusan = routeToCategory(message);
+
+  if (useTemplates !== false && keputusan.jenis === "template") {
+    logRouting(keputusan);
+    return NextResponse.json({
+      action: keputusan.action,
+      reply: keputusan.teks,
+      model: null,
+      usage: null,
+      source: "template",
+      templateCode: keputusan.kode,
+      templateWhy: keputusan.alasan,
+      kategori: keputusan.kategori,
+    });
   }
 
   // ---------- Lapisan 2: Claude ----------
@@ -79,17 +89,28 @@ export async function POST(req: Request) {
 
   const messages: Anthropic.MessageParam[] = [...past, { role: "user", content: message }];
 
+  // Rakit system prompt sesuai hasil routing. Dua blok, keduanya
+  // di-cache terpisah: blok pertama sama untuk semua kategori
+  // (dipakai ulang lintas permintaan), blok kedua hanya sebesar
+  // berkas FAQ yang benar-benar relevan.
+  const invarian = getInvariantBlock();
+  const { teks: faqTeks } = bacaBerkasFaq(keputusan.berkas);
+  const blokFaq = buildFaqBlock(faqTeks);
+  const jejak = logRouting(keputusan);
+
   try {
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      // System prompt (claude.md + SOP + KB) besar dan tidak berubah
-      // antar permintaan, jadi di-cache agar hemat biaya & latensi.
-      // Pantau usage.cache_read_input_tokens untuk memastikan kena.
       system: [
         {
           type: "text",
-          text: getKnowledge().systemPrompt,
+          text: invarian.teks,
+          cache_control: { type: "ephemeral" },
+        },
+        {
+          type: "text",
+          text: blokFaq.teks,
           cache_control: { type: "ephemeral" },
         },
       ],
@@ -108,6 +129,13 @@ export async function POST(req: Request) {
       model: MODEL,
       usage: response.usage, // jumlah token (untuk estimasi biaya)
       source: "ai",
+      // Info routing — dipakai panel demo untuk menampilkan
+      // berapa berkas KB yang benar-benar dikirim.
+      kategori: keputusan.kategori,
+      berkasKb: keputusan.berkas,
+      promptChars: invarian.karakter + blokFaq.karakter,
+      faqChars: jejak.terkirim,
+      faqCharsPenuh: jejak.total,
     });
   } catch (err) {
     // Kelas error spesifik dulu, baru yang umum.

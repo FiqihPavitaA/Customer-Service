@@ -24,7 +24,10 @@ export function GET() {
     model: MODEL,
     maxTokens: MAX_TOKENS,
     claudeConfigured: Boolean(getClient()),
+    // Batas atas: bila keempat berkas FAQ ikut terkirim.
     systemPromptChars: stats.systemPromptChars,
+    // Bagian yang selalu terkirim, berapa pun kategorinya.
+    invariantChars: stats.invariantChars,
     kbFiles: stats.files,
     missingKbFiles: missing,
     templates: templateStats(),

@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { bacaBerkasFaq, ALL_FAQ_FILES } from '../knowledge-base/router.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..'); // folder project (CS AI PROJECT)
@@ -24,15 +25,9 @@ function safeRead(file) {
 // pindah ke docs/tech-stack.md dan sengaja TIDAK dikirim ke Claude API.
 export const SYSTEM_PROMPT_BASE = safeRead('claude-core.md');
 
-// FAQ CS — empat berkas kategori hasil pemecahan faq-cs.md (2 Sep 2026).
-// Urutan tetap supaya prefix system prompt stabil.
-const FAQ_FILES = [
-  'knowledge-base/faq-interaksi.md',
-  'knowledge-base/faq-cara-pakai.md',
-  'knowledge-base/faq-produk.md',
-  'knowledge-base/faq-umum.md',
-];
-const FAQ = FAQ_FILES.map(safeRead).join('\n\n');
+// FAQ CS tidak lagi dimuat seluruhnya di awal. Sejak router KB
+// ada (2 Sep 2026), berkas mana yang ikut ditentukan per
+// permintaan — lihat buildSystemPrompt(berkasFaq) di bawah.
 
 // Daftar produk (JSON) — diringkas agar hemat token (Opsi A KB < 50KB).
 // Untuk skala besar, ganti ke RAG/pgvector (Opsi B di Tech Stack).
@@ -68,12 +63,19 @@ Lalu satu baris kosong, lalu tulis HANYA teks balasan untuk pelanggan
 (tanpa menyebut ACTION atau aturan internal apa pun).
 `;
 
-/** Susun system prompt lengkap = claude-core.md + KB produk + FAQ + kontrak output. */
-export function buildSystemPrompt() {
+/**
+ * Susun system prompt = claude-core.md + KB produk + FAQ terpilih
+ * + kontrak output.
+ *
+ * @param {string[]} berkasFaq berkas FAQ yang ikut dikirim.
+ *        Bawaannya seluruh berkas (perilaku sebelum ada router).
+ */
+export function buildSystemPrompt(berkasFaq = ALL_FAQ_FILES) {
+  const { teks: faq } = bacaBerkasFaq(berkasFaq);
   return [
     SYSTEM_PROMPT_BASE,
     '\n\n---\n# KNOWLEDGE BASE — DAFTAR PRODUK (RINGKAS)\n' + PRODUCTS,
-    '\n\n---\n# KNOWLEDGE BASE — FAQ CS\n' + FAQ,
+    '\n\n---\n# KNOWLEDGE BASE — FAQ CS\n' + faq,
     OUTPUT_CONTRACT,
   ].join('\n');
 }

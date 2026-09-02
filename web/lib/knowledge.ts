@@ -83,26 +83,34 @@ Lalu satu baris kosong, lalu tulis HANYA teks balasan untuk pelanggan
 (tanpa menyebut ACTION atau aturan internal apa pun).
 `;
 
-export type KbStats = {
-  /** Jumlah karakter tiap berkas KB — 0 berarti berkas gagal dibaca. */
-  files: Record<string, number>;
-  systemPromptChars: number;
-};
+/* ===========================================================
+   Perakitan system prompt
 
-type Kb = { systemPrompt: string; stats: KbStats };
+   Sejak router dipakai (Step "router KB", 2 Sep 2026) prompt tidak
+   lagi satu blok tetap. Isinya dibagi dua supaya prompt caching
+   tetap efektif meski bagian FAQ berubah-ubah per permintaan:
 
-let cache: Kb | null = null;
+     Blok 1 — TETAP untuk semua permintaan:
+              claude-core.md + ringkasan produk + template jawaban.
+              Satu entri cache dipakai bersama seluruh kategori.
 
-/**
- * Susun system prompt lengkap:
- *   claude-core.md (SOP sudah di dalamnya) + FAQ empat berkas +
- *   ringkasan produk + template + kontrak output.
- * Dibaca sekali lalu di-cache di memori proses (setara `const
- * SYSTEM_PROMPT = buildSystemPrompt()` saat start di server.js),
- * tetapi malas (lazy) supaya tidak ada I/O berkas saat build.
- */
-export function getKnowledge(): Kb {
-  if (cache) return cache;
+     Blok 2 — BERUBAH menurut kategori:
+              berkas FAQ hasil routing + kontrak output.
+              Satu entri cache kecil per kategori.
+
+   Tanpa pembagian ini, satu kata yang berbeda di bagian FAQ akan
+   membatalkan cache seluruh prompt, termasuk ringkasan produk yang
+   justru bagian paling besar.
+   =========================================================== */
+
+/** Satu blok system prompt siap kirim ke Anthropic SDK. */
+export type PromptBlock = { teks: string; karakter: number };
+
+let invarian: PromptBlock | null = null;
+
+/** Bagian prompt yang sama untuk setiap permintaan. */
+export function getInvariantBlock(): PromptBlock {
+  if (invarian) return invarian;
 
   // claude-core.md = HANYA aturan perilaku AI. Sejak 2 Sep 2026
   // dokumentasi developer (tech stack, tema warna, standar
@@ -110,42 +118,63 @@ export function getKnowledge(): Kb {
   // ikut dikirim — isinya tidak pernah dipakai AI untuk menjawab
   // pelanggan, tetapi tetap dibayar sebagai token input.
   const claudeCore = safeRead("claude-core.md");
-  // FAQ dibaca dari empat berkas kategori lalu disambung dengan
-  // urutan tetap. Isinya sama persis dengan faq-cs.md sebelum
-  // dipecah; pemecahannya untuk router (knowledge-base/index.json),
-  // bukan untuk mengurangi apa yang dikirim.
-  const faqPerBerkas = FAQ_FILES.map((f) => [f, safeRead(f)] as const);
-  const faq = faqPerBerkas.map(([, isi]) => isi).join("\n\n");
   // Salinan dari "template jawaban.md" di root (nama tanpa spasi).
   // Berisi aturan konsultasi tanaman, aturan membaca foto, dan contoh
-  // balasan per ACTION. Versi Express tidak pernah memuatnya.
+  // balasan per ACTION.
   const templates = safeRead("template-jawaban.md");
-  const productsRaw = safeRead("products.json");
-  const products = buildProductSummary(productsRaw);
+  const products = buildProductSummary(safeRead("products.json"));
 
-  const systemPrompt = [
+  const teks = [
     claudeCore,
     "\n\n---\n# KNOWLEDGE BASE — DAFTAR PRODUK (RINGKAS)\n" + products,
-    "\n\n---\n# KNOWLEDGE BASE — FAQ CS\n" + faq,
     "\n\n---\n# ATURAN KONSULTASI & CONTOH TEMPLATE JAWABAN\n" + templates,
-    OUTPUT_CONTRACT,
   ].join("\n");
 
-  cache = {
-    systemPrompt,
+  invarian = { teks, karakter: teks.length };
+  return invarian;
+}
+
+/**
+ * Bagian prompt yang mengikuti hasil routing.
+ * @param faqTeks isi berkas FAQ terpilih (sudah digabung oleh router)
+ */
+export function buildFaqBlock(faqTeks: string): PromptBlock {
+  const teks =
+    "\n\n---\n# KNOWLEDGE BASE — FAQ CS\n" + faqTeks + "\n" + OUTPUT_CONTRACT;
+  return { teks, karakter: teks.length };
+}
+
+export type KbStats = {
+  /** Jumlah karakter tiap berkas KB — 0 berarti berkas gagal dibaca. */
+  files: Record<string, number>;
+  /** Ukuran prompt bila SELURUH berkas FAQ dikirim (batas atas). */
+  systemPromptChars: number;
+  /** Ukuran prompt terkecil yang mungkin (tanpa FAQ sama sekali). */
+  invariantChars: number;
+};
+
+/**
+ * Statistik KB untuk /api/health. Memakai keempat berkas FAQ, jadi
+ * angkanya adalah BATAS ATAS — permintaan nyata biasanya lebih kecil
+ * karena router hanya mengirim satu berkas.
+ */
+export function getKnowledge(): { stats: KbStats } {
+  const inv = getInvariantBlock();
+  const faqPerBerkas = FAQ_FILES.map((f) => [f, safeRead(f)] as const);
+  const faqPenuh = buildFaqBlock(faqPerBerkas.map(([, isi]) => isi).join("\n\n"));
+
+  return {
     stats: {
       files: {
-        "claude-core.md": claudeCore.length,
-        ...Object.fromEntries(
-          faqPerBerkas.map(([f, isi]) => [f, isi.length]),
-        ),
-        "products.json": productsRaw.length,
-        "template-jawaban.md": templates.length,
+        "claude-core.md": safeRead("claude-core.md").length,
+        ...Object.fromEntries(faqPerBerkas.map(([f, isi]) => [f, isi.length])),
+        "products.json": safeRead("products.json").length,
+        "template-jawaban.md": safeRead("template-jawaban.md").length,
       },
-      systemPromptChars: systemPrompt.length,
+      systemPromptChars: inv.karakter + faqPenuh.karakter,
+      invariantChars: inv.karakter,
     },
   };
-  return cache;
 }
 
 export const ACTIONS = [
