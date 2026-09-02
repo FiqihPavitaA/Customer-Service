@@ -14,11 +14,23 @@ import { join } from "node:path";
 /** Folder KB. process.cwd() = root app Next.js (folder `web/`). */
 const CONTENT_DIR = join(process.cwd(), "content");
 
-/** Berkas KB yang dimuat. Sengaja konstan agar prefix prompt stabil. */
+/** Empat berkas FAQ hasil pemecahan faq-cs.md (2 Sep 2026).
+    Urutannya tetap supaya prefix prompt stabil dan cache tetap kena.
+    Daftar kode tiap berkas ada di knowledge-base/index.json. */
+export const FAQ_FILES = [
+  "knowledge-base/faq-interaksi.md",
+  "knowledge-base/faq-cara-pakai.md",
+  "knowledge-base/faq-produk.md",
+  "knowledge-base/faq-umum.md",
+] as const;
+
+/** Berkas KB yang dimuat. Sengaja konstan agar prefix prompt stabil.
+    sop.md tidak lagi di sini: isinya digabung ke claude-core.md
+    (2 Sep 2026) supaya tidak terkirim dua kali. Berkasnya tetap ada
+    di root sebagai dokumen sumber. */
 export const KB_FILES = [
   "claude-core.md",
-  "sop.md",
-  "faq-cs.md",
+  ...FAQ_FILES,
   "products.json",
   "template-jawaban.md",
 ] as const;
@@ -83,7 +95,8 @@ let cache: Kb | null = null;
 
 /**
  * Susun system prompt lengkap:
- *   claude-core.md + sop.md + ringkasan produk + FAQ + kontrak output.
+ *   claude-core.md (SOP sudah di dalamnya) + FAQ empat berkas +
+ *   ringkasan produk + template + kontrak output.
  * Dibaca sekali lalu di-cache di memori proses (setara `const
  * SYSTEM_PROMPT = buildSystemPrompt()` saat start di server.js),
  * tetapi malas (lazy) supaya tidak ada I/O berkas saat build.
@@ -97,8 +110,12 @@ export function getKnowledge(): Kb {
   // ikut dikirim — isinya tidak pernah dipakai AI untuk menjawab
   // pelanggan, tetapi tetap dibayar sebagai token input.
   const claudeCore = safeRead("claude-core.md");
-  const sop = safeRead("sop.md");
-  const faq = safeRead("faq-cs.md");
+  // FAQ dibaca dari empat berkas kategori lalu disambung dengan
+  // urutan tetap. Isinya sama persis dengan faq-cs.md sebelum
+  // dipecah; pemecahannya untuk router (knowledge-base/index.json),
+  // bukan untuk mengurangi apa yang dikirim.
+  const faqPerBerkas = FAQ_FILES.map((f) => [f, safeRead(f)] as const);
+  const faq = faqPerBerkas.map(([, isi]) => isi).join("\n\n");
   // Salinan dari "template jawaban.md" di root (nama tanpa spasi).
   // Berisi aturan konsultasi tanaman, aturan membaca foto, dan contoh
   // balasan per ACTION. Versi Express tidak pernah memuatnya.
@@ -108,7 +125,6 @@ export function getKnowledge(): Kb {
 
   const systemPrompt = [
     claudeCore,
-    "\n\n---\n# ATURAN OPERASIONAL (SOP)\n" + sop,
     "\n\n---\n# KNOWLEDGE BASE — DAFTAR PRODUK (RINGKAS)\n" + products,
     "\n\n---\n# KNOWLEDGE BASE — FAQ CS\n" + faq,
     "\n\n---\n# ATURAN KONSULTASI & CONTOH TEMPLATE JAWABAN\n" + templates,
@@ -120,8 +136,9 @@ export function getKnowledge(): Kb {
     stats: {
       files: {
         "claude-core.md": claudeCore.length,
-        "sop.md": sop.length,
-        "faq-cs.md": faq.length,
+        ...Object.fromEntries(
+          faqPerBerkas.map(([f, isi]) => [f, isi.length]),
+        ),
         "products.json": productsRaw.length,
         "template-jawaban.md": templates.length,
       },

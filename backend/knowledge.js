@@ -1,6 +1,6 @@
 /* ===========================================================
    Knowledge Base loader — Layer 4 (Opsi A: inject ke prompt)
-   Memuat claude-core.md (system prompt), products.json, faq-cs.md
+   Memuat claude-core.md (system prompt), products.json, knowledge-base/
    =========================================================== */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -24,8 +24,15 @@ function safeRead(file) {
 // pindah ke docs/tech-stack.md dan sengaja TIDAK dikirim ke Claude API.
 export const SYSTEM_PROMPT_BASE = safeRead('claude-core.md');
 
-// FAQ CS (markdown)
-const FAQ = safeRead('faq-cs.md');
+// FAQ CS — empat berkas kategori hasil pemecahan faq-cs.md (2 Sep 2026).
+// Urutan tetap supaya prefix system prompt stabil.
+const FAQ_FILES = [
+  'knowledge-base/faq-interaksi.md',
+  'knowledge-base/faq-cara-pakai.md',
+  'knowledge-base/faq-produk.md',
+  'knowledge-base/faq-umum.md',
+];
+const FAQ = FAQ_FILES.map(safeRead).join('\n\n');
 
 // Daftar produk (JSON) — diringkas agar hemat token (Opsi A KB < 50KB).
 // Untuk skala besar, ganti ke RAG/pgvector (Opsi B di Tech Stack).

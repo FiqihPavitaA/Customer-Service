@@ -1,9 +1,9 @@
 /* ===========================================================
    Lapisan 1 — pencocokan template sebelum memanggil AI.
 
-   Sumber template: content/faq-cs.md, pustaka 160 balasan baku
-   milik tim CS, tiap entri berkode `### [KODE]`. Berkas yang sama
-   tetap ikut ke system prompt, jadi tidak ada duplikasi isi.
+   Sumber template: empat berkas di content/knowledge-base/ (hasil
+   pemecahan faq-cs.md), pustaka 152 kode balasan milik tim CS, tiap
+   entri berkode `### [KODE]`. Berkas yang sama tetap ikut ke system
 
    Prinsip yang dipegang di sini:
    1. RAGU = LEMPAR KE AI. Salah balas lebih mahal daripada Rp 140.
@@ -15,24 +15,31 @@
    =========================================================== */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Action } from "./knowledge";
+import { FAQ_FILES, type Action } from "./knowledge";
 
-const FAQ_PATH = join(process.cwd(), "content", "faq-cs.md");
+const CONTENT_DIR = join(process.cwd(), "content");
 
 /* ---------- Pembaca pustaka template ---------- */
 
 let library: Map<string, string> | null = null;
 
-/** Baca faq-cs.md → peta { KODE → isi balasan }. Dibaca sekali. */
+/** Baca keempat berkas FAQ → peta { KODE → isi balasan }. Sekali saja. */
 export function getTemplateLibrary(): Map<string, string> {
   if (library) return library;
 
   const map = new Map<string, string>();
-  let raw = "";
-  try {
-    raw = readFileSync(FAQ_PATH, "utf8");
-  } catch (err) {
-    console.warn(`[TPL] Gagal membaca faq-cs.md: ${(err as Error).message}`);
+  // Urutan berkas menentukan entri mana yang menang saat kodenya
+  // kembar — lihat catatan pada flush() di bawah.
+  const potongan: string[] = [];
+  for (const berkas of FAQ_FILES) {
+    try {
+      potongan.push(readFileSync(join(CONTENT_DIR, berkas), "utf8"));
+    } catch (err) {
+      console.warn(`[TPL] Gagal membaca ${berkas}: ${(err as Error).message}`);
+    }
+  }
+  const raw = potongan.join("\n\n");
+  if (!raw) {
     library = map;
     return map;
   }
@@ -44,7 +51,7 @@ export function getTemplateLibrary(): Map<string, string> {
   const flush = () => {
     if (!code) return;
     const text = buffer.join("\n").trim();
-    // Kode yang muncul dua kali (mis. [KOMPLAIN]) — pakai yang pertama,
+    // Kode kembar (KOMPLAIN, IDUL FITRI, BERTAHAP) — pakai yang pertama,
     // karena itu yang paling ringkas dan paling umum dipakai CS.
     if (text && !map.has(code)) map.set(code, text);
     buffer = [];
@@ -83,7 +90,7 @@ const BUTUH_PENILAIAN =
 /* ---------- Daftar aturan ---------- */
 
 type Rule = {
-  /** Kode entri di faq-cs.md. */
+  /** Kode entri di berkas knowledge-base/. */
   code: string;
   /** Klasifikasi yang dilaporkan, setara keluaran AI. */
   action: Action;
@@ -230,9 +237,9 @@ export function matchTemplate(message: string): TemplateMatch | null {
 
     const reply = lib.get(rule.code);
     if (!reply) {
-      // Kode tidak ada di faq-cs.md (mis. judulnya diubah) — jangan
+      // Kode tidak ada di berkas FAQ (mis. judulnya diubah) — jangan
       // mengarang, serahkan saja ke AI.
-      console.warn(`[TPL] Kode [${rule.code}] tidak ditemukan di faq-cs.md`);
+      console.warn(`[TPL] Kode [${rule.code}] tidak ada di berkas FAQ mana pun`);
       continue;
     }
     return { code: rule.code, action: rule.action, reply, why: rule.why };
