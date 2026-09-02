@@ -5,7 +5,7 @@
    Isi & logikanya sengaja dipertahankan sama persis; yang
    berubah hanya cara file dibaca: dulu dari root project lewat
    Express, sekarang dari web/content/ lewat Next.js API Route
-   (lihat MIGRATION.md §5 poin 6 — aturan claude.md & sop.md
+   (lihat MIGRATION.md §5 poin 6 — aturan claude-core.md & sop.md
    tidak diubah, hanya berpindah tempat baca).
    =========================================================== */
 import { readFileSync } from "node:fs";
@@ -16,7 +16,7 @@ const CONTENT_DIR = join(process.cwd(), "content");
 
 /** Berkas KB yang dimuat. Sengaja konstan agar prefix prompt stabil. */
 export const KB_FILES = [
-  "claude.md",
+  "claude-core.md",
   "sop.md",
   "faq-cs.md",
   "products.json",
@@ -83,7 +83,7 @@ let cache: Kb | null = null;
 
 /**
  * Susun system prompt lengkap:
- *   claude.md + sop.md + ringkasan produk + FAQ + kontrak output.
+ *   claude-core.md + sop.md + ringkasan produk + FAQ + kontrak output.
  * Dibaca sekali lalu di-cache di memori proses (setara `const
  * SYSTEM_PROMPT = buildSystemPrompt()` saat start di server.js),
  * tetapi malas (lazy) supaya tidak ada I/O berkas saat build.
@@ -91,7 +91,12 @@ let cache: Kb | null = null;
 export function getKnowledge(): Kb {
   if (cache) return cache;
 
-  const claudeMd = safeRead("claude.md");
+  // claude-core.md = HANYA aturan perilaku AI. Sejak 2 Sep 2026
+  // dokumentasi developer (tech stack, tema warna, standar
+  // responsivitas) dipisah ke docs/tech-stack.md dan sengaja tidak
+  // ikut dikirim — isinya tidak pernah dipakai AI untuk menjawab
+  // pelanggan, tetapi tetap dibayar sebagai token input.
+  const claudeCore = safeRead("claude-core.md");
   const sop = safeRead("sop.md");
   const faq = safeRead("faq-cs.md");
   // Salinan dari "template jawaban.md" di root (nama tanpa spasi).
@@ -102,7 +107,7 @@ export function getKnowledge(): Kb {
   const products = buildProductSummary(productsRaw);
 
   const systemPrompt = [
-    claudeMd,
+    claudeCore,
     "\n\n---\n# ATURAN OPERASIONAL (SOP)\n" + sop,
     "\n\n---\n# KNOWLEDGE BASE — DAFTAR PRODUK (RINGKAS)\n" + products,
     "\n\n---\n# KNOWLEDGE BASE — FAQ CS\n" + faq,
@@ -114,7 +119,7 @@ export function getKnowledge(): Kb {
     systemPrompt,
     stats: {
       files: {
-        "claude.md": claudeMd.length,
+        "claude-core.md": claudeCore.length,
         "sop.md": sop.length,
         "faq-cs.md": faq.length,
         "products.json": productsRaw.length,

@@ -1,6 +1,6 @@
 /* ===========================================================
    Knowledge Base loader — Layer 4 (Opsi A: inject ke prompt)
-   Memuat claude.md (system prompt), products.json, faq-cs.md
+   Memuat claude-core.md (system prompt), products.json, faq-cs.md
    =========================================================== */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -18,8 +18,11 @@ function safeRead(file) {
   }
 }
 
-// claude.md = system prompt utama (identitas, SOP, aturan, klasifikasi)
-export const SYSTEM_PROMPT_BASE = safeRead('claude.md');
+// claude-core.md = system prompt utama (identitas, SOP, aturan,
+// klasifikasi). Sejak 2 Sep 2026 hanya bagian perilaku AI yang dimuat;
+// dokumentasi developer (tech stack, tema warna, standar responsivitas)
+// pindah ke docs/tech-stack.md dan sengaja TIDAK dikirim ke Claude API.
+export const SYSTEM_PROMPT_BASE = safeRead('claude-core.md');
 
 // FAQ CS (markdown)
 const FAQ = safeRead('faq-cs.md');
@@ -58,7 +61,7 @@ Lalu satu baris kosong, lalu tulis HANYA teks balasan untuk pelanggan
 (tanpa menyebut ACTION atau aturan internal apa pun).
 `;
 
-/** Susun system prompt lengkap = claude.md + KB produk + FAQ + kontrak output. */
+/** Susun system prompt lengkap = claude-core.md + KB produk + FAQ + kontrak output. */
 export function buildSystemPrompt() {
   return [
     SYSTEM_PROMPT_BASE,
