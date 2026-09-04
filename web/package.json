@@ -8,7 +8,9 @@
     "start": "next start -p 3100",
     "lint": "eslint",
     "sync-kb": "node scripts/sync-kb.mjs",
-    "seed-sql": "node --experimental-strip-types scripts/buat-seed-sql.mjs"
+    "seed-sql": "node --experimental-strip-types scripts/buat-seed-sql.mjs",
+    "template-sql": "node scripts/buat-template-sql.mjs",
+    "periksa-sql": "node scripts/periksa-seed-sql.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",

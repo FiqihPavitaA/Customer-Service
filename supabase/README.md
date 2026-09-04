@@ -188,3 +188,44 @@ Dua catatan tentang isinya:
   Nama pelapornya tetap terbaca lewat kolom teks `reporter_name`.
 - `chat_count`, `product_query`, `order_status`, dan `order_courier` tidak ikut —
   keempatnya memang tidak punya kolom di `schema.sql`.
+
+---
+
+## Mengisi tabel template (Step 6c lanjutan)
+
+[`seed-templates.sql`](seed-templates.sql) mengisi `templates` (152 baris) dan
+`template_rules` (43 baris). SQL Editor → tempel → Run.
+
+Berbeda dari `seed-demo.sql`, **ini bukan data karangan** — isinya balasan CS
+yang sungguhan dipakai, disalin apa adanya dari keempat berkas FAQ.
+
+Tiga baris masuk dalam keadaan **mati** (`is_active = false`): `[REKENING]`,
+`[CS WA]`, dan `[CS KOMPLAIN]`. Ketiganya memuat nomor rekening atau telepon,
+dan `claude-core.md` melarang mengarahkan transaksi ke luar marketplace. Tetap
+disimpan supaya CS manusia bisa menyalinnya bila memang perlu.
+
+Lima template promo bertanggal (`NATAL`, `1010`, `12.12`, `IDUL FITRI`, `6.6`)
+masuk dengan catatan peringatan. Tidak satu pun punya aturan pemicu, jadi sudah
+tidak mungkin terkirim otomatis — catatannya untuk siapa pun yang nanti tergoda
+menambahkan pemicunya.
+
+⚠️ **Setelah tim CS mulai mengedit lewat halaman Kelola Template, jangan
+jalankan ulang berkas ini** — suntingan mereka akan tertimpa isi berkas `.md`
+yang lebih lama.
+
+**Membangkitkan ulang:** `npm run template-sql` di folder `web/`.
+**Memeriksa hasilnya tanpa PostgreSQL:** `npm run periksa-sql`.
+
+### Kalau ingin tahu template mana yang belum punya pemicu
+
+Query ini ada di bagian bawah berkas SQL. Hasilnya 109 baris — dan itulah
+daftar kerja tim CS: tiap satu yang ditutup memindahkan pertanyaannya dari
+jalur berbayar ke jalur Rp 0.
+
+```sql
+select t.code, t.category_slug
+from public.templates t
+left join public.template_rules r on r.template_id = t.id
+where r.id is null and t.is_active
+order by t.category_slug, t.code;
+```
