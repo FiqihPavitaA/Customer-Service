@@ -45,6 +45,16 @@ type AuthValue = {
   isAdmin: boolean;
   /** true bila berjalan tanpa Supabase. */
   isDemo: boolean;
+  /**
+   * Terisi bila sesinya sah TETAPI profilnya tidak terbaca.
+   *
+   * Bukan sekadar catatan teknis: tanpa baris di public.profiles,
+   * is_admin() bernilai false, sehingga setiap penyimpanan
+   * Pengaturan dan setiap keputusan Flag Koreksi ditolak RLS —
+   * diam-diam, sebagai "sukses, nol baris". Karena itu pesannya
+   * ditampilkan di TopBar, bukan hanya dicatat di console.
+   */
+  profileError: string | null;
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
 };
@@ -58,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<ProfileRow | null>(
     isDemo ? DEMO_USER : null,
   );
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isDemo) return;
@@ -70,19 +81,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
        peran ('cs' | 'admin') hanya ada di public.profiles dan
        itulah yang dipakai aturan RLS is_admin(). */
     const muatProfil = async (userId: string) => {
+      /* maybeSingle(), bukan single(): single() memperlakukan "tidak
+         ada baris" sebagai galat, dengan pesan PostgREST yang
+         menyamarkan dua sebab yang sangat berbeda — barisnya memang
+         belum ada, atau pembacaannya ditolak. Penanganannya berbeda,
+         jadi dipisah di sini. */
       const { data, error } = await sb
         .from("profiles")
         .select("*")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
       if (batal) return;
+
       if (error) {
-        // Sesi sah tapi profilnya belum ada — bisa terjadi bila
-        // pengguna dibuat sebelum trigger handle_new_user dipasang.
-        console.error("[auth] profil tidak terbaca:", error.message);
+        const pesan = "Profil tidak terbaca: " + error.message;
+        console.error("[auth]", pesan);
         setProfile(null);
+        setProfileError(pesan);
+      } else if (!data) {
+        /* Sesi sah, tetapi tidak ada barisnya di public.profiles.
+           Paling sering karena pengguna dibuat sebelum trigger
+           handle_new_user terpasang, jadi triggernya tidak pernah
+           jalan untuk akun ini. */
+        const pesan =
+          "Akun ini belum punya baris di tabel profiles, jadi perannya " +
+          "tidak diketahui dan setiap penyimpanan akan ditolak. " +
+          "Tambahkan barisnya lewat SQL Editor. User id: " +
+          userId;
+        console.error("[auth]", pesan);
+        setProfile(null);
+        setProfileError(pesan);
       } else {
         setProfile(data as ProfileRow);
+        setProfileError(null);
       }
       setStatus("in");
     };
@@ -98,6 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (session) void muatProfil(session.user.id);
       else {
         setProfile(null);
+        setProfileError(null);
         setStatus("out");
       }
     });
@@ -134,10 +166,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       isAdmin: profile?.role === "admin",
       isDemo,
+      profileError,
       signIn,
       signOut,
     }),
-    [status, profile, isDemo, signIn, signOut],
+    [status, profile, profileError, isDemo, signIn, signOut],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

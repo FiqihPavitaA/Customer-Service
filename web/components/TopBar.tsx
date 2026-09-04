@@ -152,7 +152,7 @@ function MassModal({
    yang memang tidak dimiliki. */
 
 function UserChip() {
-  const { profile, isDemo, signOut } = useAuth();
+  const { profile, profileError, isDemo, signOut } = useAuth();
   const router = useRouter();
 
   if (isDemo) return null;
@@ -165,12 +165,26 @@ function UserChip() {
   return (
     <div className="flex items-center gap-1.5 max-mobile:order-4">
       <span
-        title={profile ? `Masuk sebagai ${profile.username}` : undefined}
-        className="max-w-[10rem] truncate rounded-xl border border-line bg-green-soft px-2.5 py-1.5 text-[0.82rem] font-semibold text-green-dark"
+        title={
+          profileError ??
+          (profile
+            ? `Masuk sebagai ${profile.username} — peran ${profile.role}`
+            : undefined)
+        }
+        className={
+          "max-w-[14rem] truncate rounded-xl border px-2.5 py-1.5 text-[0.82rem] font-semibold " +
+          (profileError
+            ? "border-[#f0c36d] bg-[#fdf3d8] text-[#8a5a00]"
+            : "border-line bg-green-soft text-green-dark")
+        }
       >
-        {profile ? profile.username : "…"}
-        {profile?.role === "admin" && (
-          <span className="ml-1 font-normal text-muted">· admin</span>
+        {profileError ? "⚠ profil tidak terbaca" : (profile?.username ?? "…")}
+        {/* Peran ditampilkan apa adanya, termasuk 'cs'. Justru peran
+            NON-admin yang perlu terlihat: itulah yang membuat tombol
+            Simpan ditolak, dan tanpa keterangan penolakannya terasa
+            seperti bug. */}
+        {profile && (
+          <span className="ml-1 font-normal text-muted">· {profile.role}</span>
         )}
       </span>
       <button
