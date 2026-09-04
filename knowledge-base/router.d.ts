@@ -84,3 +84,26 @@ export function logRouting(
   keputusan: Keputusan,
   prefix?: string,
 ): { terkirim: number; total: number; hemat: number };
+
+/** Satu aturan pencocokan, polanya dalam bentuk teks (bukan RegExp). */
+export type AturanSerial = {
+  /** Nomor urut penilaian; kecil = dinilai lebih dulu. Urutan = logika. */
+  urutan: number;
+  code: string;
+  action: ActionCode;
+  /** Cukup salah satu cocok (ATAU). */
+  when: string[];
+  /** Wajib ikut cocok (DAN); null bila tidak ada. */
+  also: string | null;
+  /** Bila salah satu cocok, aturan dibatalkan. */
+  unless: string[];
+  why: string;
+};
+
+export function getRules(): AturanSerial[];
+
+/**
+ * Kenapa sebuah pesan tidak tertangkap template.
+ * @returns kalimat penjelasan, atau null bila pesannya justru cocok.
+ */
+export function jelaskanTidakCocok(pesan: string): string | null;

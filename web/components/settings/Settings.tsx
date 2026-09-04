@@ -24,6 +24,7 @@ import { DemoNotice, GhostButton } from "@/components/ui/Bits";
 import { actionTagClass } from "@/components/ai/actionTag";
 import { saveSettings, useSettings } from "@/lib/db";
 import { useAuth } from "@/lib/auth";
+import TemplateManager from "./TemplateManager";
 import { inisial } from "@/lib/format";
 
 type SectionId =
@@ -420,20 +421,65 @@ function KbRow({
   );
 }
 
+/* Sub-tab di dalam panel Knowledge Base.
+
+   "Berkas" adalah panel lama apa adanya — levelnya berkas.
+   "Template Jawaban" adalah halaman baru — levelnya template
+   individual, supaya tim CS bisa memperbaiki satu balasan tanpa
+   membuka berkas mentah dan tanpa developer.
+
+   Ditaruh sebagai sub-tab, bukan menggantikan panel lama: keduanya
+   menjawab pertanyaan yang berbeda. Panel berkas menjawab "apa saja
+   yang dibaca AI"; halaman template menjawab "kalimat apa yang
+   dikirim ke pelanggan". */
+type SubKb = "berkas" | "template" | "mode";
+
 function PanelKb({ onSave }: { onSave: () => void }) {
   const toast = useToast();
+  const [sub, setSub] = useState<SubKb>("berkas");
   const ico = (e: string) => (
     <span className="grid h-10 w-10 place-items-center rounded-xl bg-green-mint text-[1.2rem]">
       {e}
     </span>
   );
 
+  /* Panel template butuh ruang untuk split-view, jadi batas lebar
+     760px hanya berlaku untuk dua sub-tab lainnya. */
   return (
-    <div className="max-w-[760px]">
+    <div className={sub === "template" ? "max-w-full" : "max-w-[760px]"}>
       <PanelHead
         title="Knowledge Base"
         desc="Sumber jawaban AI. Urutan prioritas: data sistem → Knowledge Base → SOP → riwayat percakapan."
       />
+
+      <div className="mt-4 mb-4 flex items-center gap-2 border-b border-line">
+        {(
+          [
+            ["berkas", "Berkas"],
+            ["template", "Template Jawaban"],
+            ["mode", "Mode KB"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setSub(key)}
+            className={[
+              "-mb-px cursor-pointer border-0 border-b-2 bg-transparent px-4 py-2.5 font-semibold",
+              sub === key
+                ? "border-green text-green-dark"
+                : "border-transparent text-muted",
+            ].join(" ")}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {sub === "template" && <TemplateManager />}
+
+      {sub === "berkas" && (
+        <>
       <SetCard>
         <KbRow
           icon={ico("📦")}
@@ -443,8 +489,8 @@ function PanelKb({ onSave }: { onSave: () => void }) {
         />
         <KbRow
           icon={ico("❓")}
-          title="faq-cs.md"
-          sub="152 balasan baku CS · juga dipakai lapisan template (Step 15)"
+          title="4 berkas FAQ kategori"
+          sub="152 balasan baku CS · dipecah 2 Sep: interaksi, cara-pakai, produk, umum"
           action={<GhostButton onClick={() => toast("Pengelola KB belum tersedia")}>Kelola</GhostButton>}
         />
         <KbRow
@@ -455,6 +501,10 @@ function PanelKb({ onSave }: { onSave: () => void }) {
         />
       </SetCard>
 
+        </>
+      )}
+
+      {sub === "mode" && (
       <SetCard>
         <CardSubtitle>Mode Knowledge Base</CardSubtitle>
         <label className="flex cursor-pointer items-center gap-2 py-2.5 text-[0.9rem]">
@@ -470,8 +520,9 @@ function PanelKb({ onSave }: { onSave: () => void }) {
           <span className="text-[0.8rem] text-muted">untuk KB besar / skala</span>
         </label>
       </SetCard>
+      )}
 
-      <SaveBar label="Simpan" onSave={onSave} />
+      {sub !== "template" && <SaveBar label="Simpan" onSave={onSave} />}
     </div>
   );
 }

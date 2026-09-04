@@ -16,9 +16,13 @@ import { join } from "node:path";
 import {
   matchTemplate as routerMatch,
   getTemplateLibrary as routerLibrary,
+  getAsalKode as routerAsal,
+  getRules as routerRules,
+  jelaskanTidakCocok as routerJelaskan,
   jumlahAturan,
   setKbDir,
 } from "@/content/knowledge-base/router.js";
+import type { AturanSerial } from "@/content/knowledge-base/router.js";
 import type { Action } from "./knowledge";
 
 /**
@@ -49,6 +53,31 @@ export function matchTemplate(message: string): TemplateMatch | null {
 export function getTemplateLibrary(): Map<string, string> {
   return routerLibrary();
 }
+
+/** Peta { KODE -> nama berkas asalnya }. */
+export function getAsalKode(): Map<string, string> {
+  return routerAsal();
+}
+
+/**
+ * Ke-43 aturan pemicu dalam bentuk yang bisa dikirim sebagai JSON.
+ * Dipakai halaman Kelola Template untuk menunjukkan kata kunci tiap
+ * template — dan template mana yang belum punya pemicu sama sekali.
+ */
+export function getRules(): AturanSerial[] {
+  return routerRules();
+}
+
+/**
+ * Kenapa sebuah pesan tidak tertangkap template — untuk kotak
+ * "Uji coba". Sengaja diambil dari router, bukan ditulis ulang di
+ * sisi Next.js: pengaman dan penjelasannya harus tetap satu tempat.
+ */
+export function jelaskanTidakCocok(pesan: string): string | null {
+  return routerJelaskan(pesan);
+}
+
+export type { AturanSerial };
 
 export function templateStats() {
   return { rules: jumlahAturan(), templates: routerLibrary().size };

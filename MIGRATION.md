@@ -216,9 +216,10 @@ nomor yang sudah dijanjikan di tabel route (§4 Fase 1).
 | 14 | Migrasi halaman Chat/Dashboard (paling kompleks, dikerjakan terakhir) | 4 | `components/chat/` | ✅ Selesai (mode demo) |
 | 15 | Lapisan template sebelum AI (`lib/templates.ts`, 12 aturan, uji 21/21) | Tambahan | `abd8d37` | ✅ Selesai |
 | 16 | Sub-tab Flag Koreksi di `/ai` — port `ai-flag.js` + `flag.css` | 4 | `components/ai/FlagKoreksi.tsx` | ✅ Selesai (mode demo) |
+| 17 | Kelola Template — sub-tab baru di Pengaturan → Knowledge Base, split-view per template | Tambahan | `components/settings/TemplateManager.tsx` | ✅ Selesai (sumber berkas) |
 
-**Ringkasan:** 17 step selesai (1, 2, 3, 4, 5, 6a, 6b-demo, 6c, 7, 8, 9,
-10, 11, 12, 13, 15, 16) — tinggal 6b, satu-satunya yang tidak bisa
+**Ringkasan:** 18 step selesai (1, 2, 3, 4, 5, 6a, 6b-demo, 6c, 7, 8, 9,
+10, 11, 12, 13, 15, 16, 17) — tinggal 6b, satu-satunya yang tidak bisa
 dikerjakan dari sisi kode karena butuh project Supabase nyata milik
 pemilik proyek. Seluruh halaman console sudah jadi; tidak ada lagi
 placeholder maupun sub-tab yang belum dimigrasi.
@@ -371,6 +372,105 @@ tulis `lib/db/supabase.ts` dengan nama fungsi yang sama dan ganti satu
 baris re-export di `lib/db/index.ts`. Tidak ada komponen halaman yang
 perlu diubah.
 
+### 🗂 Step 17: Kelola Template (4 Sep 2026)
+
+Sub-tab baru di **Pengaturan → Knowledge Base → Template Jawaban**.
+Tujuannya satu: tim CS yang tidak menulis kode bisa memperbaiki satu
+balasan dari 152 template tanpa membuka berkas mentah dan tanpa
+developer.
+
+Tata letak **split-view** dipilih pemilik proyek dari tiga opsi yang
+diajukan. Alasannya: pekerjaan nyata tim CS bukan membaca-baca 152
+template, melainkan "ada yang salah di satu template, cari dan
+perbaiki" — dan split-view membuat ketiganya terjadi tanpa berpindah
+layar, tanpa modal yang menghilangkan posisi di daftar.
+
+#### Temuan yang mengubah rancangan
+
+**109 dari 152 template tidak punya aturan pemicu.** Template adalah
+teks jawaban; yang membuatnya terkirim otomatis adalah aturan di
+`router.js` — dan baru 43 yang punya.
+
+| Kategori | Template | Punya pemicu | Tanpa pemicu |
+|---|---|---|---|
+| Interaksi | 32 | 9 | 23 |
+| Cara Pakai | 7 | 7 | 0 |
+| Produk | 11 | 6 | 5 |
+| Umum | 102 | 21 | 81 |
+| **Total** | **152** | **43** | **109** |
+
+Tanpa penanda ini halaman akan menyesatkan: tim CS mengira semua 152
+sudah bekerja. Karena itu status pemicu tampil di tiap baris dan ada
+penyaring khusus "Tanpa pemicu" — sekaligus jadi daftar kerja untuk
+menutup 109 celah itu, yang setiap penutupannya menurunkan biaya chat.
+
+#### Kata kunci, bukan regex
+
+Tim CS memasukkan **frasa biasa sebagai chip**, bukan pola regex. Dua
+alasannya nyata, bukan soal selera: pola yang salah tulis bisa
+menggantung server (*catastrophic backtracking*), dan pola yang terlalu
+longgar mengirim jawaban salah ke pelanggan.
+
+Penerjemahan pola → frasa berhasil untuk 35 dari 43 aturan. Delapan
+sisanya terlalu rumit untuk diringkas. Ini **tidak disembunyikan**:
+template seperti `[PAKAI POC]` menampilkan keterangan bahwa pemicunya
+ada tetapi tidak bisa ditampilkan sebagai frasa, plus pola aslinya
+dalam bagian yang bisa dibuka. Menampilkan "belum ada kata kunci" di
+situ akan berbohong.
+
+#### Kotak uji coba
+
+Bagian paling berguna di halaman ini. Tanpa uji coba, menambah kata
+kunci adalah menebak. `/api/templates/uji` menjalankan `matchTemplate()`
+yang **sama persis** dengan yang dipakai `/api/chat` — bukan tiruan —
+jadi hasilnya adalah yang sungguhan akan terjadi. Tidak memanggil
+Claude; biaya Rp 0 berapa kali pun ditekan.
+
+Hasilnya membedakan **tiga** keadaan, bukan dua. Yang ketiga paling
+sering menjebak: "cocok, tapi yang menjawab template LAIN". Kata
+kuncinya benar, hanya kalah urutan. Tanpa dibedakan, CS akan mengira
+kata kuncinya salah lalu menambah kata kunci lagi — yang justru
+memperburuk.
+
+Penjelasan "kenapa tidak cocok" datang dari `jelaskanTidakCocok()` di
+`router.js`, bukan disalin ke sisi Next.js: percobaan pertama menyalin
+polanya dan **salinannya langsung keliru**, karena pola aslinya berbeda
+dari yang diingat.
+
+#### Sumber data
+
+Sementara dari berkas `.md` lewat `/api/templates`. Tujuannya tabel
+`templates` + `template_rules` (sudah dirancang di `schema-kb.sql`);
+pada 4 Sep 2026 project Supabase belum bisa dibuat karena gangguan di
+sisi Supabase.
+
+Perubahan karena itu **hanya hidup di memori satu tab**, dan halaman
+mengatakannya terus terang di pita paling atas, lengkap dengan hitungan
+perubahan yang belum tersimpan. Menulis balik ke berkas `.md` sengaja
+tidak dipilih sebagai jalan pintas: berkas ada di repo, jadi setiap
+perubahan tetap butuh commit dan deploy — yaitu tetap butuh developer,
+yang justru masalah yang ingin dihapus halaman ini.
+
+#### ⏳ Dua hal yang ditunda untuk ditinjau pemilik proyek
+
+**1. Statistik pemakaian.** `usage_count` dan `last_used_at` bernilai
+`null`, bukan `0` — supaya halaman bisa membedakan "belum ada datanya"
+dari "benar-benar tidak pernah dipakai". Menampilkan 0 akan membuat tim
+CS menyimpulkan hal yang salah tentang semua 152 template.
+
+Prasyaratnya: `/api/chat` harus menulis ke tabel `routing_log`, yang
+sekarang belum. Saat itu dikerjakan, tambahkan juga panel **"pertanyaan
+yang belum tertangkap template mana pun"** — baris `routing_log` dengan
+`decision = 'unclear'`. Itu yang mengubah halaman ini dari arsip jadi
+alat perbaikan.
+
+**2. Placeholder `{nama_produk}`.** Belum dibangun. Perlu diingat: saat
+ini **tidak ada satu pun template yang memakai placeholder, dan router
+tidak melakukan penggantian apa pun** — kalau ada yang mengetik
+`{nama_produk}` hari ini, pelanggan menerima tulisan itu mentah-mentah.
+Jadi yang harus dibangun: daftar putih placeholder yang benar-benar
+punya sumber data, ditawarkan sebagai tombol sisip, dan simpan ditolak
+bila ada placeholder di luar daftar itu.
 ### 🚩 Step 16: sub-tab Flag Koreksi (4 Sep 2026)
 
 Bagian terakhir yang masih berupa placeholder. Dikerjakan lebih dulu

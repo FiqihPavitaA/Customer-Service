@@ -593,6 +593,41 @@ export function matchTemplate(pesan) {
   return null;
 }
 
+/**
+ * Kenapa sebuah pesan TIDAK tertangkap template.
+ *
+ * Dipakai kotak "Uji coba" di halaman Kelola Template. Ditaruh di
+ * sini, bersebelahan dengan pengamannya, dan bukan disalin ke sisi
+ * Next.js — salinan pola pengaman pasti menyimpang begitu polanya
+ * diperbarui, dan halaman akan menjelaskan sebab yang keliru.
+ *
+ * @returns kalimat penjelasan, atau null bila pesannya justru COCOK.
+ */
+export function jelaskanTidakCocok(pesan) {
+  const msg = String(pesan ?? '').trim();
+  if (!msg) return 'Pesannya masih kosong.';
+
+  if (msg.length > BATAS_PANJANG) {
+    return (
+      `Pesan lebih dari ${BATAS_PANJANG} karakter, jadi selalu diserahkan ke AI. ` +
+      'Pesan sepanjang ini biasanya pelanggan sedang bercerita, bukan menanyakan satu hal.'
+    );
+  }
+
+  if (BUTUH_PENILAIAN.test(msg)) {
+    const kena = msg.match(BUTUH_PENILAIAN);
+    return (
+      `Pesan mengandung kata "${kena ? kena[0] : ''}" yang menuntut penilaian, ` +
+      'jadi selalu diserahkan ke AI walaupun kata kuncinya cocok. ' +
+      'Balasan baku berisiko keliru untuk pertanyaan seperti ini.'
+    );
+  }
+
+  if (matchTemplate(msg)) return null;
+
+  return 'Belum ada kata kunci pemicu yang cocok dengan pesan ini.';
+}
+
 /* ===========================================================
    LAPIS 2 — penentuan kategori
 
@@ -810,4 +845,30 @@ export function logRouting(keputusan, prefix = "[KB-ROUTER]") {
 /** Jumlah aturan pencocokan template (dipakai /api/health). */
 export function jumlahAturan() {
   return RULES.length;
+}
+
+/**
+ * Aturan pencocokan dalam bentuk yang bisa dikirim sebagai JSON.
+ *
+ * RegExp tidak bisa di-JSON.stringify (hasilnya {}), jadi tiap pola
+ * dikembalikan sebagai teks sumbernya. Halaman Kelola Template
+ * memakainya untuk menunjukkan kata kunci pemicu tiap template dan
+ * — yang lebih penting — template mana yang BELUM punya pemicu sama
+ * sekali (109 dari 152 pada 4 Sep 2026).
+ *
+ * `urutan` sengaja ikut dikirim: urutan aturan adalah logika, dan
+ * tanpa nomor itu tidak terlihat kenapa satu pesan jatuh ke template
+ * A dan bukan B.
+ */
+export function getRules() {
+  const sumber = (re) => (re instanceof RegExp ? re.source : String(re));
+  return RULES.map((r, i) => ({
+    urutan: i + 1,
+    code: r.code,
+    action: r.action,
+    when: r.when.map(sumber),
+    also: r.also ? sumber(r.also) : null,
+    unless: r.unless ? r.unless.map(sumber) : [],
+    why: r.why,
+  }));
 }
