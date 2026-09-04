@@ -458,7 +458,10 @@ function Tren() {
 export default function Beranda() {
   return (
     <div className="flex flex-col gap-4.5 p-5 px-6 pb-10 max-mini:gap-3.5 max-mini:p-3.5 max-mini:pb-7.5">
-      <DemoNotice detail="Kartu bertanda 'live' sudah dihitung dari data store." />
+      <DemoNotice
+        sumber="contoh"
+        detail="Kartu bertanda 'live' dihitung dari data percakapan yang nyata; sisanya masih angka contoh dari lib/db/analytics.ts."
+      />
 
       <div className="grid grid-cols-[1fr_320px] gap-4.5 max-tablet:grid-cols-1">
         <Integrasi />

@@ -667,7 +667,10 @@ export default function Broadcast() {
         ))}
       </div>
 
-      <DemoNotice detail="Tugas yang dibuat tersimpan selama sesi ini saja, belum dikirim ke marketplace." />
+      <DemoNotice
+        sumber="contoh"
+        detail="Broadcast milik API marketplace, bukan tabel kita — tugas yang dibuat tersimpan selama sesi ini saja dan belum dikirim."
+      />
 
       {mode === "list" ? (
         <TaskList mp={mp} onAdd={() => setMode("form")} />

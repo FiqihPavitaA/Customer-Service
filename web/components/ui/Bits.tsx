@@ -169,19 +169,52 @@ export function Pill({ kind, children }: { kind: string; children: React.ReactNo
 }
 
 /* ---------- Penanda mode demo ----------
-   Ditampilkan di tiap halaman selama DB_MODE = 'memory' supaya
-   penonton demo tidak mengira angkanya sudah data produksi.
+   Ditampilkan supaya penonton demo tidak mengira angkanya sudah
+   data produksi.
 
-   Begitu Supabase menyala penanda ini HILANG, bukan berganti
-   kalimat: sebuah pita peringatan yang selalu ada akan berhenti
-   dibaca orang, dan justru saat itulah ia paling dibutuhkan. */
-export function DemoNotice({ detail }: { detail?: string }) {
-  if (DB_MODE !== "memory") return null;
+   `sumber` menentukan apa yang terjadi begitu Supabase menyala:
+
+     "db"      Data halaman ini memang pindah ke Supabase, jadi
+               penandanya HILANG — bukan berganti kalimat. Pita
+               peringatan yang selalu ada akan berhenti dibaca orang.
+
+     "contoh"  Data halaman ini TETAP dari seed walau Supabase aktif
+               (mis. ulasan & pembatalan milik API marketplace, atau
+               agregat statistik yang belum dihitung). Penandanya
+               tetap muncul, dengan kalimat yang lebih tegas.
+
+   Pembedaan ini bukan hiasan. Tanpa itu, menyalakan Supabase akan
+   membuat halaman Statistik, Beranda, Broadcast, dan Pesanan
+   menampilkan angka karangan TANPA peringatan apa pun — persis saat
+   orang paling percaya bahwa datanya sudah nyata. */
+export function DemoNotice({
+  detail,
+  sumber = "db",
+}: {
+  detail?: string;
+  sumber?: "db" | "contoh";
+}) {
+  const nyata = DB_MODE !== "memory";
+  if (nyata && sumber === "db") return null;
+
+  const tegas = nyata && sumber === "contoh";
+
   return (
-    <p className="m-0 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-green/40 bg-green-soft px-3.5 py-2 text-[0.78rem] text-text-2">
-      <span aria-hidden>🧪</span>
-      <b className="font-semibold text-green-dark">{DB_MODE_LABEL}.</b>
-      {detail && <span className="text-muted">{detail}</span>}
+    <p
+      className={[
+        "m-0 flex flex-wrap items-center gap-2 rounded-xl border border-dashed px-3.5 py-2 text-[0.78rem]",
+        tegas
+          ? "border-[#f59e0b] bg-[#fffbeb] text-[#92400e]"
+          : "border-green/40 bg-green-soft text-text-2",
+      ].join(" ")}
+    >
+      <span aria-hidden>{tegas ? "⚠️" : "🧪"}</span>
+      <b className={tegas ? "font-semibold" : "font-semibold text-green-dark"}>
+        {tegas
+          ? "Supabase aktif, tetapi angka di halaman ini MASIH data contoh."
+          : `${DB_MODE_LABEL}.`}
+      </b>
+      {detail && <span className={tegas ? "" : "text-muted"}>{detail}</span>}
     </p>
   );
 }

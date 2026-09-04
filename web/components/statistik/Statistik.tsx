@@ -261,7 +261,10 @@ export default function Statistik() {
         </GhostButton>
       </PageHead>
 
-      <DemoNotice detail="Angka statistik masih contoh; nanti dihitung dari tabel conversations." />
+      <DemoNotice
+        sumber="contoh"
+        detail="Seluruh angka di halaman ini masih dari lib/db/analytics.ts, belum dihitung dari tabel conversations."
+      />
 
       <KpiGrid range={range} />
 

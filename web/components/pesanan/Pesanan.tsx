@@ -770,7 +770,10 @@ export default function Pesanan() {
         ))}
       </div>
 
-      <DemoNotice detail="Keputusan Setujui/Tolak tersimpan selama sesi ini, belum dikirim ke marketplace." />
+      <DemoNotice
+        sumber="contoh"
+        detail="Ulasan, refund, dan pembatalan milik API pesanan marketplace — keputusan di sini tersimpan selama sesi ini saja dan belum dikirim."
+      />
 
       {tab === "penilaian" && <PanelPenilaian onChat={chatReview} />}
       {tab === "refund" && <PanelRefund onChat={chatRefund} />}
