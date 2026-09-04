@@ -144,6 +144,42 @@ function gagalTulis(apa: string, pesan: string) {
   void hydrateFromSupabase();
 }
 
+/**
+ * Periksa hasil satu penulisan.
+ *
+ * INI YANG PALING MUDAH TERLEWAT: aturan RLS yang menolak UPDATE
+ * TIDAK mengembalikan error. PostgREST membalas "sukses" dengan nol
+ * baris terpengaruh, karena dari sisi SQL memang tidak ada baris yang
+ * boleh dilihat untuk diubah — bukan kesalahan, hanya tidak ada yang
+ * cocok.
+ *
+ * Akibatnya, memeriksa `error` saja membuat layar berbohong: nilai
+ * baru tampil seolah tersimpan, lalu diam-diam kembali ke nilai lama
+ * saat halaman dimuat ulang. Persis yang dilaporkan pemilik proyek
+ * pada 4 Sep 2026 untuk ambang keyakinan AI.
+ *
+ * Karena itu setiap penulisan memakai .select(), dan nol baris
+ * diperlakukan sebagai kegagalan.
+ */
+function periksaTulis(
+  apa: string,
+  error: { message: string } | null,
+  data: unknown[] | null,
+) {
+  if (error) {
+    gagalTulis(apa, error.message);
+    return;
+  }
+  if (!data || data.length === 0) {
+    gagalTulis(
+      apa,
+      "database tidak mengubah baris apa pun. Umumnya aturan RLS menolak: " +
+        "perubahan ini butuh peran 'admin' di tabel profiles. Bisa juga " +
+        "barisnya memang tidak ada.",
+    );
+  }
+}
+
 let sedangHydrate: Promise<void> | null = null;
 
 /**
@@ -249,9 +285,8 @@ export function markRead(id: string) {
     ?.from("conversations")
     .update({ unread: false })
     .eq("id", id)
-    .then(({ error }) => {
-      if (error) gagalTulis("status dibaca", error.message);
-    });
+    .select("id")
+    .then(({ error, data }) => periksaTulis("status dibaca", error, data));
 }
 
 /** Tambah balasan CS ke sebuah percakapan. */
@@ -283,9 +318,8 @@ export function appendMessage(id: string, content: string) {
     // updated_at diisi trigger conversations_touch, jadi tidak dikirim.
     .update({ messages, last_message_at: now })
     .eq("id", id)
-    .then(({ error }) => {
-      if (error) gagalTulis("balasan", error.message);
-    });
+    .select("id")
+    .then(({ error, data }) => periksaTulis("balasan", error, data));
 }
 
 /** Perbarui panel saran AI setelah /api/chat menjawab. */
@@ -305,9 +339,8 @@ export function setAiSuggestion(
     ?.from("conversations")
     .update({ ai_suggestion: suggestion, action })
     .eq("id", id)
-    .then(({ error }) => {
-      if (error) gagalTulis("saran AI", error.message);
-    });
+    .select("id")
+    .then(({ error, data }) => periksaTulis("saran AI", error, data));
 }
 
 /* ===========================================================
@@ -342,12 +375,10 @@ export function saveSettings(
     ?.from("settings")
     .update({ ...patch, updated_by: userId })
     .eq("id", 1)
-    .then(({ error }) => {
-      // RLS settings_write hanya mengizinkan peran 'admin'. Anggota
-      // 'cs' yang menekan Simpan akan sampai di sini, dan layarnya
-      // dikembalikan ke nilai yang benar oleh gagalTulis().
-      if (error) gagalTulis("pengaturan", error.message);
-    });
+    .select("id")
+    // RLS settings_write hanya mengizinkan peran 'admin'. Penolakannya
+    // datang sebagai nol baris, BUKAN error — lihat periksaTulis().
+    .then(({ error, data }) => periksaTulis("pengaturan", error, data));
 }
 
 /* ===========================================================
@@ -402,9 +433,8 @@ export function decideFlag(
     ?.from("ai_flags")
     .update(patch)
     .eq("id", id)
-    .then(({ error }) => {
-      if (error) gagalTulis("keputusan flag", error.message);
-    });
+    .select("id")
+    .then(({ error, data }) => periksaTulis("keputusan flag", error, data));
 }
 
 /* ===========================================================
