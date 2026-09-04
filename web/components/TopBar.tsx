@@ -1,8 +1,10 @@
 "use client";
 
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "./Toast";
+import { useAuth } from "@/lib/auth";
 import { useUnreadCount } from "@/lib/db";
 import {
   MASS_SCOPES,
@@ -142,6 +144,48 @@ function MassModal({
   );
 }
 
+/* ---------------- Identitas pengguna ----------------
+   Sengaja menampilkan PERAN, bukan hanya nama: sebagian aksi
+   (menyimpan Pengaturan, memutuskan Flag Koreksi) hanya diizinkan
+   RLS untuk peran 'admin'. Kalau perannya tidak terlihat, tombol
+   yang gagal menyimpan akan terasa seperti bug, bukan seperti izin
+   yang memang tidak dimiliki. */
+
+function UserChip() {
+  const { profile, isDemo, signOut } = useAuth();
+  const router = useRouter();
+
+  if (isDemo) return null;
+
+  const keluar = async () => {
+    await signOut();
+    router.replace("/");
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 max-mobile:order-4">
+      <span
+        title={profile ? `Masuk sebagai ${profile.username}` : undefined}
+        className="max-w-[10rem] truncate rounded-xl border border-line bg-green-soft px-2.5 py-1.5 text-[0.82rem] font-semibold text-green-dark"
+      >
+        {profile ? profile.username : "…"}
+        {profile?.role === "admin" && (
+          <span className="ml-1 font-normal text-muted">· admin</span>
+        )}
+      </span>
+      <button
+        type="button"
+        onClick={keluar}
+        title="Keluar"
+        aria-label="Keluar"
+        className="h-9 w-9 cursor-pointer rounded-xl border-none bg-transparent text-[1.05rem] transition hover:bg-green-mint"
+      >
+        <span aria-hidden>⏻</span>
+      </button>
+    </div>
+  );
+}
+
 /* ---------------- TopBar ---------------- */
 
 export default function TopBar() {
@@ -225,6 +269,7 @@ export default function TopBar() {
         </div>
 
         <div className="flex items-center gap-1.5">
+          <UserChip />
           <button
             type="button"
             className="cursor-pointer rounded-xl border border-line bg-white px-2.5 py-1.5 font-semibold text-text-2"

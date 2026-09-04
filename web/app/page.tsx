@@ -1,14 +1,16 @@
 import Image from "next/image";
-import Link from "next/link";
 import type { Metadata } from "next";
+import LoginForm from "@/components/auth/LoginForm";
 
 export const metadata: Metadata = { title: "Masuk" };
 
 /* ===========================================================
    Halaman depan (pengganti index.html).
-   Formulir login sesungguhnya dibuat di Step 7 memakai Supabase
-   Auth — login hardcode lama sengaja TIDAK dipindahkan ke sini.
-   Untuk sementara halaman ini hanya pintu masuk ke console.
+
+   Tetap komponen server supaya metadata & gambar tetap dirender
+   di server; isinya yang butuh keadaan sesi diserahkan ke
+   <LoginForm>, dan formulir itu sendiri yang memutuskan tampil
+   sebagai login sungguhan atau pintu masuk mode demo.
    =========================================================== */
 
 export default function Home() {
@@ -34,24 +36,13 @@ export default function Home() {
 
         <div className="rounded-[32px] bg-white/90 p-10 shadow-card max-mini:p-6">
           <p className="m-0 mb-4 text-[0.82rem] font-bold tracking-[0.08em] text-green uppercase">
-            Migrasi sedang berjalan
+            Console Customer Service
           </p>
           <h2 className="m-0 mb-5 text-4xl leading-tight font-bold max-mini:text-3xl">
-            Versi Next.js dari console CS
+            Masuk ke console
           </h2>
-          <p className="mt-0 mb-8 max-w-xl leading-relaxed text-text-2">
-            Kerangka layout sudah berdiri. Halaman-halaman di dalamnya masih
-            dipindahkan satu per satu dari versi HTML lama. Login dengan
-            Supabase Auth dipasang di Step 7 — sampai saat itu console bisa
-            dibuka langsung tanpa autentikasi.
-          </p>
 
-          <Link
-            href="/beranda"
-            className="inline-block rounded-2xl bg-green px-6 py-4 font-bold text-white no-underline transition hover:bg-green-hover"
-          >
-            Buka Console →
-          </Link>
+          <LoginForm />
         </div>
       </div>
     </div>

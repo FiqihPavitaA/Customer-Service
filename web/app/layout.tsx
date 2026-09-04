@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/lib/auth";
 
 /* Font Inter — sama dengan stack font di styles.css/dashboard.css lama. */
 const inter = Inter({
@@ -23,7 +24,11 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="id" className={inter.variable}>
-      <body className="font-sans antialiased">{children}</body>
+      {/* AuthProvider dipasang di akar, bukan di (dashboard), supaya
+          halaman login dan console memakai sesi yang sama. */}
+      <body className="font-sans antialiased">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

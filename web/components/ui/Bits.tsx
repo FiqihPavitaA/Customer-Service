@@ -6,7 +6,7 @@
    di komentar masing-masing.
    =========================================================== */
 
-import { DB_MODE_LABEL } from "@/lib/db";
+import { DB_MODE, DB_MODE_LABEL } from "@/lib/db";
 
 /* ---------- .date-tabs / .dt (beranda.css, statistik.css) ---------- */
 export function DateTabs<T extends string>({
@@ -170,8 +170,13 @@ export function Pill({ kind, children }: { kind: string; children: React.ReactNo
 
 /* ---------- Penanda mode demo ----------
    Ditampilkan di tiap halaman selama DB_MODE = 'memory' supaya
-   penonton demo tidak mengira angkanya sudah data produksi. */
+   penonton demo tidak mengira angkanya sudah data produksi.
+
+   Begitu Supabase menyala penanda ini HILANG, bukan berganti
+   kalimat: sebuah pita peringatan yang selalu ada akan berhenti
+   dibaca orang, dan justru saat itulah ia paling dibutuhkan. */
 export function DemoNotice({ detail }: { detail?: string }) {
+  if (DB_MODE !== "memory") return null;
   return (
     <p className="m-0 flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-green/40 bg-green-soft px-3.5 py-2 text-[0.78rem] text-text-2">
       <span aria-hidden>🧪</span>

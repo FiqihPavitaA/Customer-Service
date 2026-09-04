@@ -23,6 +23,7 @@ import { useToast } from "@/components/Toast";
 import { DemoNotice, GhostButton } from "@/components/ui/Bits";
 import { actionTagClass } from "@/components/ai/actionTag";
 import { saveSettings, useSettings } from "@/lib/db";
+import { useAuth } from "@/lib/auth";
 import { inisial } from "@/lib/format";
 
 type SectionId =
@@ -227,6 +228,7 @@ const AI_ACTIONS = [
 ];
 
 function PanelAi() {
+  const { profile } = useAuth();
   const settings = useSettings();
   const toast = useToast();
 
@@ -380,7 +382,12 @@ function PanelAi() {
       <SaveBar
         label="Simpan Pengaturan AI"
         onSave={() => {
-          saveSettings({ ai_enabled: enabled, ai_model: model, confidence: conf });
+          // profile.id dicatat di kolom updated_by supaya terlihat siapa
+          // yang terakhir mengubah ambang keyakinan AI.
+          saveSettings(
+            { ai_enabled: enabled, ai_model: model, confidence: conf },
+            profile?.id ?? null,
+          );
           toast("Pengaturan AI tersimpan ✅");
         }}
       />
@@ -472,6 +479,7 @@ function PanelKb({ onSave }: { onSave: () => void }) {
 /* ---------------- Panel: Handover ---------------- */
 
 function PanelHandover() {
+  const { profile } = useAuth();
   const settings = useSettings();
   const toast = useToast();
   /* Sama seperti PanelAi: nilai awal dari store, disinkronkan
@@ -566,7 +574,7 @@ function PanelHandover() {
       <SaveBar
         label="Simpan"
         onSave={() => {
-          saveSettings({ escalation_keywords: keywords });
+          saveSettings({ escalation_keywords: keywords }, profile?.id ?? null);
           toast("Kata kunci eskalasi tersimpan ✅");
         }}
       />

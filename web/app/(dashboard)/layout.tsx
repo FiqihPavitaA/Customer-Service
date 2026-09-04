@@ -1,6 +1,7 @@
 import Rail from "@/components/Rail";
 import TopBar from "@/components/TopBar";
 import { ToastProvider } from "@/components/Toast";
+import AuthGuard from "@/components/auth/AuthGuard";
 
 /* ===========================================================
    Shell console — pengganti <div class="app"> yang selama ini
@@ -20,16 +21,18 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ToastProvider>
-      <div className="flex h-dvh flex-col overflow-hidden">
-        <TopBar />
-        <div className="relative flex min-h-0 flex-1 max-mobile:flex-col">
-          <Rail />
-          <main className="min-h-0 min-w-0 flex-1 overflow-auto max-mobile:order-1">
-            {children}
-          </main>
+    <AuthGuard>
+      <ToastProvider>
+        <div className="flex h-dvh flex-col overflow-hidden">
+          <TopBar />
+          <div className="relative flex min-h-0 flex-1 max-mobile:flex-col">
+            <Rail />
+            <main className="min-h-0 min-w-0 flex-1 overflow-auto max-mobile:order-1">
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
-    </ToastProvider>
+      </ToastProvider>
+    </AuthGuard>
   );
 }

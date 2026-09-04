@@ -1,49 +1,55 @@
 /* ===========================================================
-   Titik tukar sumber data — satu-satunya berkas yang berubah
-   saat Supabase dinyalakan (Step 6b -> Step 6/7 penuh).
+   Titik masuk lapisan data.
 
-   MODE SEKARANG: "memory"
-   Data berasal dari lib/db/seed.ts dan hidup di memori browser
-   (lib/db/store.ts). Dipilih atas permintaan pemilik proyek:
-   demo dulu, koneksi database setelah disetujui.
+   MODE DITENTUKAN OTOMATIS, bukan diketik tangan:
+
+     NEXT_PUBLIC_SUPABASE_URL & _ANON_KEY terisi -> "supabase"
+     belum terisi                                -> "memory"
+
+   Kenapa otomatis: kalau modenya berupa konstanta yang harus
+   diubah manual, cepat atau lambat akan ada keadaan di mana
+   konstantanya bilang "supabase" sementara .env.local kosong —
+   dan gejalanya adalah halaman kosong tanpa pesan galat, yang
+   sulit ditebak sebabnya. Dengan cara ini keduanya tidak mungkin
+   berbeda.
+
+   Menyalakan Supabase karena itu = mengisi dua baris di
+   web/.env.local, lalu jalankan ulang dev server. Tidak ada kode
+   yang perlu disentuh.
 
    ----------------------------------------------------------
-   CARA MENUKAR KE SUPABASE NANTI
+   CARA KERJANYA (sejak Step 7)
    ----------------------------------------------------------
-   1. Jalankan supabase/schema.sql di project Supabase.
-   2. Isi NEXT_PUBLIC_SUPABASE_URL & NEXT_PUBLIC_SUPABASE_ANON_KEY
-      di web/.env.local (barisnya sudah ada, tinggal dibuka).
-   3. npm i @supabase/supabase-js
-   4. Buat lib/db/supabase.ts dengan fungsi bernama sama seperti
-      yang diekspor store.ts, lalu ganti baris re-export di bawah.
+   store.ts adalah satu-satunya jalur data, dan ia write-through:
+   membaca dari Supabase saat login, mengirim tiap perubahan ke
+   database, dan menyegarkan lewat Realtime bila admin lain ikut
+   mengubah. Rencana lama — modul lib/db/supabase.ts terpisah
+   berisi fungsi bernama sama — ditinggalkan karena dua
+   implementasi dari API yang sama pasti menyimpang diam-diam.
 
-   Pemetaan fungsi -> panggilan Supabase (sudah disiapkan):
-
-     useConversations()      select * from conversations
-                             order by last_message_at desc
-     useUnreadCount()        select count(*) where unread
-     markRead(id)            update conversations set unread=false
-     appendMessage(id, txt)  update conversations
-                             set messages = messages || $1
-     setAiSuggestion(...)    update conversations
-                             set ai_suggestion, action
-     useSettings()           select * from settings where id = 1
-     saveSettings(patch)     update settings set ... where id = 1
-     useAiFlags()            select * from ai_flags order by created_at desc
-
-   Yang TIDAK bisa ditukar ke Supabase karena bukan data kita:
+   Yang TIDAK ikut ke Supabase, dan alasannya:
      useReviews / useRefunds / useCancels / decideCancels
-       -> Shopee & TikTok Shop Order/Review API
+       -> milik Shopee & TikTok Shop Order/Review API
      useBroadcast / addBroadcastTask
-       -> Chat Broadcast API tiap marketplace
+       -> milik Chat Broadcast API tiap marketplace
      lib/db/analytics.ts
-       -> hasil agregasi conversations + data pesanan
+       -> hasil agregasi, bukan tabel
+   Keempatnya tetap dari seed.ts walau Supabase menyala. Menyalin
+   data milik marketplace ke tabel kita berarti menyimpan angka
+   yang bisa basi kapan saja tanpa kita tahu.
    =========================================================== */
 
-export const DB_MODE = "memory" as const;
+import { isSupabaseConfigured } from "@/lib/supabase/client";
+
+export const DB_MODE: "memory" | "supabase" = isSupabaseConfigured()
+  ? "supabase"
+  : "memory";
 
 /** Ditampilkan di UI supaya penonton demo tahu datanya belum nyata. */
-export const DB_MODE_LABEL = "Mode demo — data contoh, belum tersambung Supabase";
+export const DB_MODE_LABEL =
+  DB_MODE === "supabase"
+    ? "Tersambung Supabase"
+    : "Mode demo — data contoh, belum tersambung Supabase";
 
 export * from "./types";
 export * from "./store";

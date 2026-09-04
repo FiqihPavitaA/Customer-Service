@@ -175,7 +175,7 @@ Setiap halaman dianggap selesai migrasi bila:
 
 ## 7. Status Saat Ini
 
-_Terakhir diperbarui: 2 September 2026 (setelah Step 6b mode demo). Rekap per-step ada di tabel di bawah._
+_Terakhir diperbarui: 4 September 2026 (setelah Step 6c + Step 7). Rekap per-step ada di tabel di bawah._
 
 - [x] Node.js terinstall di mesin pengembangan — `v24.16.0`
 - [x] Repo GitHub dibuat — `infarmsales/Customer-Service`
@@ -205,7 +205,8 @@ nomor yang sudah dijanjikan di tabel route (§4 Fase 1).
 | 6a | **Tulis** skema `supabase/schema.sql` (5 tabel + RLS + Realtime) + `supabase/README.md` | 3 | `4a07318` | ✅ Selesai |
 | 6b-demo | Lapisan data `web/lib/db/` — tipe TS dari `schema.sql` + seed dari mock lama + satu titik tukar ke Supabase | 3 | `lib/db/` | ✅ Selesai |
 | 6b | **Jalankan** skema di project Supabase nyata + isi URL & anon key di `web/.env.local` | 3 | — | ⛔ Ditunda — menunggu pemilik proyek |
-| 7 | Login hardcode → Supabase Auth (route `/`) | 3 | — | ⛔ Belum |
+| 6c | **Tulis** skema KB `supabase/schema-kb.sql` (5 tabel template + log router) | 3 | `schema-kb.sql` | ✅ Selesai |
+| 7 | Login Supabase Auth + lapisan data write-through ke Supabase | 3 | `lib/auth.tsx`, `lib/supabase/client.ts`, `lib/db/store.ts` | ✅ Kode selesai — menyala sendiri saat kredensial diisi |
 | 8 | Halaman Settings; pengaturan AI pindah dari `localStorage` → store berbentuk tabel `settings` | 3 & 4 | `components/settings/` | ✅ Selesai (mode demo) |
 | 9 | Migrasi halaman Statistik | 4 | `components/statistik/` | ✅ Selesai (mode demo) |
 | 10 | Migrasi halaman Beranda | 4 | `components/beranda/` | ✅ Selesai (mode demo) |
@@ -215,9 +216,14 @@ nomor yang sudah dijanjikan di tabel route (§4 Fase 1).
 | 14 | Migrasi halaman Chat/Dashboard (paling kompleks, dikerjakan terakhir) | 4 | `components/chat/` | ✅ Selesai (mode demo) |
 | 15 | Lapisan template sebelum AI (`lib/templates.ts`, 12 aturan, uji 21/21) | Tambahan | `abd8d37` | ✅ Selesai |
 
-**Ringkasan:** 14 step selesai (1, 2, 3, 4, 5, 6a, 6b-demo, 8, 9, 10, 11,
-12, 13, 15) — 2 step belum (6b, 7), keduanya butuh project Supabase
-nyata. Ketujuh halaman console sudah jadi; tidak ada lagi placeholder.
+**Ringkasan:** 16 step selesai (1, 2, 3, 4, 5, 6a, 6b-demo, 6c, 7, 8, 9,
+10, 11, 12, 13, 15) — tinggal 6b, satu-satunya yang tidak bisa dikerjakan
+dari sisi kode karena butuh project Supabase nyata milik pemilik proyek.
+Ketujuh halaman console sudah jadi; tidak ada lagi placeholder.
+
+> Step 7 ditulis supaya **tidak menunggu** Step 6b. Kodenya sudah ada dan
+> teruji di kedua cabang; yang menentukan mana yang dipakai adalah ada
+> tidaknya kredensial di `web/.env.local`, bukan konstanta di kode.
 
 > "Selesai (mode demo)" berarti tampilan & interaksi halaman sudah
 > setara versi HTML lama dan datanya sudah berbentuk baris
@@ -363,6 +369,71 @@ tulis `lib/db/supabase.ts` dengan nama fungsi yang sama dan ganti satu
 baris re-export di `lib/db/index.ts`. Tidak ada komponen halaman yang
 perlu diubah.
 
+### 🔐 Step 7: login + tukar data ke Supabase (4 Sep 2026)
+
+Dikerjakan atas permintaan pemilik proyek setelah skema KB selesai
+ditulis. Yang penting dari step ini bukan formulir loginnya, melainkan
+**cara modenya ditentukan**.
+
+#### Mode tidak lagi diketik tangan
+
+`DB_MODE` di `web/lib/db/index.ts` dulu berupa konstanta `"memory"` yang
+harus diubah manual. Sekarang nilainya diturunkan dari ada tidaknya
+`NEXT_PUBLIC_SUPABASE_URL` & `_ANON_KEY`.
+
+Alasannya: dengan konstanta manual, cepat atau lambat akan muncul keadaan
+di mana konstantanya berkata `"supabase"` sementara `.env.local` kosong —
+dan gejalanya adalah **halaman kosong tanpa pesan galat**, yang sulit
+ditebak sebabnya. Dengan cara sekarang keduanya tidak mungkin berbeda.
+
+Konsekuensinya: menyalakan Supabase = mengisi dua baris di `.env.local`
+lalu jalankan ulang server. Tidak ada berkas kode yang perlu disentuh.
+
+#### Write-through, bukan modul tandingan
+
+Rencana lama (tertulis di `lib/db/index.ts` versi Step 6b) adalah membuat
+`lib/db/supabase.ts` berisi fungsi bernama sama, lalu menukar baris
+re-export. Rencana itu **ditinggalkan**: dua implementasi dari API yang
+sama pasti menyimpang diam-diam, dan setiap perbaikan harus ditulis dua
+kali. Sekarang `store.ts` tetap satu-satunya jalur, dengan satu
+percabangan di dalamnya — membaca saat login, menulis setiap perubahan,
+dan menyegarkan lewat Realtime.
+
+#### Yang perlu diingat soal keamanan
+
+`AuthGuard` mengalihkan pengguna yang belum login ke `/`. **Itu
+kenyamanan, bukan pengaman** — siapa pun bisa mematikannya lewat
+devtools. Yang benar-benar menjaga data adalah RLS: setiap kebijakan
+berbunyi `to authenticated`, jadi tanpa sesi yang sah query balik kosong
+walau halamannya dibuka paksa.
+
+Karena itu pula sesi disimpan di `localStorage`, bukan cookie: route
+handler di server tidak perlu melihatnya. `/api/chat` memakai kunci
+Anthropic milik server dan memang tidak perlu tahu siapa yang login.
+
+#### Yang TETAP dari seed walau Supabase menyala
+
+`reviews`, `refunds`, `cancels`, dan `broadcast`. Keempatnya bukan tabel
+kita — sumbernya API pesanan & broadcast marketplace. Menyalinnya ke
+Supabase berarti menyimpan angka milik Shopee/TikTok yang bisa basi kapan
+saja tanpa kita tahu.
+
+#### Bagaimana ini diuji tanpa project Supabase
+
+Kedua cabang dijalankan sungguhan, bukan hanya dikompilasi:
+
+| Cabang | Cara | Hasil |
+|---|---|---|
+| Demo (env kosong) | `next build` + `next start` | `/` menampilkan "Buka Console", `/beranda` memuat penanda mode demo |
+| Supabase (env palsu) | build ulang dengan URL & key karangan | `/` menampilkan formulir email + kata sandi, `/beranda` berhenti di "Memeriksa sesi…" |
+
+Cabang kedua memakai kredensial palsu, jadi yang terbukti adalah
+**percabangan dan tampilannya**, bukan query-nya. Query sungguhan baru
+bisa diuji setelah Step 6b dijalankan.
+
+Selain itu: `tsc --noEmit` bersih, `eslint` bersih, `router.test.mjs`
+48/48, `sync-kb --check` 10 berkas sinkron. Tidak ada panggilan Claude
+API sepanjang step ini.
 ### ⏸ Yang tertahan menunggu pemilik proyek
 1. ~~**Step 5 — uji AI engine sungguhan**~~ ✅ selesai 31 Agu 2026.
 2. **Step 6b — jalankan skema:** butuh project Supabase + jalankan `supabase/schema.sql`, lalu URL & anon key di `web/.env.local`. **DITUNDA** atas permintaan pemilik proyek — demo dijalankan lebih dulu dengan lapisan data mode demo (lihat bagian Step 6b di atas).

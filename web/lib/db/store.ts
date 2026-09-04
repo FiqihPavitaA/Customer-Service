@@ -1,25 +1,37 @@
 "use client";
 
 /* ===========================================================
-   Store mode demo — "database" yang hidup di memori browser.
-   Dibuat pada Step 6b (MIGRATION.md Fase 3).
+   Store data console — satu sumber data bersama untuk semua
+   halaman (mis. jumlah chat belum dibaca dipakai Rail dan
+   halaman Chat sekaligus).
 
-   Kenapa ada: halaman React butuh satu sumber data bersama
-   (mis. jumlah chat belum dibaca dipakai Rail dan halaman
-   Chat sekaligus). Sebelum Supabase menyala, sumber itu adalah
-   modul ini. Bentuk datanya sudah mengikuti schema.sql, jadi
-   penggantinya nanti hanya menukar isi fungsi, bukan UI.
+   Dibuat pada Step 6b sebagai store memori murni. Sejak Step 7
+   store yang sama menjadi WRITE-THROUGH ke Supabase:
 
-   BATASAN YANG DISENGAJA — tidak disembunyikan:
-   - Data hidup di memori satu tab. Refresh = kembali ke seed.
-   - Tidak ada sinkronisasi antar admin (itu justru yang akan
-     dibuktikan TEST-PLAN-SINKRONISASI.md setelah Supabase).
-   - Tidak ada autentikasi; pengguna aktif dipaku ke DEMO_USER.
+     - Kredensial belum diisi -> tetap seperti dulu, seluruh data
+       dari lib/db/seed.ts dan hidup di memori satu tab.
+     - Kredensial sudah diisi -> hydrateFromSupabase() mengganti
+       isinya dengan baris asli, setiap perubahan dikirim ke
+       database, dan Realtime menyegarkan bila admin lain ikut
+       mengubah.
 
-   Cara menukar ke Supabase nanti: lihat lib/db/index.ts.
+   KENAPA WRITE-THROUGH, BUKAN MODUL TANDINGAN
+   Rencana awal di lib/db/index.ts adalah membuat lib/db/supabase.ts
+   berisi fungsi bernama sama, lalu menukar baris re-export. Cara
+   itu ditinggalkan: dua implementasi dari API yang sama pasti
+   menyimpang diam-diam, dan setiap perbaikan harus ditulis dua
+   kali. Sekarang hanya ada satu jalur, dengan satu percabangan
+   di dalamnya.
+
+   YANG TETAP DARI SEED WALAU SUPABASE MENYALA:
+   reviews, refunds, cancels, dan broadcast. Keempatnya BUKAN
+   tabel kita — sumber sebenarnya API pesanan & broadcast
+   marketplace (Fase 3 roadmap). Menaruhnya di Supabase berarti
+   menyalin data milik Shopee/TikTok yang bisa basi kapan saja.
    =========================================================== */
 
 import { useCallback, useSyncExternalStore } from "react";
+import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import {
   DEMO_USER,
   SEED_AI_FLAGS,
@@ -38,6 +50,8 @@ import type {
   Cancel,
   ChatMessage,
   Conversation,
+  ConversationExtra,
+  ConversationRow,
   EscalationRow,
   Refund,
   Review,
@@ -96,6 +110,115 @@ export function useDb<T>(selector: (s: DbState) => T): T {
 }
 
 /* ===========================================================
+   Jembatan Supabase
+   =========================================================== */
+
+const PAKAI_SUPABASE = isSupabaseConfigured();
+
+/**
+ * Empat field yang dipakai UI lama tetapi tidak punya kolom di
+ * schema.sql. Sengaja TIDAK dikarang isinya:
+ *   chat_count  -> bisa dihitung dari panjang messages
+ *   product_query -> tidak ada sumbernya; kosong = kotak input kosong
+ *   order_status / order_courier -> milik API pesanan marketplace;
+ *     Chat.tsx sudah punya cabang tampilan untuk nilai null.
+ */
+function lengkapi(r: ConversationRow): Conversation {
+  const extra: ConversationExtra = {
+    chat_count: Array.isArray(r.messages) ? r.messages.length : 0,
+    product_query: "",
+    order_status: null,
+    order_courier: null,
+  };
+  return { ...r, ...extra };
+}
+
+/**
+ * Kegagalan menulis tidak boleh lewat diam-diam: UI sudah terlanjur
+ * memperlihatkan perubahan yang sebenarnya gagal tersimpan. Jadi
+ * dicatat ke console, lalu state ditarik ulang dari database supaya
+ * layar kembali menunjukkan keadaan yang sebenarnya.
+ */
+function gagalTulis(apa: string, pesan: string) {
+  console.error(`[db] gagal menyimpan ${apa}: ${pesan}`);
+  void hydrateFromSupabase();
+}
+
+let sedangHydrate: Promise<void> | null = null;
+
+/**
+ * Tarik seluruh data dari Supabase dan gantikan isi store.
+ * Dipanggil AuthGuard setelah pengguna login, dan diulang tiap
+ * kali Realtime memberi tahu ada perubahan.
+ *
+ * Aman dipanggil berkali-kali: pemanggilan yang tumpang tindih
+ * ikut menunggu permintaan yang sedang berjalan.
+ */
+export function hydrateFromSupabase(): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return Promise.resolve();
+  if (sedangHydrate) return sedangHydrate;
+
+  sedangHydrate = (async () => {
+    const [conv, esc, set, flags] = await Promise.all([
+      sb.from("conversations").select("*").order("last_message_at", { ascending: false }),
+      sb.from("escalations").select("*").order("created_at", { ascending: false }),
+      sb.from("settings").select("*").eq("id", 1).maybeSingle(),
+      sb.from("ai_flags").select("*").order("created_at", { ascending: false }),
+    ]);
+
+    const patch: Partial<DbState> = {};
+
+    // Tiap tabel diperlakukan sendiri-sendiri: satu tabel yang gagal
+    // (mis. RLS menolak) tidak boleh mengosongkan tiga tabel lain.
+    if (conv.error) console.error("[db] conversations:", conv.error.message);
+    else patch.conversations = (conv.data as ConversationRow[]).map(lengkapi);
+
+    if (esc.error) console.error("[db] escalations:", esc.error.message);
+    else patch.escalations = esc.data as EscalationRow[];
+
+    if (set.error) console.error("[db] settings:", set.error.message);
+    else if (set.data) patch.settings = set.data as SettingsRow;
+
+    if (flags.error) console.error("[db] ai_flags:", flags.error.message);
+    else patch.aiFlags = flags.data as AiFlagRow[];
+
+    if (Object.keys(patch).length) setState(patch);
+  })().finally(() => {
+    sedangHydrate = null;
+  });
+
+  return sedangHydrate;
+}
+
+/**
+ * Dengarkan perubahan dari admin lain.
+ *
+ * Sengaja menarik ulang seluruh data, bukan menambal baris yang
+ * berubah: payload Realtime tidak membawa hasil order/filter, dan
+ * logika penambalan per-peristiwa adalah tempat lahirnya bug urutan
+ * yang sulit ditelusuri. Tabelnya kecil, jadi menarik ulang murah.
+ *
+ * @returns fungsi untuk berhenti mendengarkan.
+ */
+export function subscribeRealtime(): () => void {
+  const sb = getSupabase();
+  if (!sb) return () => {};
+
+  const ch = sb.channel("konsol-cs");
+  for (const table of ["conversations", "escalations", "settings", "ai_flags"]) {
+    ch.on("postgres_changes", { event: "*", schema: "public", table }, () => {
+      void hydrateFromSupabase();
+    });
+  }
+  ch.subscribe();
+
+  return () => {
+    void sb.removeChannel(ch);
+  };
+}
+
+/* ===========================================================
    conversations
    =========================================================== */
 
@@ -118,36 +241,73 @@ export function markRead(id: string) {
   const next = state.conversations.map((c) =>
     c.id === id && c.unread ? { ...c, unread: false } : c,
   );
-  if (next.some((c, i) => c !== state.conversations[i])) {
-    setState({ conversations: next });
-  }
+  if (!next.some((c, i) => c !== state.conversations[i])) return;
+  setState({ conversations: next });
+
+  if (!PAKAI_SUPABASE) return;
+  void getSupabase()
+    ?.from("conversations")
+    .update({ unread: false })
+    .eq("id", id)
+    .then(({ error }) => {
+      if (error) gagalTulis("status dibaca", error.message);
+    });
 }
 
 /** Tambah balasan CS ke sebuah percakapan. */
 export function appendMessage(id: string, content: string) {
   const now = new Date().toISOString();
   const msg: ChatMessage = { role: "assistant", content, timestamp: now };
+
+  const target = state.conversations.find((c) => c.id === id);
+  if (!target) return;
+  const messages = [...target.messages, msg];
+
   setState({
     conversations: state.conversations.map((c) =>
       c.id === id
         ? {
             ...c,
-            messages: [...c.messages, msg],
+            messages,
+            chat_count: messages.length,
             updated_at: now,
             last_message_at: now,
           }
         : c,
     ),
   });
+
+  if (!PAKAI_SUPABASE) return;
+  void getSupabase()
+    ?.from("conversations")
+    // updated_at diisi trigger conversations_touch, jadi tidak dikirim.
+    .update({ messages, last_message_at: now })
+    .eq("id", id)
+    .then(({ error }) => {
+      if (error) gagalTulis("balasan", error.message);
+    });
 }
 
 /** Perbarui panel saran AI setelah /api/chat menjawab. */
-export function setAiSuggestion(id: string, suggestion: string, action: Conversation["action"]) {
+export function setAiSuggestion(
+  id: string,
+  suggestion: string,
+  action: Conversation["action"],
+) {
   setState({
     conversations: state.conversations.map((c) =>
       c.id === id ? { ...c, ai_suggestion: suggestion, action } : c,
     ),
   });
+
+  if (!PAKAI_SUPABASE) return;
+  void getSupabase()
+    ?.from("conversations")
+    .update({ ai_suggestion: suggestion, action })
+    .eq("id", id)
+    .then(({ error }) => {
+      if (error) gagalTulis("saran AI", error.message);
+    });
 }
 
 /* ===========================================================
@@ -160,15 +320,34 @@ export function useSettings() {
   return useDb(selectSettings);
 }
 
-export function saveSettings(patch: Partial<Omit<SettingsRow, "id">>) {
+/**
+ * Simpan pengaturan AI.
+ * @param userId id profil yang menyimpan; null di mode demo.
+ */
+export function saveSettings(
+  patch: Partial<Omit<SettingsRow, "id">>,
+  userId: string | null = DEMO_USER.id,
+) {
   setState({
     settings: {
       ...state.settings,
       ...patch,
       updated_at: new Date().toISOString(),
-      updated_by: DEMO_USER.id,
+      updated_by: userId,
     },
   });
+
+  if (!PAKAI_SUPABASE) return;
+  void getSupabase()
+    ?.from("settings")
+    .update({ ...patch, updated_by: userId })
+    .eq("id", 1)
+    .then(({ error }) => {
+      // RLS settings_write hanya mengizinkan peran 'admin'. Anggota
+      // 'cs' yang menekan Simpan akan sampai di sini, dan layarnya
+      // dikembalikan ke nilai yang benar oleh gagalTulis().
+      if (error) gagalTulis("pengaturan", error.message);
+    });
 }
 
 /* ===========================================================
@@ -210,6 +389,9 @@ export function useCancelCount() {
  * 'lanjut' = tolak    -> pesanan tetap dilanjutkan
  * Mengembalikan berapa baris yang benar-benar berubah, supaya
  * pemanggil bisa menyusun pesan toast seperti pesanan.js lama.
+ *
+ * Tetap lokal walau Supabase menyala: keputusan pembatalan harus
+ * dikirim ke API pesanan marketplace, bukan ke tabel kita.
  */
 export function decideCancels(orders: string[], decision: "batal" | "lanjut") {
   const target = new Set(orders);
@@ -255,8 +437,16 @@ export function addBroadcastTask(marketplace: string, task: BroadcastTask) {
    Utilitas demo
    =========================================================== */
 
-/** Kembalikan seluruh data ke seed — tombol "Atur ulang data demo". */
+/**
+ * Kembalikan seluruh data ke seed — tombol "Atur ulang data demo".
+ * Tidak melakukan apa pun bila Supabase menyala: menimpa percakapan
+ * asli dengan data contoh bukan "atur ulang", itu kehilangan data.
+ */
 export function resetDemoData() {
+  if (PAKAI_SUPABASE) {
+    console.warn("[db] Atur ulang data demo diabaikan — Supabase aktif.");
+    return;
+  }
   setState({
     conversations: clone(SEED_CONVERSATIONS),
     escalations: clone(SEED_ESCALATIONS),
