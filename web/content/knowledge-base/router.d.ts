@@ -107,3 +107,23 @@ export function getRules(): AturanSerial[];
  * @returns kalimat penjelasan, atau null bila pesannya justru cocok.
  */
 export function jelaskanTidakCocok(pesan: string): string | null;
+
+/**
+ * Susun pola pemicu dari frasa biasa yang diketik tim CS.
+ * Semua karakter khusus di-escape, jadi frasa tidak bisa jadi pola liar.
+ * @returns sumber regex, atau null bila tidak ada frasa.
+ */
+export function buatPolaDariFrasa(frasa: string[]): string | null;
+
+/** Hasil menguji kata kunci yang belum tersimpan sebagai aturan. */
+export type HasilUjiDraf = {
+  /** Terisi bila pengaman router membatalkan pencocokan, apa pun frasanya. */
+  dicegatPengaman: string | null;
+  /** Frasa yang diketik menangkap pesan ini. */
+  cocokDraf: boolean;
+  /** Kode template TERSIMPAN yang menang lebih dulu, bila ada. */
+  direbutOleh: string | null;
+  pola: string | null;
+};
+
+export function ujiDraf(pesan: string, frasa: string[]): HasilUjiDraf;

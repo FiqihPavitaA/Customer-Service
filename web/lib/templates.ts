@@ -19,10 +19,14 @@ import {
   getAsalKode as routerAsal,
   getRules as routerRules,
   jelaskanTidakCocok as routerJelaskan,
+  ujiDraf as routerUjiDraf,
   jumlahAturan,
   setKbDir,
 } from "@/content/knowledge-base/router.js";
-import type { AturanSerial } from "@/content/knowledge-base/router.js";
+import type {
+  AturanSerial,
+  HasilUjiDraf,
+} from "@/content/knowledge-base/router.js";
 import type { Action } from "./knowledge";
 
 /**
@@ -77,7 +81,16 @@ export function jelaskanTidakCocok(pesan: string): string | null {
   return routerJelaskan(pesan);
 }
 
-export type { AturanSerial };
+/**
+ * Uji kata kunci yang BELUM tersimpan sebagai aturan — dipakai form
+ * "Tambah Template". Tanpa ini tim CS harus menyimpan dulu baru tahu
+ * apakah kata kuncinya menangkap, yaitu menebak.
+ */
+export function ujiDraf(pesan: string, frasa: string[]): HasilUjiDraf {
+  return routerUjiDraf(pesan, frasa);
+}
+
+export type { AturanSerial, HasilUjiDraf };
 
 export function templateStats() {
   return { rules: jumlahAturan(), templates: routerLibrary().size };

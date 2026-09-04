@@ -1,32 +1,36 @@
 /* ===========================================================
-   Kotak "Uji coba" di halaman Kelola Template.
+   Kotak "Uji coba" — dipakai dua tempat dengan dua kebutuhan
+   yang berbeda:
 
-   Kenapa ini ada: tanpa uji coba, menambah kata kunci pemicu adalah
-   MENEBAK. Tim CS mengetik frasa, menyimpan, lalu tidak pernah tahu
-   apakah frasa itu benar-benar menangkap pertanyaan pelanggan —
-   sampai ada yang mengeluh.
+   1. Detail template TERSIMPAN (tanpa `kataKunci`)
+      "Kalau pelanggan menulis ini, template mana yang menjawab?"
 
-   Yang dijalankan di sini adalah matchTemplate() yang SAMA PERSIS
-   dengan yang dipakai /api/chat. Bukan tiruan. Jadi hasil di sini
-   adalah hasil yang sungguhan akan terjadi.
+   2. Form Tambah Template (dengan `kataKunci`)
+      "Kalau saya pakai frasa ini, apakah pesan tadi tertangkap —
+       dan apakah ada template lain yang merebutnya lebih dulu?"
 
-   Penjelasan "kenapa tidak cocok" juga datang dari router
-   (jelaskanTidakCocok), bukan disalin ke sini — salinan pola
-   pengaman pasti menyimpang begitu polanya diperbarui.
+   Yang kedua yang membuat form tambah tidak jadi tebak-tebakan.
+   Tanpa itu, tim CS harus menyimpan dulu baru tahu hasilnya.
 
-   TIDAK memanggil Claude API. Hanya regex + baca berkas .md lokal.
-   Biaya Rp 0 berapa kali pun ditekan.
+   Semua pencocokan memakai fungsi yang sama dengan /api/chat —
+   bukan tiruan. TIDAK memanggil Claude API: hanya regex + baca
+   berkas .md lokal, jadi Rp 0 berapa kali pun ditekan.
    =========================================================== */
 
 import { NextResponse } from "next/server";
-import { jelaskanTidakCocok, matchTemplate } from "@/lib/templates";
-import type { HasilUji } from "@/lib/db/templateTypes";
+import { jelaskanTidakCocok, matchTemplate, ujiDraf } from "@/lib/templates";
+import type { HasilUji, HasilUjiDraft } from "@/lib/db/templateTypes";
 
 export async function POST(req: Request) {
   let pesan = "";
+  let kataKunci: string[] | null = null;
+
   try {
-    const body = (await req.json()) as { pesan?: unknown };
+    const body = (await req.json()) as { pesan?: unknown; kataKunci?: unknown };
     pesan = String(body.pesan ?? "").trim();
+    if (Array.isArray(body.kataKunci)) {
+      kataKunci = body.kataKunci.map((k) => String(k));
+    }
   } catch {
     return NextResponse.json({ error: "Body bukan JSON yang sah." }, { status: 400 });
   }
@@ -35,11 +39,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Pesan masih kosong." }, { status: 400 });
   }
 
-  const hit = matchTemplate(pesan);
+  /* ---- Mode draf: menguji frasa yang belum tersimpan ---- */
+  if (kataKunci) {
+    const d = ujiDraf(pesan, kataKunci);
+    const hasil: HasilUjiDraft = {
+      mode: "draf",
+      dicegatPengaman: d.dicegatPengaman,
+      cocokDraf: d.cocokDraf,
+      direbutOleh: d.direbutOleh,
+      pola: d.pola,
+    };
+    return NextResponse.json(hasil);
+  }
 
+  /* ---- Mode biasa: aturan yang sudah tersimpan ---- */
+  const hit = matchTemplate(pesan);
   const hasil: HasilUji = hit
-    ? { cocok: true, code: hit.code, why: hit.why, sebab: null }
-    : { cocok: false, code: null, why: null, sebab: jelaskanTidakCocok(pesan) };
+    ? { mode: "tersimpan", cocok: true, code: hit.code, why: hit.why, sebab: null }
+    : {
+        mode: "tersimpan",
+        cocok: false,
+        code: null,
+        why: null,
+        sebab: jelaskanTidakCocok(pesan),
+      };
 
   return NextResponse.json(hasil);
 }

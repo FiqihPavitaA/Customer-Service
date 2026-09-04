@@ -33,41 +33,34 @@ import {
   type KategoriTemplate,
   type TemplateItem,
 } from "@/lib/db/templateTypes";
+import TemplateBaru from "./TemplateBaru";
 import {
   hapusTemplate,
   muatTemplates,
   simpanTemplate,
-  tambahTemplate,
   useTemplates,
 } from "@/lib/db/templateStore";
 
 type SaringStatus = "semua" | "aktif" | "tanpa";
 
-const KOSONG: TemplateItem = {
-  code: "",
-  kategori: "umum",
-  berkas: "faq-umum.md",
-  body: "",
-  action: "AUTO_REPLY",
-  urutanAturan: null,
-  kataKunci: [],
-  kataKunciUtuh: true,
-  polaAsli: [],
-  also: null,
-  unless: [],
-  why: null,
-  usageCount: null,
-  lastUsedAt: null,
-};
-
 /* ---------------- Potongan kecil ---------------- */
 
+/* Tiga keadaan, bukan dua:
+     hijau  - punya aturan pemicu, bisa terkirim otomatis
+     biru   - baru dibuat di halaman ini; kata kuncinya mungkin sudah
+              ada, tetapi aturannya belum masuk router, jadi belum
+              aktif. Menandainya "tanpa pemicu" pun keliru.
+     kuning - benar-benar tidak punya pemicu apa pun */
 function StatusDot({ item }: { item: TemplateItem }) {
-  const aktif = item.urutanAturan !== null;
+  const { warna, judul } = item.baru
+    ? { warna: "bg-[#3b82f6]", judul: "Baru dibuat — belum aktif sampai tersimpan ke database" }
+    : item.urutanAturan !== null
+      ? { warna: "bg-green", judul: "Punya pemicu — bisa terkirim otomatis" }
+      : { warna: "bg-[#f59e0b]", judul: "Belum punya pemicu" };
   return (
     <span
-      title={aktif ? "Punya pemicu — bisa terkirim otomatis" : "Belum punya pemicu"}
-      className={`inline-block h-2 w-2 shrink-0 rounded-full ${aktif ? "bg-green" : "bg-[#f59e0b]"}`}
+      title={judul}
+      className={`inline-block h-2 w-2 shrink-0 rounded-full ${warna}`}
       aria-hidden
     />
   );
@@ -125,6 +118,7 @@ function UjiCoba({ kodeIni }: { kodeIni: string }) {
       setHasil((await r.json()) as HasilUji);
     } catch {
       setHasil({
+        mode: "tersimpan",
         cocok: false,
         code: null,
         why: null,
@@ -200,11 +194,9 @@ function UjiCoba({ kodeIni }: { kodeIni: string }) {
 
 function Detail({
   item,
-  baru,
   onTutup,
 }: {
   item: TemplateItem;
-  baru: boolean;
   onTutup: () => void;
 }) {
   const toast = useToast();
@@ -235,24 +227,8 @@ function Detail({
   };
 
   const simpan = () => {
-    if (baru) {
-      const galat = tambahTemplate({
-        ...KOSONG,
-        code,
-        kategori,
-        body,
-        kataKunci: kata,
-        berkas: `faq-${kategori}.md`,
-      });
-      if (galat) {
-        toast(galat);
-        return;
-      }
-      toast(`Template [${code.toUpperCase()}] ditambahkan`);
-    } else {
-      simpanTemplate(item.code, { code, kategori, body, kataKunci: kata });
-      toast(`[${item.code}] disimpan`);
-    }
+    simpanTemplate(item.code, { code, kategori, body, kataKunci: kata });
+    toast(`[${item.code}] disimpan`);
     onTutup();
   };
 
@@ -267,16 +243,14 @@ function Detail({
       {/* ---- Kepala ---- */}
       <div className="flex items-start justify-between gap-3 border-b border-line px-4.5 py-3.5">
         <div className="min-w-0">
-          <div className="truncate text-[1.05rem] font-bold">
-            {baru ? "Template baru" : `[${item.code}]`}
-          </div>
-          {!baru && (
-            <div className="mt-0.5 text-[0.78rem] text-muted">
-              {item.urutanAturan !== null
+          <div className="truncate text-[1.05rem] font-bold">[{item.code}]</div>
+          <div className="mt-0.5 text-[0.78rem] text-muted">
+            {item.baru
+              ? `Baru dibuat — belum aktif · ${item.berkas}`
+              : item.urutanAturan !== null
                 ? `Aturan pemicu ke-${item.urutanAturan} · ${item.berkas}`
                 : `Belum punya pemicu · ${item.berkas}`}
-            </div>
-          )}
+          </div>
         </div>
         <button
           type="button"
@@ -469,15 +443,13 @@ function Detail({
       {/* ---- Kaki ---- */}
       {bolehUbah && (
         <div className="flex items-center gap-2.5 border-t border-line px-4.5 py-3 max-mini:flex-col-reverse max-mini:items-stretch">
-          {!baru && (
-            <button
-              type="button"
-              onClick={hapus}
-              className="cursor-pointer rounded-xl border border-[#fecaca] bg-white px-4 py-2.5 font-bold text-[#b91c1c] hover:bg-[#fee2e2]"
-            >
-              Hapus
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={hapus}
+            className="cursor-pointer rounded-xl border border-[#fecaca] bg-white px-4 py-2.5 font-bold text-[#b91c1c] hover:bg-[#fee2e2]"
+          >
+            Hapus
+          </button>
           <div className="flex-1 max-mini:hidden" />
           <button
             type="button"
@@ -489,10 +461,10 @@ function Detail({
           <button
             type="button"
             onClick={simpan}
-            disabled={!berubah && !baru}
+            disabled={!berubah}
             className="cursor-pointer rounded-xl border-none bg-green px-5 py-2.5 font-bold text-white transition hover:bg-green-hover disabled:opacity-50"
           >
-            {baru ? "Tambahkan" : "Simpan Perubahan"}
+            Simpan Perubahan
           </button>
         </div>
       )}
@@ -519,8 +491,11 @@ export default function TemplateManager() {
     const q = cari.trim().toLowerCase();
     return items.filter((i) => {
       if (kategori !== "semua" && i.kategori !== kategori) return false;
-      if (saring === "aktif" && i.urutanAturan === null) return false;
-      if (saring === "tanpa" && i.urutanAturan !== null) return false;
+      // Template baru belum aktif, tapi juga bukan "tanpa pemicu"
+      // kalau kata kuncinya sudah diisi — jadi dikecualikan dari
+      // kedua penyaring supaya hitungannya tidak menyesatkan.
+      if (saring === "aktif" && (i.baru || i.urutanAturan === null)) return false;
+      if (saring === "tanpa" && (i.baru || i.urutanAturan !== null)) return false;
       if (!q) return true;
       // Cari juga di isi & kata kunci, bukan hanya kode: pertanyaan
       // paling umum adalah "tadi ada template soal ongkir, kodenya apa?"
@@ -533,7 +508,7 @@ export default function TemplateManager() {
   }, [items, cari, kategori, saring]);
 
   const item = dipilih ? (items.find((i) => i.code === dipilih) ?? null) : null;
-  const panelTerbuka = baru || item !== null;
+  const panelTerbuka = item !== null;
 
   if (status === "memuat" || status === "idle") {
     return <p className="m-0 py-8 text-center text-muted">Memuat template…</p>;
@@ -544,6 +519,25 @@ export default function TemplateManager() {
       <div className="rounded-xl border border-[#fecaca] bg-[#fef2f2] px-4 py-3 text-[0.9rem] text-[#b91c1c]">
         Gagal memuat daftar template: {error}
       </div>
+    );
+  }
+
+  /* Mode tambah mengambil alih seluruh lebar. Form isian dari nol
+     butuh ruang untuk menuntun; panel sempit di sebelah daftar hanya
+     cocok untuk mengubah satu-dua hal pada template yang sudah ada. */
+  if (baru) {
+    return (
+      <TemplateBaru
+        kodeTerpakai={items.map((i) => i.code)}
+        onBatal={() => setBaru(false)}
+        onSelesai={(code) => {
+          setBaru(false);
+          setDipilih(code);
+          setCari("");
+          setSaring("semua");
+          setKategori("semua");
+        }}
+      />
     );
   }
 
@@ -689,13 +683,9 @@ export default function TemplateManager() {
             ].join(" ")}
           >
             <Detail
-              key={baru ? "__baru__" : (item?.code ?? "")}
-              item={baru ? KOSONG : item!}
-              baru={baru}
-              onTutup={() => {
-                setBaru(false);
-                setDipilih(null);
-              }}
+              key={item!.code}
+              item={item!}
+              onTutup={() => setDipilih(null)}
             />
           </div>
         )}

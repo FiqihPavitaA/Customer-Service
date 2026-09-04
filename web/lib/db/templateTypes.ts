@@ -67,6 +67,17 @@ export type TemplateItem = {
    */
   usageCount: number | null;
   lastUsedAt: string | null;
+
+  /**
+   * true bila template ini baru dibuat lewat halaman Kelola Template
+   * dan BELUM tersimpan ke mana pun.
+   *
+   * Perlu dibedakan dari dua keadaan lain: template yang punya aturan
+   * (aktif) dan yang tidak punya sama sekali. Template baru boleh jadi
+   * sudah diberi kata kunci, tetapi aturannya belum ada di router —
+   * jadi ia belum aktif, dan menandainya "tanpa pemicu" pun keliru.
+   */
+  baru?: boolean;
 };
 
 export type RingkasanTemplate = {
@@ -84,12 +95,28 @@ export type TemplatesResponse = {
   error?: string;
 };
 
-/** Hasil kotak "Uji coba" di form. */
+/** Hasil uji terhadap aturan yang SUDAH tersimpan. */
 export type HasilUji = {
+  mode: "tersimpan";
   cocok: boolean;
   /** Kode template yang menang; belum tentu yang sedang diedit. */
   code: string | null;
   why: string | null;
   /** Alasan tidak cocok, dalam bahasa yang bisa dibaca CS. */
   sebab: string | null;
+};
+
+/**
+ * Hasil uji terhadap kata kunci yang BELUM tersimpan (form tambah).
+ *
+ * Tiga hal dilaporkan terpisah karena tindakannya berbeda:
+ * pengaman router membatalkan apa pun frasanya; frasa tidak menangkap;
+ * atau frasa menangkap tetapi kalah dari template lain.
+ */
+export type HasilUjiDraft = {
+  mode: "draf";
+  dicegatPengaman: string | null;
+  cocokDraf: boolean;
+  direbutOleh: string | null;
+  pola: string | null;
 };

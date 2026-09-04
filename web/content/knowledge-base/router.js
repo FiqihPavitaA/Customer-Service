@@ -842,6 +842,76 @@ export function logRouting(keputusan, prefix = "[KB-ROUTER]") {
   return { terkirim, total, hemat };
 }
 
+/**
+ * Susun pola pemicu dari frasa biasa yang diketik tim CS.
+ *
+ * INILAH yang membuat halaman Kelola Template aman dipakai orang
+ * non-teknis: mereka mengetik "dosis npk", bukan pola regex. Semua
+ * karakter khusus di-escape, jadi frasa seperti "12.12" atau "(promo)"
+ * diperlakukan sebagai teks biasa dan tidak bisa menjadi pola liar
+ * yang menggantung server.
+ *
+ * Spasi jadi \\s+ supaya "cara pakai" tetap cocok pada "cara  pakai".
+ *
+ * @param {string[]} frasa
+ * @returns {string|null} sumber regex, atau null bila tidak ada frasa.
+ */
+export function buatPolaDariFrasa(frasa) {
+  const escape = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const bagian = (frasa ?? [])
+    .map((t) => String(t ?? '').trim().toLowerCase())
+    .filter(Boolean)
+    .map((t) => escape(t).replace(/\s+/g, '\\s+'));
+  if (!bagian.length) return null;
+  return `\\b(${bagian.join('|')})\\b`;
+}
+
+/**
+ * Uji kata kunci yang BELUM tersimpan sebagai aturan.
+ *
+ * Dipakai form "Tambah Template": tanpa ini, tim CS harus menyimpan
+ * dulu baru tahu apakah kata kuncinya menangkap — yaitu menebak.
+ *
+ * Yang dilaporkan tiga hal, karena ketiganya butuh tindakan berbeda:
+ *   dicegatPengaman - kata kunci tidak akan pernah dipakai untuk pesan
+ *                     seperti ini, apa pun frasanya
+ *   cocokDraf       - frasa yang diketik menangkap pesan ini
+ *   direbut         - ada template TERSIMPAN yang menang lebih dulu
+ *
+ * @param {string} pesan
+ * @param {string[]} frasa
+ */
+export function ujiDraf(pesan, frasa) {
+  const msg = String(pesan ?? '').trim();
+  const sumber = buatPolaDariFrasa(frasa);
+
+  const alasanPengaman =
+    msg.length > BATAS_PANJANG || BUTUH_PENILAIAN.test(msg)
+      ? jelaskanTidakCocok(msg)
+      : null;
+
+  let cocokDraf = false;
+  if (sumber) {
+    try {
+      cocokDraf = new RegExp(sumber, 'i').test(msg);
+    } catch {
+      // buatPolaDariFrasa sudah meng-escape semuanya, jadi ini
+      // seharusnya tidak terjadi. Kalau toh terjadi, anggap tidak
+      // cocok — jangan sampai satu frasa aneh menjatuhkan halaman.
+      cocokDraf = false;
+    }
+  }
+
+  const tersimpan = matchTemplate(msg);
+
+  return {
+    dicegatPengaman: alasanPengaman,
+    cocokDraf,
+    direbutOleh: tersimpan ? tersimpan.code : null,
+    pola: sumber,
+  };
+}
+
 /** Jumlah aturan pencocokan template (dipakai /api/health). */
 export function jumlahAturan() {
   return RULES.length;
