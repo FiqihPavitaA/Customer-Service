@@ -165,6 +165,42 @@ const BUTUH_PENILAIAN =
 /** Pesan lebih panjang dari ini biasanya bercerita/berlapis. */
 const BATAS_PANJANG = 180;
 
+/**
+ * Pertanyaan yang meminta DESKRIPSI produk, bukan cara pakainya.
+ * "apa ya" sengaja TIDAK dimasukkan: tanpa batas kata ia tercakup
+ * di dalam "ber-apa ya-ng", dan dengan batas kata pun masih terlalu
+ * longgar ("POC ada apa ya" bisa berarti menanyakan stok).
+ */
+const MINTA_DESKRIPSI =
+  /\b(apa itu|itu apa|ini apa|apa sih|apaan|fungsi(nya)?|manfaat(nya)?|kegunaan(nya)?|kandungan(nya)?|deskripsi(nya)?|jelasin|jelaskan|buat apa|untuk apa|produk apa)\b/i;
+
+/**
+ * Pembatal bersama untuk keenam aturan PRODUK * di bawah.
+ * Baris 1: pertanyaan pemakaian — wilayah aturan PAKAI * atau AI.
+ * Baris 2: stok/harga/pengiriman — "POC ready nggak kak?" itu tanya
+ *          ketersediaan, bukan minta deskripsi produk.
+ */
+const TOLAK_DESKRIPSI = [
+  /\b(cara (pakai|penggunaan|pake|aplikasi)|gimana pakai|dosis|takaran|berapa ml|berapa gram|semprot|siram)\b/i,
+  /\b(ready|stok|stock|kosong|harga|ongkir|kirim|resi|promo|diskon|garansi)\b/i,
+];
+
+/**
+ * Pertanyaan yang menanyakan CARA PAKAI atau DOSIS.
+ * Dipakai sebagai syarat DAN (`also`) oleh aturan Tier 1, supaya
+ * menyebut nama produk saja tidak memicu balasan baku: "NPK habis"
+ * bukan pertanyaan dosis, sedangkan "dosis NPK berapa" iya.
+ */
+const MINTA_PEMAKAIAN =
+  /\b(cara (pakai|penggunaan|pake|aplikasi|menggunakan|hitung|menghitung|ngitung|kalibrasi|cangkok|stek|semai|tanam|rendam|merendam)|gimana (cara )?(pakai|pake|makai)|cara nya|caranya|dosis|takaran|kalibrasi|berapa (ml|gram|gr|sendok|sdm|sdt|tutup|sachet)|per liter|per l\b)/i;
+
+/* Bentuk satu aturan:
+     code    kode entri di berkas FAQ
+     action  klasifikasi yang dilaporkan, setara keluaran AI
+     when    daftar pola; cukup SALAH SATU cocok (bersifat ATAU)
+     also    pola tambahan yang WAJIB ikut cocok (bersifat DAN)
+     unless  bila salah satu cocok, aturan dibatalkan
+     why     alasan aturan ini aman tanpa AI, untuk audit          */
 const RULES = [
   {
     code: "BANTU",
@@ -201,7 +237,7 @@ const RULES = [
   {
     code: "HARGA",
     action: "AUTO_REPLY",
-    when: [/\bharga\b/i, /\bberapa(an)? (harganya|duit|rupiah)\b/i],
+    when: [/\bharga(nya)?\b/i, /\bberapa(an)? (harganya|duit|rupiah)\b/i],
     // sop.md melarang AI menyebut harga; template pun tidak menyebut
     // angka, hanya mengarahkan ke halaman produk. Aman.
     unless: [/\b(dosis|takaran|ongkir|ongkos kirim)\b/i],
@@ -263,7 +299,262 @@ const RULES = [
       /\b(cara (pakai|penggunaan|pake)|dosis|takaran)\b.*\bab ?mix\b/i,
       /\bab ?mix\b.*\b(cara (pakai|penggunaan|pake)|dosis|takaran)\b/i,
     ],
+    // Varian instan punya dosis sendiri ([PAKAI ABMC]: 5 ml + 5 ml,
+    // bukan dilarutkan ke 500 ml). Tanpa pengecualian ini, aturan
+    // ABMB yang lebih dulu dalam urutan akan mengirim dosis yang salah.
+    unless: [/\binstan(t)?\b/i],
     why: "Dosis AB Mix wajib persis Knowledge Base, termasuk larangan mencampur stok A dan B.",
+  },
+  /* ---------- Tier 1: dosis & cara pakai (2 Sep 2026) ----------
+     Dua puluh lima entri yang jawabannya berupa DOSIS atau LANGKAH
+     baku. Justru inilah kelompok yang paling berbahaya bila dikarang
+     AI: sop.md melarang mengubah dosis yang tercantum di Knowledge
+     Base, jadi membalas dari berkas lebih aman daripada menyusun
+     kalimat sendiri.
+
+     Semua memakai also: MINTA_PEMAKAIAN — menyebut nama produk saja
+     tidak cukup. "NPK habis, mau beli lagi" tetap ke AI.
+
+     Ditaruh SEBELUM blok PRODUK * di bawah supaya pertanyaan cara
+     pakai menang atas pertanyaan deskripsi: "cara pakai miracle
+     powder" -> [MIRACLE POWDER], bukan [PRODUK MIRACLE].
+
+     Urutan di dalam blok ini juga disengaja: yang lebih spesifik
+     lebih dulu (kalibrasi sebelum cara pakai alat, hitung ppm
+     sebelum TDS meter).                                           */
+  {
+    code: "CARA KALIBRASI ULANG TDS METER",
+    action: "AUTO_REPLY",
+    when: [/\bkalibrasi\b.*\btds\b|\btds\b.*\bkalibrasi\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Prosedur kalibrasi TDS meter — langkah baku, salah urutan bikin alat meleset.",
+  },
+  {
+    code: "CARA KALIBRASI ULANG PH METER",
+    action: "AUTO_REPLY",
+    when: [/\bkalibrasi\b.*\bph\b|\bph\b.*\bkalibrasi\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Prosedur kalibrasi pH meter — langkah baku.",
+  },
+  {
+    code: "HITUNG PPM TDS",
+    action: "AUTO_REPLY",
+    when: [/\b(hitung|ngitung|menghitung)\b.*\bppm\b|\bppm\b.*\b(hitung|ngitung|rumus)\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Rumus ppm nutrisi = ppm TDS dikurangi ppm air baku. Angka tetap.",
+  },
+  {
+    code: "CARA PAKAI TDS METER",
+    action: "AUTO_REPLY",
+    when: [/\btds( ?meter)?\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Langkah pemakaian TDS meter — prosedur baku.",
+  },
+  {
+    code: "CARA PAKAI PH METER",
+    action: "AUTO_REPLY",
+    when: [/\bph ?meter\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Langkah pemakaian pH meter — prosedur baku.",
+  },
+  {
+    code: "SOIL METER",
+    action: "AUTO_REPLY",
+    when: [/\bsoil ?meter\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Langkah pemakaian soil meter — prosedur baku.",
+  },
+  {
+    code: "PAKAI ABMC",
+    action: "AUTO_REPLY",
+    when: [/\bab ?mix instan(t)?\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Dosis AB Mix instan 5 ml A + 5 ml B — wajib persis Knowledge Base.",
+  },
+  {
+    code: "PAKAI FRUITEXPERT",
+    action: "AUTO_REPLY",
+    when: [/\bfruit ?expert\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Jadwal selang-seling Fruit Expert & POC — aturan tetap, bukan penilaian.",
+  },
+  {
+    code: "VITAMIN AKAR",
+    action: "AUTO_REPLY",
+    when: [/\bvitamin akar\b|\bvitamin b ?1\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Jadwal selang-seling vitamin akar — aturan tetap.",
+  },
+  {
+    code: "PAKAI AKAR",
+    action: "AUTO_REPLY",
+    when: [/\b(nutrisi|hormon) akar\b|\bauksin\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Dosis hormon akar 0,5 ml/L untuk stek — wajib persis Knowledge Base.",
+  },
+  {
+    code: "PAKAI B1",
+    action: "AUTO_REPLY",
+    when: [/\bb ?1\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Dosis B1: 1 tutup botol per 2 liter — wajib persis.",
+  },
+  {
+    code: "MAGNESIUM",
+    action: "AUTO_REPLY",
+    when: [/\b(magnesium|mgso4|garam inggris)\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Dosis Magnesium Sulfat kocor 5-10 gr/L — wajib persis.",
+  },
+  {
+    code: "CARA PAKAI NPK",
+    action: "AUTO_REPLY",
+    when: [/\bnpk\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Dosis NPK 1 sdm per liter — wajib persis.",
+  },
+  {
+    code: "PAKAI GUANO",
+    action: "AUTO_REPLY",
+    when: [/\bguano\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Dosis pupuk guano — wajib persis Knowledge Base.",
+  },
+  {
+    code: "DOLOMIT",
+    action: "AUTO_REPLY",
+    when: [/\bdolomit\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Dosis dolomit 100-200 gr/m2 — wajib persis.",
+  },
+  {
+    code: "MIRACLE POWDER",
+    action: "AUTO_REPLY",
+    when: [/\bmiracle( ?powder)?\b|\basam humat\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Dosis Miracle Powder (asam humat) — wajib persis. Ditaruh sebelum [PRODUK MIRACLE] supaya pertanyaan pemakaian tidak dijawab deskripsi.",
+  },
+  {
+    code: "NUTRIPOD",
+    action: "AUTO_REPLY",
+    when: [/\bnutripod\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Dosis Nutripod 1 sachet per 10 liter — wajib persis.",
+  },
+  {
+    code: "CARA PAKAI ASAM AMINO",
+    action: "AUTO_REPLY",
+    when: [/\basam amino\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Dosis asam amino 5 ml/L — wajib persis.",
+  },
+  {
+    code: "CARA PAKAI EM4",
+    action: "AUTO_REPLY",
+    when: [/\bem ?4\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Langkah pengomposan dengan EM4 — prosedur baku.",
+  },
+  {
+    code: "PBM",
+    action: "AUTO_REPLY",
+    when: [/\bpbm\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Dosis POC Sayur pada paket PBM — wajib persis.",
+  },
+  {
+    code: "PAKAI AGK LENGKAP",
+    action: "AUTO_REPLY",
+    when: [/\bagk\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Urutan pemakaian paket AGK lengkap — prosedur baku.",
+  },
+  {
+    code: "COCOPEAT",
+    action: "AUTO_REPLY",
+    when: [/\bcocopeat\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Langkah merendam & memakai cocopeat block — prosedur baku.",
+  },
+  {
+    code: "CANGKOK",
+    action: "AUTO_REPLY",
+    when: [/\b(cangkok|groot)\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Langkah stek/cangkok dengan groot — prosedur baku.",
+  },
+  {
+    code: "ATRAKTAN PETROGENOL",
+    action: "AUTO_REPLY",
+    when: [/\b(petrogenol|atraktan)\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Langkah pemasangan perangkap atraktan — prosedur baku.",
+  },
+  {
+    code: "BIVI",
+    action: "AUTO_REPLY",
+    when: [/\bbivi\b/i],
+    also: MINTA_PEMAKAIAN,
+    why: "Dosis BIVI 0,5 gr/L pencegahan — wajib persis.",
+  },
+  /* ---------- Enam entri PRODUK * (ditambahkan 2 Sep 2026) ----------
+     Semuanya deskripsi produk yang tetap ("apa itu X", "X untuk apa"),
+     bukan penilaian — aman dijawab baku.
+
+     Sengaja diletakkan SETELAH aturan PAKAI * di atas. Aturan dinilai
+     berurutan, jadi "cara pakai POC" tetap jatuh ke [PAKAI POC], bukan
+     ke [PRODUK POC]. TOLAK_DESKRIPSI hanya jaring kedua bila pola
+     PAKAI * meleset.
+
+     Semua tetap tunduk pada BUTUH_PENILAIAN, jadi "POC cocok nggak
+     buat cabai" atau "boleh dicampur nggak" tetap diserahkan ke AI. */
+  {
+    code: "PRODUK POC",
+    action: "AUTO_REPLY",
+    when: [/\bpoc\b/i],
+    also: MINTA_DESKRIPSI,
+    unless: TOLAK_DESKRIPSI,
+    why: "Deskripsi POC: pupuk organik cair untuk melebatkan buah & sayur. Kalimat tetap, tidak bergantung situasi pelanggan.",
+  },
+  {
+    code: "PRODUK MIRACLE",
+    action: "AUTO_REPLY",
+    when: [/\bmiracle( ?powder)?\b/i],
+    also: MINTA_DESKRIPSI,
+    unless: TOLAK_DESKRIPSI,
+    why: "Deskripsi Miracle Powder: menggemburkan tanah yang mengeras. Kalimat tetap.",
+  },
+  {
+    code: "PRODUK AKAR",
+    action: "AUTO_REPLY",
+    when: [/\b(produk|nutrisi|booster) akar\b/i],
+    also: MINTA_DESKRIPSI,
+    unless: TOLAK_DESKRIPSI,
+    why: "Deskripsi nutrisi akar: melebatkan akar & mengurangi stres tanaman stek. Kalimat tetap.",
+  },
+  {
+    code: "PRODUK PELEBAT",
+    action: "AUTO_REPLY",
+    when: [/\b(paket )?pelebat\b/i],
+    also: MINTA_DESKRIPSI,
+    unless: TOLAK_DESKRIPSI,
+    why: "Deskripsi paket pelebat untuk tanaman berbuah. Kalimat tetap.",
+  },
+  {
+    code: "PRODUK PESTISIDA",
+    action: "AUTO_REPLY",
+    when: [/\bpestisida\b/i],
+    also: MINTA_DESKRIPSI,
+    unless: TOLAK_DESKRIPSI,
+    why: "Deskripsi pestisida organik untuk ulat & kutu. Kalimat tetap; dosisnya tetap milik [PAKAI NEEM] atau AI.",
+  },
+  {
+    code: "PRODUK SEEDBOOSTER",
+    action: "AUTO_REPLY",
+    when: [/\bseed ?booster\b/i],
+    also: MINTA_DESKRIPSI,
+    unless: TOLAK_DESKRIPSI,
+    why: "Deskripsi seed booster untuk mempercepat benih dorman bertunas. Kalimat tetap.",
   },
   {
     code: "KOMPLAIN",
@@ -288,6 +579,7 @@ export function matchTemplate(pesan) {
   for (const rule of RULES) {
     if (rule.unless?.some((re) => re.test(msg))) continue;
     if (!rule.when.some((re) => re.test(msg))) continue;
+    if (rule.also && !rule.also.test(msg)) continue;
 
     const reply = lib.get(rule.code);
     if (!reply) {
