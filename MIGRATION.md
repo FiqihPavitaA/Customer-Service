@@ -117,9 +117,10 @@ npx create-next-app@latest web --typescript --tailwind --app
   - **RLS aktif di kelima tabel** + 10 kebijakan akses. Tanpa ini, `anon key` yang dipakai browser bisa membaca dan menulis seluruh isi tabel.
   - **Koreksi terhadap `claude.md`:** komentar SQL di sana menulis nilai `action` sebagai `ASK_INFO | HANDOVER | CHECK_ORDER`, padahal yang benar-benar dikirim `/api/chat` adalah `ASK_INFORMATION | HANDOVER_TO_CS | CHECK_ORDER_SYSTEM`. Skema memakai nilai yang nyata.
 - [x] **Supabase Realtime** dinyalakan untuk `conversations`, `escalations`, `settings`, dan `ai_flags` (dasar sinkronisasi multi-admin).
-- [ ] **Menunggu pemilik proyek:** buat project Supabase, jalankan `schema.sql`, buat admin pertama, lalu salin URL + anon key ke `web/.env.local`. Skema di atas belum pernah dijalankan pada database sungguhan.
-- [ ] Ganti login hardcode → **Supabase Auth** (email/password untuk tiap admin).
-- [ ] Pindahkan pengaturan AI (Settings) dari `localStorage` → tabel `settings` (1 baris, dibaca semua admin).
+- [x] **Dijalankan pada database sungguhan (4 Sep 2026).** Project Supabase dibuat, `schema.sql` + `schema-kb.sql` + kedua berkas seed dijalankan, admin pertama dibuat, URL & anon key terisi di `web/.env.local`.
+  - **Cacat yang ketahuan saat itu:** skema memasang 19 kebijakan RLS tetapi **tidak satu pun `GRANT`**, sehingga setiap query gagal dengan `permission denied for table profiles` sebelum kebijakan mana pun sempat dievaluasi. Diperbaiki lewat `supabase/grants.sql`, dan blok yang sama kini ada di ujung kedua berkas skema. Pelajarannya: RLS memilih **baris**, GRANT memberi izin menyentuh **tabel** — dua lapisan terpisah, dan bunyi kegagalannya berbeda (galat keras vs nol baris tanpa suara).
+- [x] Ganti login hardcode → **Supabase Auth** (email/password untuk tiap admin) — terbukti bekerja pada database sungguhan.
+- [x] Pindahkan pengaturan AI (Settings) dari `localStorage` → tabel `settings` (1 baris, dibaca semua admin) — tersimpan dan bertahan setelah refresh.
 
 > Setelah fase ini selesai, **`TEST-PLAN-SINKRONISASI.md` baru bisa dijalankan secara nyata** (sebelumnya terhalang karena data masih mock per-browser).
 
