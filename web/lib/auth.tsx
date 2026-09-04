@@ -55,6 +55,15 @@ type AuthValue = {
    * ditampilkan di TopBar, bukan hanya dicatat di console.
    */
   profileError: string | null;
+  /**
+   * Identitas dari sesi Supabase Auth — BUKAN dari tabel profiles.
+   *
+   * Dipisah justru supaya keduanya bisa dibandingkan: id di sini
+   * berasal dari JWT, id di profile berasal dari database. Kalau
+   * sesinya sah tetapi profilnya kosong, id inilah yang perlu
+   * dicari di tabel profiles.
+   */
+  authUser: { id: string; email: string | null } | null;
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
 };
@@ -69,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isDemo ? DEMO_USER : null,
   );
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [authUser, setAuthUser] = useState<AuthValue["authUser"]>(null);
 
   useEffect(() => {
     if (isDemo) return;
@@ -104,11 +114,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
            handle_new_user terpasang, jadi triggernya tidak pernah
            jalan untuk akun ini. */
         const pesan =
-          "Akun ini belum punya baris di tabel profiles, jadi perannya " +
-          "tidak diketahui dan setiap penyimpanan akan ditolak. " +
-          "Tambahkan barisnya lewat SQL Editor. User id: " +
-          userId;
-        console.error("[auth]", pesan);
+          "Pembacaan berhasil tetapi tidak mengembalikan satu baris pun. " +
+          "Dua sebab yang mungkin: barisnya memang belum ada untuk user " +
+          "id di bawah, atau tabel profiles menyalakan RLS tanpa " +
+          "kebijakan SELECT — tabel seperti itu mengembalikan nol baris " +
+          "kepada siapa pun, tanpa galat.";
+        console.error("[auth]", pesan, "user id:", userId);
         setProfile(null);
         setProfileError(pesan);
       } else {
@@ -120,16 +131,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     sb.auth.getSession().then(({ data }) => {
       if (batal) return;
-      if (data.session) void muatProfil(data.session.user.id);
-      else setStatus("out");
+      if (data.session) {
+        const u = data.session.user;
+        setAuthUser({ id: u.id, email: u.email ?? null });
+        void muatProfil(u.id);
+      } else setStatus("out");
     });
 
     const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
       if (batal) return;
-      if (session) void muatProfil(session.user.id);
-      else {
+      if (session) {
+        setAuthUser({ id: session.user.id, email: session.user.email ?? null });
+        void muatProfil(session.user.id);
+      } else {
         setProfile(null);
         setProfileError(null);
+        setAuthUser(null);
         setStatus("out");
       }
     });
@@ -167,10 +184,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAdmin: profile?.role === "admin",
       isDemo,
       profileError,
+      authUser,
       signIn,
       signOut,
     }),
-    [status, profile, profileError, isDemo, signIn, signOut],
+    [status, profile, profileError, authUser, isDemo, signIn, signOut],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

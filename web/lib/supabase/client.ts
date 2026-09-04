@@ -31,6 +31,20 @@ export function isSupabaseConfigured(): boolean {
   return Boolean(URL && ANON);
 }
 
+/**
+ * Ref proyek dari URL, mis. "abcdefghij" pada
+ * https://abcdefghij.supabase.co — untuk panel diagnosa.
+ *
+ * Gunanya satu dan penting: memastikan aplikasi bicara dengan
+ * proyek yang SAMA dengan yang dibuka di dashboard Supabase.
+ * Kalau berbeda, semua gejalanya menyerupai masalah izin — data
+ * ada di layar SQL Editor, tetapi tidak pernah ada di aplikasi.
+ */
+export function projectRef(): string | null {
+  const cocok = /^https?:\/\/([^.]+)\./.exec(URL ?? "");
+  return cocok ? cocok[1] : null;
+}
+
 let client: SupabaseClient | null = null;
 
 /**
