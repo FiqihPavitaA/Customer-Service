@@ -204,7 +204,7 @@ nomor yang sudah dijanjikan di tabel route (§4 Fase 1).
 | 5 | Uji AI engine sungguhan: 4 pesan → 4 ACTION benar, ukur token & biaya, temuan TTL cache 5 menit | 2 | `edf4989` | ✅ Selesai |
 | 6a | **Tulis** skema `supabase/schema.sql` (5 tabel + RLS + Realtime) + `supabase/README.md` | 3 | `4a07318` | ✅ Selesai |
 | 6b-demo | Lapisan data `web/lib/db/` — tipe TS dari `schema.sql` + seed dari mock lama + satu titik tukar ke Supabase | 3 | `lib/db/` | ✅ Selesai |
-| 6b | **Jalankan** skema di project Supabase nyata + isi URL & anon key di `web/.env.local` | 3 | — | ⛔ Ditunda — menunggu pemilik proyek |
+| 6b | **Jalankan** skema di project Supabase nyata + isi URL & anon key di `web/.env.local` | 3 | 4 Sep 2026 | 🟡 Sebagian — kedua skema sudah dijalankan & admin pertama dibuat; sisa: isi kredensial + verifikasi login |
 | 6c | **Tulis** skema KB `supabase/schema-kb.sql` (5 tabel template + log router) | 3 | `schema-kb.sql` | ✅ Selesai |
 | 7 | Login Supabase Auth + lapisan data write-through ke Supabase | 3 | `lib/auth.tsx`, `lib/supabase/client.ts`, `lib/db/store.ts` | ✅ Kode selesai — menyala sendiri saat kredensial diisi |
 | 8 | Halaman Settings; pengaturan AI pindah dari `localStorage` → store berbentuk tabel `settings` | 3 & 4 | `components/settings/` | ✅ Selesai (mode demo) |
