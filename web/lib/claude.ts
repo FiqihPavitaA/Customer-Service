@@ -17,6 +17,27 @@ export const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
  */
 export const MAX_TOKENS = Number(process.env.MAX_TOKENS || 600);
 
+/**
+ * SAKLAR PENGAMAN SALDO.
+ *
+ * Bila AI_TEST_LOCK=1, seluruh panggilan berbayar ke Claude ditolak
+ * sebelum dikirim. Jalur template tetap jalan seperti biasa, jadi
+ * console masih bisa didemokan — yang mati hanya yang memotong saldo.
+ *
+ * Ada karena catatan di CLAUDE.md hanya mengikat agen coding yang
+ * kebetulan membacanya. Saklar ini berlaku untuk siapa pun dan apa
+ * pun yang menekan endpoint, termasuk skrip, agen, atau klik tak
+ * sengaja di halaman AI Chatbot.
+ *
+ * Dibaca setiap kali dipanggil, bukan sekali saat modul dimuat,
+ * supaya mengubah .env.local langsung berlaku tanpa perlu paham
+ * kapan modul di-cache.
+ */
+export function aiTerkunci(): boolean {
+  const v = (process.env.AI_TEST_LOCK || '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'ya';
+}
+
 let client: Anthropic | null = null;
 
 /**

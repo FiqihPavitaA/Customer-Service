@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
+import { aiTerkunci, getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
 import { getKnowledge } from "@/lib/knowledge";
 import { templateStats } from "@/lib/templates";
 
@@ -24,6 +24,9 @@ export function GET() {
     model: MODEL,
     maxTokens: MAX_TOKENS,
     claudeConfigured: Boolean(getClient()),
+    // Saklar pengaman saldo. Dilaporkan supaya halaman AI Chatbot bisa
+    // menjelaskan kenapa balasan AI ditolak, alih-alih terlihat rusak.
+    aiTerkunci: aiTerkunci(),
     // Batas atas: bila keempat berkas FAQ ikut terkirim.
     systemPromptChars: stats.systemPromptChars,
     // Bagian yang selalu terkirim, berapa pun kategorinya.

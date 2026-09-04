@@ -51,6 +51,7 @@ type Health = {
   kbFiles: Record<string, number>;
   missingKbFiles: string[];
   templates?: { rules: number; templates: number };
+  aiTerkunci?: boolean;
 };
 
 type ChatResponse = {
@@ -162,7 +163,12 @@ export default function AiChatbot() {
     statusText = "server tidak merespons";
     statusClass = "text-[#b91c1c]";
   } else if (health) {
-    if (health.claudeConfigured) {
+    if (health.aiTerkunci) {
+      // Saklar pengaman saldo. Ditampilkan lebih dulu daripada status
+      // API key: kalau terkunci, konfigurasi kuncinya tidak relevan.
+      statusText = "AI dikunci 🔒";
+      statusClass = "text-[#b91c1c]";
+    } else if (health.claudeConfigured) {
       statusText = "Claude aktif ✅";
       statusClass = "text-green-dark";
     } else {

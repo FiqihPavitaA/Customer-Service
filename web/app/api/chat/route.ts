@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
-import { getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
+import { aiTerkunci, getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
 import { buildFaqBlock, getInvariantBlock, parseAction } from "@/lib/knowledge";
 import { ukurBalasan } from "@/lib/limits";
 // Router dipakai lewat pembungkus bertipe di lib/templates supaya
@@ -67,6 +67,24 @@ export async function POST(req: Request) {
       // melanggar langsung ketahuan, bukan setelah sampai pelanggan.
       panjang: ukurBalasan(keputusan.teks),
     });
+  }
+
+  // ---------- Penjaga saldo ----------
+  // Diperiksa SEBELUM apa pun yang menyentuh Anthropic. Ditaruh
+  // setelah jalur template supaya balasan gratis tetap jalan: yang
+  // dikunci hanya yang memotong saldo, bukan seluruh console.
+  if (aiTerkunci()) {
+    console.warn("[SALDO] Panggilan Claude ditolak — AI_TEST_LOCK aktif.");
+    return NextResponse.json(
+      {
+        error:
+          "AI_TEST_LOCK aktif — panggilan berbayar ke Claude ditolak. " +
+          "Jalur template tetap berjalan. Hapus AI_TEST_LOCK di " +
+          "web/.env.local lalu jalankan ulang server untuk membukanya.",
+        terkunci: true,
+      },
+      { status: 423 },
+    );
   }
 
   // ---------- Lapisan 2: Claude ----------

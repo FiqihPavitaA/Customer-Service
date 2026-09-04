@@ -27,6 +27,16 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.static(ROOT));
 
 // Inisialisasi Claude. API key diambil dari .env (ANTHROPIC_API_KEY)
+/**
+ * SAKLAR PENGAMAN SALDO — lihat CLAUDE.md bagian paling atas.
+ * Bila AI_TEST_LOCK=1, panggilan berbayar ke Claude ditolak sebelum
+ * dikirim. Jalur template tetap jalan.
+ */
+function aiTerkunci() {
+  const v = String(process.env.AI_TEST_LOCK || '').trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'ya';
+}
+
 const apiKey = process.env.ANTHROPIC_API_KEY;
 const client = apiKey ? new Anthropic({ apiKey }) : null;
 
@@ -82,6 +92,21 @@ app.post('/api/chat', async (req, res) => {
     }
 
     logRouting(keputusan);
+
+    // ---------- Penjaga saldo ----------
+    // Ditaruh SETELAH jalur template supaya balasan gratis tetap
+    // jalan: yang dikunci hanya yang memotong saldo. Sepadan dengan
+    // penjaga yang sama di web/app/api/chat/route.ts.
+    if (aiTerkunci()) {
+      console.warn('[SALDO] Panggilan Claude ditolak — AI_TEST_LOCK aktif.');
+      return res.status(423).json({
+        error:
+          'AI_TEST_LOCK aktif — panggilan berbayar ke Claude ditolak. ' +
+          'Jalur template tetap berjalan. Hapus AI_TEST_LOCK di ' +
+          'backend/.env lalu jalankan ulang server untuk membukanya.',
+        terkunci: true,
+      });
+    }
 
     const resp = await client.messages.create({
       model: MODEL,
