@@ -25,6 +25,27 @@ Paket gratis cukup: 500 MB database, 2 project — sesuai catatan di `claude.md`
 Berkas ini idempoten — kalau nanti ada perubahan skema, jalankan ulang seluruh
 isinya tanpa takut menghapus data yang sudah ada.
 
+> **Kalau skema pernah dijalankan sebelum 4 September 2026**, jalankan juga
+> [`grants.sql`](grants.sql) sekali. Versi lama `schema.sql` memasang seluruh
+> kebijakan RLS tetapi tidak satu pun `GRANT`, dan tanpa itu aplikasi gagal
+> dengan `permission denied for table profiles` — lihat penjelasan di bawah.
+
+### Dua lapis izin yang berbeda
+
+Ini sumber kebingungan yang mahal, jadi ditulis eksplisit. PostgreSQL memeriksa
+**dua hal yang terpisah**, dan keduanya harus lolos:
+
+| Lapisan | Menentukan | Bunyi kegagalannya |
+|---|---|---|
+| `GRANT` | boleh menyentuh **tabelnya** sama sekali? | galat keras: `permission denied for table X` |
+| Kebijakan RLS | **baris mana** yang boleh dilihat/diubah? | diam-diam **nol baris**, tanpa galat |
+
+Perbedaan bunyi itulah alat diagnosanya. `permission denied` berarti permintaan
+berhenti di lapisan pertama dan kebijakan RLS bahkan tidak sempat dievaluasi.
+Sebaliknya, layar yang menampilkan nilai bawaan tanpa pesan apa pun justru
+menunjuk ke lapisan kedua — atau ke tabel ber-RLS yang belum punya kebijakan
+`SELECT` sama sekali.
+
 **Cek hasilnya:** menu **Table Editor** harus memperlihatkan 5 tabel —
 `profiles`, `conversations`, `escalations`, `settings`, `ai_flags` —
 dan tabel `settings` sudah berisi tepat 1 baris.

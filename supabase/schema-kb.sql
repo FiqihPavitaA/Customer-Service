@@ -401,3 +401,20 @@ order by 1 desc;
 -- Selama tabel kosong, router tetap membaca berkas .md — aplikasi
 -- berjalan normal. Langkah berikutnya: supabase/README.md "Step 6c".
 -- ===========================================================
+
+
+-- ===========================================================
+-- HAK AKSES TABEL (GRANT)
+-- ===========================================================
+-- Sama alasannya seperti di schema.sql: RLS memilih baris, GRANT
+-- memberi izin menyentuh tabelnya, dan keduanya diperiksa terpisah.
+-- Diulang di sini supaya berkas ini tetap benar bila dijalankan
+-- terpisah dari schema.sql.
+
+grant usage on schema public to anon, authenticated;
+
+grant select, insert, update, delete
+  on all tables in schema public to authenticated;
+
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to authenticated;

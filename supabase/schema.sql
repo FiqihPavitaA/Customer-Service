@@ -318,3 +318,27 @@ $blk$;
 -- Selesai. Langkah berikutnya ada di supabase/README.md:
 -- membuat pengguna admin pertama dan menyalin kunci API.
 -- ===========================================================
+
+
+-- ===========================================================
+-- 8. HAK AKSES TABEL (GRANT)
+-- ===========================================================
+-- WAJIB, dan mudah terlupakan: kebijakan RLS di atas hanya memilih
+-- BARIS. Yang menentukan boleh-tidaknya menyentuh TABELNYA adalah
+-- GRANT, dan keduanya diperiksa terpisah. Tanpa blok ini, aplikasi
+-- gagal dengan "permission denied for table profiles" sebelum satu
+-- pun kebijakan di atas sempat dievaluasi.
+--
+-- Keterangan lengkapnya ada di supabase/grants.sql, yang isinya
+-- sama persis dan bisa dijalankan sendiri pada database yang skemanya
+-- sudah terpasang.
+
+grant usage on schema public to anon, authenticated;
+
+grant select, insert, update, delete
+  on all tables in schema public to authenticated;
+
+grant execute on function public.is_admin() to authenticated;
+
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to authenticated;
