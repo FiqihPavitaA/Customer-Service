@@ -154,3 +154,37 @@ ini.
 berkas. Ketiganya ikut jadi *system prompt* yang di-cache Anthropic; memindahkan
 isinya ke database tidak menghemat apa pun dan justru menambah satu titik gagal
 sebelum setiap panggilan API.
+
+---
+
+## Data contoh untuk demo (opsional)
+
+> Ditambahkan 4 September 2026.
+
+Setelah skema dijalankan, tabel `conversations` **kosong** — wajar, tapi halaman
+Chat jadi terlihat mati saat didemokan ke tim CS.
+
+[`seed-demo.sql`](seed-demo.sql) mengisinya dengan 6 percakapan, 1 eskalasi, dan
+3 flag koreksi — persis yang selama ini tampil di mode demo. SQL Editor → tempel
+→ Run.
+
+⚠️ **Ini data karangan.** Jangan dijalankan di database yang sudah berisi
+percakapan pelanggan sungguhan, kecuali Anda memang ingin data contoh ikut
+muncul di sana.
+
+**Menghapusnya kembali:** blok `DELETE` ada di bagian paling bawah berkas yang
+sama, tinggal dibuka tanda komentarnya. Semua baris contoh memakai UUID berpola
+`c0000000-` / `e0000000-` / `f0000000-`, jadi penghapusannya tidak mungkin
+menyentuh data nyata.
+
+**Kalau `seed.ts` berubah**, bangkitkan ulang dengan `npm run seed-sql` di
+folder `web/` — berkas SQL-nya dihasilkan dari sana, bukan diketik tangan,
+supaya isi database dan isi mode demo tidak pernah berbeda.
+
+Dua catatan tentang isinya:
+
+- `reporter_id` dan `reviewed_by` pada `ai_flags` sengaja `NULL`. Keduanya
+  foreign key ke `profiles`, dan profil demo tidak punya baris di `auth.users`.
+  Nama pelapornya tetap terbaca lewat kolom teks `reporter_name`.
+- `chat_count`, `product_query`, `order_status`, dan `order_courier` tidak ikut —
+  keempatnya memang tidak punya kolom di `schema.sql`.
