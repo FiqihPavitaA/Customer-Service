@@ -353,6 +353,27 @@ export const SEED_AI_FLAGS: AiFlagRow[] = [
     reviewed_at: wib("15:30", "2026-06-23"),
     reviewed_by: DEMO_USER.id,
   },
+  {
+    /* Contoh berstatus 'ditolak' — ada supaya cabang tampilan
+       penolakan (beserta alasannya) ikut terlihat saat demo, bukan
+       hanya jalur setujui. */
+    id: "f0000000-0000-4000-8000-000000000003",
+    code: "FLG-0003",
+    customer_message: "Harga Furadan 1 kg berapa kak?",
+    ai_answer: "Harga Furadan 1 Kg sekitar Rp 25.000, Kak.",
+    ai_action: "AUTO_REPLY",
+    correct_answer:
+      "AI tidak punya data harga real-time dan tidak boleh menyebut harga tanpa data sistem — seharusnya diarahkan ke halaman produk marketplace.",
+    category: "harga",
+    reporter_id: SEED_PROFILES[1].id,
+    reporter_name: "CSINFARM2",
+    note: "Harga pada jawaban AI tidak sesuai harga toko saat ini.",
+    status: "ditolak",
+    reject_reason: "Duplikat — sudah diperbaiki lewat laporan sebelumnya.",
+    created_at: wib("09:12", "2026-06-20"),
+    reviewed_at: wib("14:40", "2026-06-21"),
+    reviewed_by: DEMO_USER.id,
+  },
 ];
 
 /* ===========================================================

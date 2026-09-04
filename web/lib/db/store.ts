@@ -360,6 +360,53 @@ export function useAiFlags() {
   return useDb(selectAiFlags);
 }
 
+/** Jumlah flag yang masih menunggu review — badge di sub-tab. */
+export function usePendingFlagCount() {
+  return useDb(
+    useCallback(
+      (s: DbState) => s.aiFlags.filter((f) => f.status === "menunggu").length,
+      [],
+    ),
+  );
+}
+
+/**
+ * Putuskan sebuah flag: setujui atau tolak.
+ *
+ * Hanya admin yang boleh — tombolnya disembunyikan untuk peran 'cs',
+ * dan RLS ai_flags_review menolaknya di sisi database. Dua lapis,
+ * karena menyembunyikan tombol saja bukan pengaman.
+ *
+ * @param reviewerId id profil yang memutuskan; null di mode demo.
+ */
+export function decideFlag(
+  id: string,
+  keputusan: "disetujui" | "ditolak",
+  reviewerId: string | null,
+  alasanTolak = "",
+) {
+  const now = new Date().toISOString();
+  const patch = {
+    status: keputusan,
+    reject_reason: keputusan === "ditolak" ? alasanTolak.trim() || null : null,
+    reviewed_at: now,
+    reviewed_by: reviewerId,
+  } as const;
+
+  setState({
+    aiFlags: state.aiFlags.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+  });
+
+  if (!PAKAI_SUPABASE) return;
+  void getSupabase()
+    ?.from("ai_flags")
+    .update(patch)
+    .eq("id", id)
+    .then(({ error }) => {
+      if (error) gagalTulis("keputusan flag", error.message);
+    });
+}
+
 /* ===========================================================
    Pesanan — ulasan, refund, pembatalan
    (bukan tabel Supabase; sumber akhirnya API marketplace)

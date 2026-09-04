@@ -215,11 +215,13 @@ nomor yang sudah dijanjikan di tabel route (§4 Fase 1).
 | 13 | Halaman AI Chatbot `/ai` + pengukur token & biaya — **dikerjakan lebih awal** | 4 | `cfc98f2` | ✅ Selesai |
 | 14 | Migrasi halaman Chat/Dashboard (paling kompleks, dikerjakan terakhir) | 4 | `components/chat/` | ✅ Selesai (mode demo) |
 | 15 | Lapisan template sebelum AI (`lib/templates.ts`, 12 aturan, uji 21/21) | Tambahan | `abd8d37` | ✅ Selesai |
+| 16 | Sub-tab Flag Koreksi di `/ai` — port `ai-flag.js` + `flag.css` | 4 | `components/ai/FlagKoreksi.tsx` | ✅ Selesai (mode demo) |
 
-**Ringkasan:** 16 step selesai (1, 2, 3, 4, 5, 6a, 6b-demo, 6c, 7, 8, 9,
-10, 11, 12, 13, 15) — tinggal 6b, satu-satunya yang tidak bisa dikerjakan
-dari sisi kode karena butuh project Supabase nyata milik pemilik proyek.
-Ketujuh halaman console sudah jadi; tidak ada lagi placeholder.
+**Ringkasan:** 17 step selesai (1, 2, 3, 4, 5, 6a, 6b-demo, 6c, 7, 8, 9,
+10, 11, 12, 13, 15, 16) — tinggal 6b, satu-satunya yang tidak bisa
+dikerjakan dari sisi kode karena butuh project Supabase nyata milik
+pemilik proyek. Seluruh halaman console sudah jadi; tidak ada lagi
+placeholder maupun sub-tab yang belum dimigrasi.
 
 > Step 7 ditulis supaya **tidak menunggu** Step 6b. Kodenya sudah ada dan
 > teruji di kedua cabang; yang menentukan mana yang dipakai adalah ada
@@ -369,6 +371,65 @@ tulis `lib/db/supabase.ts` dengan nama fungsi yang sama dan ganti satu
 baris re-export di `lib/db/index.ts`. Tidak ada komponen halaman yang
 perlu diubah.
 
+### 🚩 Step 16: sub-tab Flag Koreksi (4 Sep 2026)
+
+Bagian terakhir yang masih berupa placeholder. Dikerjakan lebih dulu
+karena Supabase sedang mengalami gangguan (*Project Lifecycle Actions*),
+sehingga Step 6b tidak bisa dijalankan hari itu — sedangkan halaman ini
+sepenuhnya bisa dibangun dan diuji di mode demo.
+
+#### Tetap sub-tab, bukan halaman sendiri
+
+Sempat terpikir menjadikannya route `/flag`. Tidak jadi: rail navigasi
+hanya punya delapan ikon (🏠💬📦🤖📣📈⚙️👤) sesuai `claude.md`, dan tidak
+ada satu pun untuk Flag Koreksi. Route terpisah tanpa ikon rail berarti
+halaman yang tidak bisa dijangkau siapa pun kecuali dengan mengetik URL.
+Versi lama pun menaruhnya sebagai sub-tab di `ai.html`.
+
+#### Yang diperbaiki dari versi lama
+
+`flag-store.js` menyimpan seluruh flag di `localStorage`. Akibatnya daftar
+flag tiap admin berbeda, dan **hasil review satu orang tidak pernah
+terlihat oleh yang lain** — laporan yang sudah diputuskan tetap tampak
+"menunggu" di layar rekannya. Sekarang datanya lewat `lib/db/store.ts`,
+yang begitu Supabase menyala menulis ke `ai_flags` dan menyegarkan lewat
+Realtime.
+
+Peran juga tidak lagi datang dari tombol `localStorage`, melainkan dari
+`profiles.role` — kolom yang sama yang dipakai RLS `is_admin()`. Tombol
+penukar peran tetap ada **hanya di mode demo**, supaya perbedaan tampilan
+Admin vs CS masih bisa diperagakan tanpa membuat akun kedua.
+
+#### Dua lapis izin, bukan satu
+
+Tombol Setujui/Tolak disembunyikan untuk peran `cs`, DAN kebijakan RLS
+`ai_flags_review` menolaknya di sisi database. Menyembunyikan tombol saja
+bukan pengaman — siapa pun bisa memanggil fungsinya lewat devtools.
+
+Penyaringan "CS hanya melihat laporannya sendiri" sebaliknya memang
+**hanya** kenyamanan tampilan: `ai_flags_read` sengaja mengizinkan semua
+CS membaca, supaya laporan yang sama tidak dikirim dua kali oleh orang
+yang berbeda.
+
+#### Cara mengujinya tanpa peramban
+
+Sub-tab dan tampilan detail keduanya dikendalikan state klien, jadi tidak
+muncul di HTML hasil render. Untuk membuktikannya benar-benar tampil,
+nilai awal state diubah sementara (`tab` ke `"flag"`, lalu `dibuka` ke
+flag pertama), aplikasi dibangun dan diambil dengan `curl`, kemudian
+kedua perubahan itu dikembalikan.
+
+Hasilnya: daftar memuat 3 baris dengan hitungan penyaring benar
+(Semua 3 / Menunggu 1 / Disetujui 1 / Ditolak 1), badge sub-tab
+menunjukkan 1, dan tampilan detail memuat seluruh bagian termasuk tombol
+keputusan admin.
+
+**Yang belum diuji:** klik Setujui/Tolak dan perpindahan daftar ↔ detail —
+keduanya butuh interaksi peramban sungguhan.
+
+Satu contoh berstatus `ditolak` ditambahkan ke seed supaya cabang
+penolakan (beserta alasannya) ikut terlihat saat demo, bukan hanya jalur
+setujui.
 ### 🔐 Step 7: login + tukar data ke Supabase (4 Sep 2026)
 
 Dikerjakan atas permintaan pemilik proyek setelah skema KB selesai

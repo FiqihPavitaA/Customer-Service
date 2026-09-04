@@ -9,6 +9,8 @@ import CostMeter, {
   type SessionTotals,
 } from "./CostMeter";
 import { computeCost, type Usage } from "@/lib/pricing";
+import FlagKoreksi from "./FlagKoreksi";
+import { usePendingFlagCount } from "@/lib/db";
 
 /* ===========================================================
    Halaman AI Chatbot — port sub-tab "Coba Balasan AI" di ai.html,
@@ -64,6 +66,7 @@ export default function AiChatbot() {
   const toast = useToast();
 
   const [tab, setTab] = useState<"chatbot" | "flag">("chatbot");
+  const flagMenunggu = usePendingFlagCount();
   const [health, setHealth] = useState<Health | null>(null);
   const [healthFailed, setHealthFailed] = useState(false);
 
@@ -188,6 +191,15 @@ export default function AiChatbot() {
             ].join(" ")}
           >
             {label}
+            {/* Badge hanya di sub-tab Flag, dan hanya bila ada yang
+                menunggu — angka 0 yang selalu tampil akan diabaikan
+                orang, sama seperti pita peringatan yang tidak pernah
+                berubah. */}
+            {key === "flag" && flagMenunggu > 0 && (
+              <span className="ml-1.5 rounded-lg bg-[#ef4444] px-1.5 py-px text-[0.62rem] font-bold text-white align-middle">
+                {flagMenunggu}
+              </span>
+            )}
           </button>
         ))}
         <span className={`ml-auto pr-1 text-xs font-semibold ${statusClass}`}>
@@ -196,15 +208,7 @@ export default function AiChatbot() {
       </div>
 
       {tab === "flag" ? (
-        <div className="rounded-2xl border border-line bg-white p-8">
-          <h2 className="mt-0 mb-2 text-xl font-bold">🚩 Flag Koreksi Jawaban AI</h2>
-          <p className="m-0 text-text-2">
-            Belum dimigrasi. Sub-tab ini menunggu tabel <code>ai_flags</code> di
-            Supabase — versi lamanya menyimpan data di <code>localStorage</code>,
-            sehingga daftar flag tiap admin berbeda dan hasil review tidak
-            terlihat oleh siapa pun.
-          </p>
-        </div>
+        <FlagKoreksi />
       ) : (
         <>
           {/* ---------- Kartu statistik ---------- */}
