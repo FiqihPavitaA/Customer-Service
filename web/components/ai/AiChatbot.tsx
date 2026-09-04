@@ -9,6 +9,7 @@ import CostMeter, {
   type SessionTotals,
 } from "./CostMeter";
 import { computeCost, type Usage } from "@/lib/pricing";
+import { BATAS_BALASAN, ukurBalasan } from "@/lib/limits";
 import FlagKoreksi from "./FlagKoreksi";
 import { usePendingFlagCount } from "@/lib/db";
 
@@ -59,6 +60,7 @@ type ChatResponse = {
   usage: Usage | null;
   source?: "ai" | "template";
   templateCode?: string;
+  panjang?: { panjang: number; lewat: boolean; mepet: boolean; sisa: number };
   templateWhy?: string;
 };
 
@@ -382,6 +384,30 @@ export default function AiChatbot() {
                     )}
                   </div>
                   <div className="whitespace-pre-wrap">{result.reply}</div>
+
+                  {/* Batas 600 karakter diminta tim CS (4 Sep 2026).
+                      Ditampilkan, bukan dipaksakan dengan memangkas:
+                      balasan berisi dosis yang terpotong di tengah jauh
+                      lebih berbahaya daripada balasan yang kepanjangan. */}
+                  {(() => {
+                    const u = result.panjang ?? ukurBalasan(result.reply);
+                    return (
+                      <p
+                        className={[
+                          "mt-2 mb-0 text-xs",
+                          u.lewat
+                            ? "font-semibold text-[#b91c1c]"
+                            : u.mepet
+                              ? "text-[#92400e]"
+                              : "text-muted",
+                        ].join(" ")}
+                      >
+                        {u.panjang} / {BATAS_BALASAN} karakter
+                        {u.lewat && ` — lewat ${-u.sisa}, minta AI meringkas`}
+                        {u.mepet && " — sudah mepet batas"}
+                      </p>
+                    );
+                  })()}
 
                   {result.templateWhy && (
                     <p className="mt-3 mb-0 rounded-lg bg-white px-3 py-2 text-xs text-muted">

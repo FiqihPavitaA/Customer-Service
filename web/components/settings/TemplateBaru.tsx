@@ -32,6 +32,7 @@ import {
   type TemplateItem,
 } from "@/lib/db/templateTypes";
 import { tambahTemplate } from "@/lib/db/templateStore";
+import { AMBANG_MEPET, BATAS_BALASAN } from "@/lib/limits";
 
 /* ---------------- Pemeriksaan isi ---------------- */
 
@@ -83,10 +84,19 @@ function periksaIsi(body: string): Periksa[] {
     }
   }
 
-  if (isi.length > 900) {
+  /* Batas 600 karakter diminta tim CS pada 4 Sep 2026. Ini GALAT,
+     bukan peringatan: saat aturan dibuat, ke-152 template yang ada
+     sudah memenuhinya (terpanjang 599), jadi membiarkan template baru
+     melanggar berarti merusak keseragaman yang sudah ada. */
+  if (isi.length > BATAS_BALASAN) {
+    hasil.push({
+      berat: "galat",
+      pesan: `Panjangnya ${isi.length} karakter, lewat ${isi.length - BATAS_BALASAN} dari batas ${BATAS_BALASAN}. Jawab inti pertanyaannya saja lalu tawarkan penjelasan lanjutan — jangan memaksakan semuanya dalam satu balasan.`,
+    });
+  } else if (isi.length > AMBANG_MEPET) {
     hasil.push({
       berat: "peringatan",
-      pesan: `Panjangnya ${isi.length} karakter. Balasan CS yang baik 2–5 kalimat pendek; yang terlalu panjang jarang dibaca pelanggan.`,
+      pesan: `Panjangnya ${isi.length} karakter — tinggal ${BATAS_BALASAN - isi.length} lagi sampai batas ${BATAS_BALASAN}.`,
     });
   }
 
@@ -288,7 +298,8 @@ export default function TemplateBaru({
           className="w-full resize-y rounded-xl border border-line bg-green-soft px-3.5 py-3 leading-relaxed outline-none focus:bg-white"
         />
         <p className="mt-1.5 mb-0 text-[0.75rem] text-muted">
-          {body.trim().length} karakter · dikirim apa adanya, tanpa diubah AI.
+          {body.trim().length} / {BATAS_BALASAN} karakter · dikirim apa adanya,
+          tanpa diubah AI.
         </p>
         {catatanIsi.map((c) => (
           <Catatan key={c.pesan} p={c} />

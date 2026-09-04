@@ -34,6 +34,7 @@ import {
   type TemplateItem,
 } from "@/lib/db/templateTypes";
 import TemplateBaru from "./TemplateBaru";
+import { BATAS_BALASAN } from "@/lib/limits";
 import {
   hapusTemplate,
   muatTemplates,
@@ -414,8 +415,10 @@ function Detail({
             className="w-full resize-y rounded-xl border border-line bg-green-soft px-3 py-2.5 leading-relaxed outline-none focus:bg-white disabled:opacity-60"
           />
           <p className="mt-1.5 mb-0 text-[0.75rem] text-muted">
-            {body.length} karakter · dikirim apa adanya ke pelanggan, termasuk
-            baris kosong dan emoji.
+            <span className={body.trim().length > BATAS_BALASAN ? "font-semibold text-[#b91c1c]" : ""}>
+              {body.trim().length} / {BATAS_BALASAN} karakter
+            </span>{" "}
+            · dikirim apa adanya ke pelanggan, termasuk baris kosong dan emoji.
           </p>
         </div>
 

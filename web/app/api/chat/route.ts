@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
 import { buildFaqBlock, getInvariantBlock, parseAction } from "@/lib/knowledge";
+import { ukurBalasan } from "@/lib/limits";
 // Router dipakai lewat pembungkus bertipe di lib/templates supaya
 // setKbDir() sudah dijalankan sebelum berkas KB dibaca.
 import "@/lib/templates";
@@ -61,6 +62,10 @@ export async function POST(req: Request) {
       templateCode: keputusan.kode,
       templateWhy: keputusan.alasan,
       kategori: keputusan.kategori,
+      // Ke-152 template sudah di bawah 600 karakter saat aturan ini
+      // dibuat; diukur juga di sini supaya template baru yang
+      // melanggar langsung ketahuan, bukan setelah sampai pelanggan.
+      panjang: ukurBalasan(keputusan.teks),
     });
   }
 
@@ -136,6 +141,9 @@ export async function POST(req: Request) {
       promptChars: invarian.karakter + blokFaq.karakter,
       faqChars: jejak.terkirim,
       faqCharsPenuh: jejak.total,
+      // Balasan kepanjangan TIDAK dipangkas — alasannya di lib/limits.ts.
+      // Diukur dan dilaporkan supaya bisa ditindaklanjuti.
+      panjang: ukurBalasan(reply),
     });
   } catch (err) {
     // Kelas error spesifik dulu, baru yang umum.
