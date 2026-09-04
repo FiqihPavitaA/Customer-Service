@@ -97,3 +97,60 @@ mengirim laporan flag baru.
 **Realtime** dinyalakan untuk `conversations`, `escalations`, `settings`, dan
 `ai_flags` — inilah dasar yang membuat `TEST-PLAN-SINKRONISASI.md` bisa
 dijalankan dengan beberapa admin sekaligus.
+
+---
+
+## Step 6c — tabel Knowledge Base & template
+
+> Ditambahkan 4 September 2026. Jalankan **setelah** langkah 1–4 di atas.
+
+Sampai sekarang 152 balasan baku `[KODE]` hanya ada sebagai berkas `.md` di
+repo. Artinya setiap koreksi kalimat — termasuk koreksi **dosis** — harus lewat
+edit kode dan deploy ulang, dan tim CS tidak bisa memperbaikinya sendiri.
+`schema-kb.sql` menyiapkan tempatnya di database.
+
+1. **SQL Editor** → **New query** → tempel seluruh isi
+   [`schema-kb.sql`](schema-kb.sql) → **Run**.
+2. **Table Editor** sekarang menampilkan 5 tabel tambahan: `kb_categories`,
+   `templates`, `template_rules`, `template_revisions`, `routing_log`.
+   `kb_categories` sudah berisi 4 baris; empat tabel lain sengaja **kosong**.
+
+### Kenapa tabelnya dibiarkan kosong
+
+Skrip pengisi (`.md` → Supabase) belum dibuat. Menulisnya sekarang berarti
+menyerahkan skrip yang belum pernah dijalankan, karena mengujinya butuh URL dan
+key yang baru ada setelah project berdiri. Selama tabel kosong, `router.js`
+tetap membaca berkas `.md` seperti biasa — **aplikasi berjalan normal**, tidak
+ada yang rusak. Pengisian adalah langkah terpisah setelah kredensial siap.
+
+| Tabel | Menggantikan / menambah | Hak tulis |
+|---|---|---|
+| `kb_categories` | `knowledge-base/index.json` | admin |
+| `templates` | 152 entri `[KODE]` di 4 berkas FAQ | admin |
+| `template_rules` | `RULES[]` di `knowledge-base/router.js` | admin |
+| `template_revisions` | — (baru) riwayat perubahan dosis | hanya baca |
+| `routing_log` | `console.log` di `logRouting()` | semua CS |
+
+### Tiga hal yang perlu diperhatikan
+
+**Urutan aturan adalah logika.** `template_rules.priority` wajib unik dan
+router membacanya dengan `order by priority`. Menukar dua baris bisa membuat
+"cara pakai miracle powder" dijawab deskripsi produk, bukan takarannya.
+
+**Pola regex datang dari database.** Node menyusunnya kembali dengan
+`new RegExp()`. Pola yang salah tulis bisa menggantung server (catastrophic
+backtracking), jadi hak tulisnya dibatasi admin dan setiap perubahan harus
+lolos `node knowledge-base/router.test.mjs` lebih dulu.
+
+**Template jangan dibaca dari database di tiap pesan.** Satu perjalanan ke
+Supabase per chat menambah latensi pada jalur yang sekarang berbiaya Rp 0 dan
+nol jaringan. Rencananya: baca sekali, simpan di memori proses, segarkan lewat
+langganan Realtime `templates` & `template_rules` yang sudah dinyalakan skema
+ini.
+
+### Yang tetap di berkas, bukan di database
+
+`claude-core.md`, `products.json`, dan `template-jawaban.md` tetap berupa
+berkas. Ketiganya ikut jadi *system prompt* yang di-cache Anthropic; memindahkan
+isinya ke database tidak menghemat apa pun dan justru menambah satu titik gagal
+sebelum setiap panggilan API.
