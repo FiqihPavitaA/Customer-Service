@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { aiTerkunci, getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
 import { buildFaqBlock, getInvariantBlock, parseAction } from "@/lib/knowledge";
 import { ukurBalasan } from "@/lib/limits";
-import { AMBANG_YAKIN, kenaliMaksud } from "@/lib/pengenal";
+import { AMBANG_YAKIN, kenaliMaksud, MODE_PENGENAL } from "@/lib/pengenal";
 // Router dipakai lewat pembungkus bertipe di lib/templates supaya
 // setKbDir() sudah dijalankan sebelum berkas KB dibaca.
 import "@/lib/templates";
@@ -112,25 +112,31 @@ export async function POST(req: Request) {
       const pilih = kenal.kandidat[0];
       console.log(
         `[GERBANG-2] yakin ${pilih.skor.toFixed(3)} >= ${AMBANG_YAKIN} -> [${pilih.code}] ` +
-          `(lewat contoh: "${pilih.contoh}")`,
+          `(lewat contoh: "${pilih.contoh}") mode=${MODE_PENGENAL}`,
       );
-      return NextResponse.json({
-        action: "AUTO_REPLY",
-        reply: pilih.body,
-        model: null,
-        usage: null,
-        source: "pengenal",
-        templateCode: pilih.code,
-        templateWhy: `Kemiripan ${pilih.skor.toFixed(3)} dengan contoh "${pilih.contoh}".`,
-        kategori: keputusan.kategori,
-        skor: pilih.skor,
-        kandidat: kenal.kandidat,
-        tokenVoyage: pengenalToken,
-        panjang: ukurBalasan(pilih.body),
-      });
-    }
 
-    if (kenal.jenis === "ragu") {
+      // Mode bayangan: dihitung dan dicatat, tetapi TIDAK dikirim.
+      // Catatannya tetap terkumpul untuk dibandingkan dengan jawaban
+      // Sonnet, dan itulah yang menentukan kapan gerbang ini layak
+      // diaktifkan. Lihat MODE_PENGENAL di lib/pengenal.ts.
+      if (MODE_PENGENAL === "aktif") {
+        return NextResponse.json({
+          action: "AUTO_REPLY",
+          reply: pilih.body,
+          model: null,
+          usage: null,
+          source: "pengenal",
+          templateCode: pilih.code,
+          templateWhy: `Kemiripan ${pilih.skor.toFixed(3)} dengan contoh "${pilih.contoh}".`,
+          kategori: keputusan.kategori,
+          skor: pilih.skor,
+          kandidat: kenal.kandidat,
+          tokenVoyage: pengenalToken,
+          panjang: ukurBalasan(pilih.body),
+        });
+      }
+      console.log("[GERBANG-2] mode bayangan — tidak dikirim, diteruskan ke Sonnet");
+    } else if (kenal.jenis === "ragu") {
       // Di sinilah Gerbang 3 (Claude Haiku) akan berdiri: memilih
       // satu dari tiga kandidat, atau menjawab NONE. Selama gerbang
       // itu belum ada, kandidatnya dicatat lalu permintaan jatuh ke

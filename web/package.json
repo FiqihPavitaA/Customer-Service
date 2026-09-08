@@ -12,7 +12,8 @@
     "template-sql": "node scripts/buat-template-sql.mjs",
     "periksa-sql": "node scripts/periksa-seed-sql.mjs",
     "periksa-katalog": "node ../knowledge-base/periksa-katalog.mjs",
-    "contoh": "node --experimental-strip-types scripts/bangun-contoh.mjs"
+    "contoh": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/bangun-contoh.mjs",
+    "tes0": "node --env-file-if-exists=.env.local scripts/tes0.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
