@@ -191,6 +191,8 @@ type BarisTemplate = {
   usage_count: number | null;
   last_used_at: string | null;
   template_rules: BarisAturan[] | null;
+  /** Bentuk agregat dari PostgREST: [{ count: n }]. */
+  template_examples: { count: number }[] | null;
 };
 
 const BERKAS_SLUG: Record<KategoriTemplate, string> = {
@@ -254,7 +256,11 @@ export async function ambilTemplatesDb(
     .select(
       "code, category_slug, body, action, is_active, is_sensitive, note, " +
         "usage_count, last_used_at, " +
-        "template_rules ( priority, when_patterns, also_pattern, unless_patterns, why, is_active )",
+        "template_rules ( priority, when_patterns, also_pattern, unless_patterns, why, is_active ), " +
+        // Hanya jumlahnya. Menarik seluruh teks contoh untuk 154 template
+        // sekaligus membuat halaman berat tanpa ada yang membacanya —
+        // isinya baru diambil saat satu template dibuka.
+        "template_examples ( count )",
     )
     .order("code");
 
@@ -291,6 +297,7 @@ export async function ambilTemplatesDb(
       // /api/chat belum menulis ke routing_log. Dikirim null, BUKAN 0,
       // supaya halaman bisa membedakan "belum ada datanya" dari
       // "benar-benar tidak pernah dipakai".
+      jumlahContoh: t.template_examples?.[0]?.count ?? 0,
       usageCount: t.usage_count ?? null,
       lastUsedAt: t.last_used_at ?? null,
       nonaktif: !t.is_active,

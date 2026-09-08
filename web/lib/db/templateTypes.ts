@@ -69,6 +69,20 @@ export type TemplateItem = {
   lastUsedAt: string | null;
 
   /**
+   * Berapa contoh pertanyaan yang dimiliki template ini (Gerbang 2).
+   *
+   * Pembeda paling penting kedua di halaman ini, sesudah urutanAturan.
+   * Template dengan 0 contoh tidak akan pernah terpilih Gerbang 2 —
+   * hanya lewat kata kunci persis. Per 8 September 2026: 119 dari 154.
+   *
+   * Dua kolom ini menjawab pertanyaan yang berbeda, dan bedanya perlu
+   * dijaga: `urutanAturan` menentukan apakah template bisa terkirim
+   * lewat kata kunci PERSIS, `jumlahContoh` menentukan apakah ia bisa
+   * terkirim lewat kalimat yang MAKSUDNYA sama.
+   */
+  jumlahContoh?: number;
+
+  /**
    * true bila template ini baru dibuat lewat halaman Kelola Template
    * dan BELUM tersimpan ke mana pun.
    *

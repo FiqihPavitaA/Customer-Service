@@ -34,7 +34,9 @@ import {
   type TemplateItem,
 } from "@/lib/db/templateTypes";
 import TemplateBaru from "./TemplateBaru";
+import ContohPertanyaan, { BangunVektor } from "./ContohPertanyaan";
 import { BATAS_BALASAN } from "@/lib/limits";
+import { CONTOH_MINIMUM } from "@/lib/mutuContoh";
 import {
   hapusTemplate,
   muatTemplates,
@@ -470,6 +472,15 @@ function Detail({
           </div>
         )}
 
+        {/* ---- Contoh pertanyaan (Gerbang 2) ----
+             Ditaruh SESUDAH isi jawaban dan SEBELUM kotak uji, karena
+             urutannya mengikuti cara orang berpikir: baca dulu apa
+             yang dijawab template ini, baru tulis pertanyaan apa saja
+             yang seharusnya sampai ke sana. */}
+        <div className="mb-4">
+          <ContohPertanyaan code={item.code} onBerubah={() => void muatTemplates(true)} />
+        </div>
+
         <div className="mb-4">
           <UjiCoba kodeIni={item.code} />
         </div>
@@ -521,6 +532,15 @@ function Detail({
 
 export default function TemplateManager() {
   const { status, items, ringkasan, error, sumber, peringatan } = useTemplates();
+  const { isAdmin, isDemo } = useAuth();
+
+  /* Kemajuan Tahap C. Dihitung dari daftar yang SUDAH ada di layar,
+     bukan lewat permintaan baru: /api/templates sudah membawa jumlah
+     contoh per template, jadi angka ini gratis dan selalu sepadan
+     dengan apa yang terlihat di daftar. */
+  const cukupContoh = items.filter((i) => (i.jumlahContoh ?? 0) >= CONTOH_MINIMUM).length;
+  const tanpaContoh = items.filter((i) => (i.jumlahContoh ?? 0) === 0).length;
+  const persenContoh = items.length ? Math.round((cukupContoh / items.length) * 100) : 0;
 
   const [cari, setCari] = useState("");
   const [kategori, setKategori] = useState<KategoriTemplate | "semua">("semua");
@@ -719,7 +739,30 @@ export default function TemplateManager() {
                     <span className="truncate font-mono text-[0.85rem] font-bold">
                       [{i.code}]
                     </span>
-                    <span className="ml-auto shrink-0 rounded-md bg-green-soft px-2 py-0.5 text-[0.7rem] font-semibold text-muted">
+                    {/* Contoh pertanyaan — Gerbang 2.
+                        Ditampilkan di setiap baris karena inilah daftar
+                        kerja Tahap C, dan daftar kerja yang harus dibuka
+                        satu per satu bukan daftar kerja. Hijau hanya bila
+                        sudah cukup; angka telanjang saja akan terbaca
+                        seolah "ada isinya, berarti beres". */}
+                    <span
+                      title={
+                        (i.jumlahContoh ?? 0) >= CONTOH_MINIMUM
+                          ? `${i.jumlahContoh} contoh pertanyaan — cukup`
+                          : `${i.jumlahContoh ?? 0} contoh pertanyaan, perlu ${CONTOH_MINIMUM}`
+                      }
+                      className={[
+                        "ml-auto shrink-0 rounded-md px-2 py-0.5 font-mono text-[0.7rem] font-semibold",
+                        (i.jumlahContoh ?? 0) >= CONTOH_MINIMUM
+                          ? "bg-green-mint text-green-dark"
+                          : (i.jumlahContoh ?? 0) > 0
+                            ? "bg-[#fef3c7] text-[#92400e]"
+                            : "bg-[#fee2e2] text-[#b91c1c]",
+                      ].join(" ")}
+                    >
+                      {i.jumlahContoh ?? 0}/{CONTOH_MINIMUM}
+                    </span>
+                    <span className="shrink-0 rounded-md bg-green-soft px-2 py-0.5 text-[0.7rem] font-semibold text-muted">
                       {KATEGORI_LABEL[i.kategori]}
                     </span>
                   </div>
@@ -752,6 +795,55 @@ export default function TemplateManager() {
           </div>
         )}
       </div>
+
+      {/* ---- Kemajuan Tahap C + tombol berbayar ---- */}
+      {sumber === "supabase" && (
+        <>
+          <section className="mt-4 rounded-2xl border border-line bg-white p-4">
+            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+              <h4 className="m-0 text-[0.9rem] font-bold">
+                Kemajuan contoh pertanyaan (Gerbang 2)
+              </h4>
+              <span className="font-mono text-[0.82rem] font-bold text-text-2">
+                {cukupContoh} / {items.length} template
+              </span>
+            </div>
+
+            <div
+              className="h-2 w-full overflow-hidden rounded-full bg-green-soft"
+              role="progressbar"
+              aria-valuenow={persenContoh}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Template yang punya contoh pertanyaan cukup"
+            >
+              <div
+                className="h-full rounded-full bg-green transition-[width]"
+                style={{ width: `${persenContoh}%` }}
+              />
+            </div>
+
+            <p className="mt-2 mb-0 text-[0.8rem] leading-relaxed text-text-2">
+              <b>{persenContoh}%</b> template punya minimal {CONTOH_MINIMUM} contoh.
+              {tanpaContoh > 0 && (
+                <>
+                  {" "}
+                  <b className="text-[#b91c1c]">{tanpaContoh}</b> belum punya satu
+                  pun — template itu hanya bisa terkirim lewat kata kunci persis.
+                </>
+              )}
+            </p>
+            <p className="mt-1.5 mb-0 text-[0.75rem] leading-relaxed text-muted">
+              Ini pekerjaan yang paling menentukan ketepatan Gerbang 2, dan
+              satu-satunya yang tidak bisa dikerjakan developer — yang tahu
+              bagaimana pelanggan sungguhan menulis adalah yang membalas chat
+              setiap hari. Buka sebuah template untuk mengisinya.
+            </p>
+          </section>
+
+          <BangunVektor bolehJalan={isAdmin || isDemo} />
+        </>
+      )}
     </div>
   );
 }

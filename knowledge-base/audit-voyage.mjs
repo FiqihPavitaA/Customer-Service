@@ -137,10 +137,28 @@ const KATA_TANYA = [
   "apa", "apakah", "gimana", "gmn", "bagaimana", "berapa", "brp", "kapan",
   "kpn", "bisa", "boleh", "kenapa", "mana", "adakah", "ada",
 ];
-const CIRI_CHAT = [
-  "gmn", "brp", "blm", "kpn", "gak", "ga ", "udh", "tdk", "yg", "sy",
-  "kak", "kk", "ka ", "sis", "min", "bang", "aja", "dong", "nya",
-  "gak", "engga", "nggak", "trs", "bs ",
+/* Definisi gaya chat DISENGAJA sama persis dengan
+   web/lib/mutuContoh.ts. Dua definisi yang berbeda berarti laporan
+   audit dan peringatan di layar tim CS akan berselisih tentang
+   kalimat yang sama — dan tidak ada yang bisa menjelaskan mana yang
+   benar.
+
+   Versi pertama daftar ini memuat "gimana" dan "kak", dan itu
+   KELIRU: keduanya muncul juga di kalimat yang ditulis rapi, jadi
+   contoh bootstrap seperti "cara pakai neem oil gimana?" ikut
+   terhitung bergaya chat. Angka 16% pada laporan pertama berasal
+   dari kekeliruan itu. Dibetulkan 8 September 2026 setelah
+   `npm run uji-mutu` menunjukkannya. */
+const SINGKATAN_KUAT = [
+  "gmn", "gmna", "brp", "brpa", "blm", "kpn", "udh", "tdk", "yg", "sy",
+  "trs", "kk", "knp", "dgn", "utk", "kl", "klo", "bgt", "jd", "dlm",
+  "hrg", "tp", "sdh", "blh", "bs", "dr", "dpt", "sm", "tq",
+  "gak", "ga", "ngga", "nggak", "engga", "sampe", "makasih", "mksh",
+];
+
+const PARTIKEL = [
+  "kak", "ka", "sis", "min", "bang", "gan", "mimin",
+  "aja", "dong", "nih", "sih", "deh", "kok", "tuh", "yaa", "yah",
 ];
 
 const kata = (t) => t.trim().split(/\s+/).filter(Boolean);
@@ -157,11 +175,23 @@ function nilaiContoh(t) {
   return masalah;
 }
 
-function gayaChat(t) {
-  const rendah = ` ${t.toLowerCase()} `;
-  if (CIRI_CHAT.some((c) => rendah.includes(c))) return true;
-  // huruf kecil semua tanpa tanda baca akhir
-  return t === t.toLowerCase() && !/[.?!]$/.test(t.trim());
+function gayaChat(teks) {
+  const t = String(teks ?? "").trim();
+  if (!t) return false;
+
+  const kataKata = t
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (kataKata.some((k) => SINGKATAN_KUAT.includes(k))) return true;
+
+  // Tanda baca penutup adalah penanda "tulisan rapi" yang paling
+  // bisa diandalkan pada data ini.
+  if (/[.?!]$/.test(t)) return false;
+
+  return t === t.toLowerCase() || kataKata.some((k) => PARTIKEL.includes(k));
 }
 
 /* ---- B5: duplikat lintas template ---- */

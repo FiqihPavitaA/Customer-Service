@@ -45,7 +45,7 @@ Tiga hal yang harus dibereskan lebih dulu, berurutan:
 | Tidak ada pasangan INTI dengan kemiripan ≥ 0,80 | **4 pasangan** | ❌ |
 | Tidak ada kode template duplikat | 0 duplikat | ✅ |
 | ≥ 90% template INTI punya ≥ 3 contoh | **0%** (0 dari 105) | ❌ |
-| ≥ 80% template INTI punya contoh bergaya chat | **16%** (17 dari 105) | ❌ |
+| ≥ 80% template INTI punya contoh bergaya chat | **4%** (4 dari 105) | ❌ |
 | Kolom `keywords` & `contoh_pertanyaan` terpisah | terpisah, bahkan beda tabel | ✅ |
 | Aturan sensitif jalan sebelum pencocokan apa pun | Gerbang 0 tanpa syarat | ✅ |
 
@@ -234,7 +234,20 @@ Menurunkan akurasi, tetapi tidak membuat jawaban salah terkirim.
 Tidak ada mekanisme yang memberi tahu bahwa keduanya menyimpang — tidak ada
 pemeriksaan, tidak ada peringatan.
 
-### P2. Hanya 16% template INTI punya contoh bergaya chat pelanggan
+### P2. Hanya 4% template INTI punya contoh bergaya chat pelanggan
+
+> **Dikoreksi 8 September 2026.** Angka pertama laporan ini menyebut 16%,
+> dan itu keliru: pemeriksa gaya saya sendiri memuat kata "gimana" dan
+> "kak" sebagai ciri chat, padahal keduanya muncul juga di kalimat yang
+> ditulis rapi. Akibatnya contoh seperti `"cara pakai neem oil gimana?"`
+> — yang justru jadi temuan bagian ini — ikut terhitung bergaya chat.
+> `npm run uji-mutu` menemukannya. Angka sebenarnya **4%**, jadi keadaannya
+> lebih buruk daripada yang saya laporkan, bukan lebih baik.
+>
+> Pembeda yang benar bukan sapaan, melainkan **singkatan yang membuang
+> vokal** ("gmn", "brp", "blm") dan **tidak adanya tanda baca penutup**.
+> Keenam contoh bootstrap yang jadi temuan berakhir dengan "?"; tidak
+> satu pun dari 19 kalimat gaya pelanggan pada `tes-ambang` memakainya.
 
 35 dari 36 contoh ditulis rapi: `"cara pakai neem oil gimana?"`,
 `"dosis NPK berapa kak?"`. Pelanggan asli menulis `"nem oilnya dipakenya gmn kak"`.
@@ -323,7 +336,7 @@ pemicu Gerbang 1 atau tidak.
 | `DATA` | KONDISI_INTERNAL | 0 | — | — | 0 contoh | faq-interaksi.md:96 |
 | `RESI REVISI` | SENSITIF | 0 | — | — | 0 contoh | faq-interaksi.md:99 |
 | `KOSONG` | OUTBOUND | 0 | — | — | 0 contoh | faq-interaksi.md:102 |
-| `HARGA` | BROADCAST | 1 | ya | ya | hanya 1 contoh | faq-interaksi.md:112 |
+| `HARGA` | BROADCAST | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-interaksi.md:112 |
 | `KIRIM REGULER` | INTI | 0 | — | — | 0 contoh | faq-interaksi.md:119 |
 | `KIRIM INSTANT` | INTI | 0 | — | — | 0 contoh | faq-interaksi.md:126 |
 | `OTW` | INTI | 0 | — | — | 0 contoh | faq-interaksi.md:133 |
@@ -331,23 +344,23 @@ pemicu Gerbang 1 atau tidak.
 | `GARANSI` | SENSITIF | 0 | — | ya | 0 contoh | faq-interaksi.md:145 |
 | `REQ RANDOM` | OUTBOUND | 0 | — | — | 0 contoh | faq-interaksi.md:156 |
 | `DITERUSKAN CS` | OUTBOUND | 0 | — | — | 0 contoh | faq-interaksi.md:159 |
-| `PAKAI ABMB` | INTI | 1 | ya | ya | hanya 1 contoh | faq-cara-pakai.md:8 |
+| `PAKAI ABMB` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-cara-pakai.md:8 |
 | `PAKAI NEEM` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-cara-pakai.md:19 |
-| `PAKAI POC` | INTI | 1 | ya | ya | hanya 1 contoh | faq-cara-pakai.md:31 |
+| `PAKAI POC` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-cara-pakai.md:31 |
 | `PAKAI FRUITEXPERT` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-cara-pakai.md:38 |
 | `PAKAI ABMC` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-cara-pakai.md:45 |
-| `PAKAI AKAR` | INTI | 1 | ya | ya | hanya 1 contoh | faq-cara-pakai.md:54 |
-| `BIVI` | INTI | 1 | ya | ya | hanya 1 contoh | faq-cara-pakai.md:66 |
+| `PAKAI AKAR` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-cara-pakai.md:54 |
+| `BIVI` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-cara-pakai.md:66 |
 | `POLYBAG 1KG` | INTI | 0 | — | — | 0 contoh | faq-produk.md:8 |
 | `POLYBAG 500GR` | INTI | 0 | — | — | 0 contoh | faq-produk.md:22 |
 | `POLYBAG 250 GR` | INTI | 0 | — | — | 0 contoh | faq-produk.md:36 |
 | `VELCRO` | INTI | 0 | — | — | 0 contoh | faq-produk.md:48 |
 | `PRODUK POC` | INTI | 1 | ya | ya | hanya 1 contoh | faq-produk.md:51 |
 | `PRODUK MIRACLE` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-produk.md:57 |
-| `PRODUK AKAR` | INTI | 1 | ya | ya | hanya 1 contoh | faq-produk.md:63 |
+| `PRODUK AKAR` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-produk.md:63 |
 | `PRODUK PELEBAT` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-produk.md:69 |
 | `PRODUK PESTISIDA` | INTI | 1 | ya | ya | hanya 1 contoh | faq-produk.md:75 |
-| `PRODUK SEEDBOOSTER` | INTI | 1 | ya | ya | hanya 1 contoh | faq-produk.md:81 |
+| `PRODUK SEEDBOOSTER` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-produk.md:81 |
 | `PBL` | INTI | 0 | — | — | 0 contoh | faq-produk.md:87 |
 | `VOUCHER KOMPLAIN` | SENSITIF | 0 | — | — | 0 contoh | faq-umum.md:8 |
 | `CANCEL` | KONDISI_INTERNAL | 0 | — | — | 0 contoh | faq-umum.md:11 |
@@ -375,7 +388,7 @@ pemicu Gerbang 1 atau tidak.
 | `PARANET` | INTI | 0 | — | — | 0 contoh | faq-umum.md:82 |
 | `ONGKIR` | SENSITIF | 0 | — | — | 0 contoh | faq-umum.md:88 |
 | `SPRAYER KIMIA KERAS` | INTI | 0 | — | — | 0 contoh | faq-umum.md:96 |
-| `PAKAI B1` | INTI | 1 | ya | ya | hanya 1 contoh | faq-umum.md:99 |
+| `PAKAI B1` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:99 |
 | `CANGKOK` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:108 |
 | `BEDA NEEM DAN PESNAB` | INTI | 0 | — | — | 0 contoh | faq-umum.md:120 |
 | `PAKAI USIA` | INTI | 0 | — | — | 0 contoh | faq-umum.md:124 |
@@ -387,7 +400,7 @@ pemicu Gerbang 1 atau tidak.
 | `ATRAKTAN PETROGENOL` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:148 |
 | `HITUNG PPM TDS` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:158 |
 | `BEDA AB MIX POC` | INTI | 0 | — | — | 0 contoh | faq-umum.md:166 |
-| `NUTRIPOD` | INTI | 1 | ya | ya | hanya 1 contoh | faq-umum.md:169 |
+| `NUTRIPOD` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:169 |
 | `CAMPAIGN3` | BROADCAST | 0 | — | — | 0 contoh | faq-umum.md:177 |
 | `1PROMO NUTRIPOD` | BROADCAST | 0 | — | — | 0 contoh | faq-umum.md:193 |
 | `BEDA BLOCK PRESS` | INTI | 0 | — | — | 0 contoh | faq-umum.md:206 |
@@ -408,7 +421,7 @@ pemicu Gerbang 1 atau tidak.
 | `UKURAN SARUNG TANGAN` | INTI | 0 | — | — | 0 contoh | faq-umum.md:265 |
 | `IKUT` | INTI | 0 | — | — | 0 contoh | faq-umum.md:268 |
 | `PESTNAB SEMENTARA` | OUTBOUND | 0 | — | — | 0 contoh | faq-umum.md:271 |
-| `DOLOMIT` | INTI | 1 | ya | ya | hanya 1 contoh | faq-umum.md:279 |
+| `DOLOMIT` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:279 |
 | `1010` | BROADCAST | 0 | — | — | 0 contoh | faq-umum.md:288 |
 | `SINGLE` | INTI | 0 | — | — | 0 contoh | faq-umum.md:306 |
 | `COCOPEAT` | SENSITIF | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:309 |
@@ -424,7 +437,7 @@ pemicu Gerbang 1 atau tidak.
 | `BEDA BOOSTER BIO DAN FRUIT EXPERT` | INTI | 0 | — | — | 0 contoh | faq-umum.md:358 |
 | `ABMIX MELON` | INTI | 0 | — | — | 0 contoh | faq-umum.md:361 |
 | `12.12` | BROADCAST | 0 | — | — | 0 contoh | faq-umum.md:371 |
-| `VITAMIN AKAR` | INTI | 1 | ya | ya | hanya 1 contoh | faq-umum.md:379 |
+| `VITAMIN AKAR` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:379 |
 | `EXPRESS ECO` | INTI | 0 | — | — | 0 contoh | faq-umum.md:386 |
 | `BEDA GUANO DAN POP` | INTI | 0 | — | — | 0 contoh | faq-umum.md:393 |
 | `PENINJAUAN` | INTI | 0 | — | — | 0 contoh | faq-umum.md:396 |
@@ -432,14 +445,14 @@ pemicu Gerbang 1 atau tidak.
 | `PAKET5BENIH` | KONDISI_INTERNAL | 0 | — | — | 0 contoh | faq-umum.md:407 |
 | `SAMPLE` | INTI | 0 | — | — | 0 contoh | faq-umum.md:417 |
 | `KIRIM DARI` | KONDISI_INTERNAL | 0 | — | — | 0 contoh | faq-umum.md:420 |
-| `CARA PAKAI NPK` | INTI | 1 | ya | ya | hanya 1 contoh | faq-umum.md:423 |
+| `CARA PAKAI NPK` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:423 |
 | `BAHAN PLANTER BAG` | INTI | 0 | — | — | 0 contoh | faq-umum.md:430 |
 | `CARA PAKAI TDS METER` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:433 |
 | `CARA PAKAI PH METER` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:441 |
-| `CARA KALIBRASI ULANG TDS METER` | INTI | 2 | ya | ya | hanya 2 contoh; ragam panjang sempit (1 kata) | faq-umum.md:450 |
+| `CARA KALIBRASI ULANG TDS METER` | INTI | 2 | — | ya | hanya 2 contoh; tidak ada contoh bergaya chat; ragam panjang sempit (1 kata) | faq-umum.md:450 |
 | `CARA KALIBRASI ULANG PH METER` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:460 |
 | `CARA PAKAI EM4` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:470 |
-| `CARA PAKAI ASAM AMINO` | INTI | 1 | ya | ya | hanya 1 contoh | faq-umum.md:480 |
+| `CARA PAKAI ASAM AMINO` | INTI | 1 | — | ya | hanya 1 contoh; tidak ada contoh bergaya chat | faq-umum.md:480 |
 | `TIPS SEMAI ANTI KUTILANG` | SENSITIF | 0 | — | — | 0 contoh | faq-umum.md:486 |
 | `IDUL FITRI` | KONDISI_INTERNAL | 0 | — | — | 0 contoh | faq-umum.md:492 |
 | `BERTAHAP` | KONDISI_INTERNAL | 0 | — | — | 0 contoh | faq-umum.md:495 |

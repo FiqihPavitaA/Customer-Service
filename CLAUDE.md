@@ -18,6 +18,9 @@ saldo tanpa sepengetahuan pemiliknya — jangan diulangi.
 ### Yang WAJIB minta izin dulu, setiap kali
 
 - `POST /api/chat` (Next.js) dan endpoint chat di `backend/server.js`
+- `POST /api/pengenal/bangun` **dengan `jalankan: true`** — membangun
+  vektor contoh pertanyaan lewat Voyage. Tanpa `jalankan` ia hanya
+  memperkirakan biaya dan aman dipanggil berapa kali pun.
 - Skrip apa pun yang meng-import `@anthropic-ai/sdk` atau memanggil
   `api.anthropic.com`
 - Uji apa pun yang tujuannya "memastikan balasan AI benar"
@@ -41,6 +44,9 @@ pemilik proyek menjawab.
 | `node knowledge-base/periksa-katalog.mjs` | Tidak ada kode kembar, index.json sinkron, semua balasan <= 600 karakter |
 | `node knowledge-base/uji-sumber-luar.mjs` | 23 kasus lapisan sumber tabel: tabel menang atas berkas, tabel kosong kembali ke berkas, pola rusak dibuang satuan |
 | `node knowledge-base/audit-voyage.mjs` | Audit kesiapan data Gerbang 2: jumlah contoh, gaya bahasa, kode ganda, kemiripan antar-template |
+| `npm run uji-mutu` | 30 kasus pemeriksa mutu contoh pertanyaan: kalimat rapi ditandai, kalimat pelanggan tidak |
+| `npm run periksa-sumber` | Apakah tabel `templates` & `pustaka_router()` siap dipakai router (membaca Supabase, tidak menulis) |
+| `POST /api/pengenal/bangun` tanpa `jalankan` | Berapa contoh yang belum bervektor & perkiraan biayanya |
 | `POST /api/templates/uji` | Pesan tertentu kena template mana |
 | `POST /api/pengenal/uji` | **BERBAYAR ~Rp 0,003** — uji Gerbang 2 tanpa memanggil Claude |
 | `npm run tes0` | Kebingungan antar-contoh dari vektor yang sudah ada |
