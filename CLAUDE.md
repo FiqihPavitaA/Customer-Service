@@ -40,6 +40,7 @@ pemilik proyek menjawab.
 | `node knowledge-base/router.test.mjs` | 48 kasus pencocokan template |
 | `node knowledge-base/periksa-katalog.mjs` | Tidak ada kode kembar, index.json sinkron, semua balasan <= 600 karakter |
 | `POST /api/templates/uji` | Pesan tertentu kena template mana |
+| `POST /api/pengenal/uji` | **BERBAYAR ~Rp 0,003** — uji Gerbang 2 tanpa memanggil Claude |
 | `GET /api/templates` | Daftar 152 template + aturan pemicunya |
 | `GET /api/health` | Konfigurasi & ukuran KB (tidak memanggil Claude) |
 | `npx tsc --noEmit` · `npx eslint .` · `npx next build` | Kode benar |

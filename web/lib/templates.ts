@@ -19,6 +19,7 @@ import {
   getAsalKode as routerAsal,
   getRules as routerRules,
   jelaskanTidakCocok as routerJelaskan,
+  periksaSatpam as routerSatpam,
   ujiDraf as routerUjiDraf,
   jumlahAturan,
   setKbDir,
@@ -36,6 +37,15 @@ import type { Action } from "./knowledge";
  * ditetapkan eksplisit di sini, sekali saat modul dimuat.
  */
 setKbDir(join(process.cwd(), "content", "knowledge-base"));
+
+/**
+ * Gerbang 0 — apakah pesan ini wajib langsung ke CS manusia?
+ *
+ * Diteruskan lewat berkas ini, bukan diimpor langsung dari
+ * router.js, supaya setKbDir() di atas dijamin sudah berjalan dan
+ * hanya ada satu jembatan bertipe ke router.
+ */
+export const periksaSatpam = routerSatpam;
 
 export type TemplateMatch = {
   code: string;
