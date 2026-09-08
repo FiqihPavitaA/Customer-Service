@@ -79,7 +79,8 @@ type ChatResponse = {
     jenis: "yakin" | "ragu" | "lewat";
     kandidat?: { code: string; contoh: string; skor: number }[];
     alasan?: string;
-    ambang: { yakin: number; ragu: number };
+    ambang: { yakin: number; ragu: number; margin: number };
+    margin?: number;
     mode: string;
     dipakai: boolean;
   } | null;
@@ -144,7 +145,11 @@ function PanelPengenal({ p }: { p: NonNullable<ChatResponse["pengenal"]> }) {
             ))}
           </ul>
           <p className="mt-2 mb-0 text-[0.78rem] text-muted">
-            Ambang yakin {p.ambang.yakin} · ragu {p.ambang.ragu} · mode {p.mode}
+            Syarat: skor ≥ {p.ambang.yakin} DAN margin ≥ {p.ambang.margin}
+            {typeof p.margin === "number" && (
+              <> — margin sekarang {p.margin.toFixed(3)}</>
+            )}{" "}
+            · mode {p.mode}
             {!p.dipakai && p.jenis === "yakin" && (
               <>
                 {" "}

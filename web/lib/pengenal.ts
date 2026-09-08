@@ -18,45 +18,83 @@ import { embed, voyageSiap, voyageTerkunci } from "@/lib/voyage";
 import { getSupabaseServer } from "@/lib/supabase/server";
 
 /**
- * Skor di atas ini dianggap cukup yakin untuk langsung dipakai.
+ * Skor minimum juara. Syarat PERTAMA dari dua; yang kedua ada di
+ * AMBANG_MARGIN di bawah, dan keduanya harus lolos.
  *
- * DINAIKKAN DARI 0,85 KE 0,93 PADA 8 SEPTEMBER 2026, berdasarkan
- * pengukuran — bukan firasat. Angka 0,85 berasal dari artefak alur
- * sebagai tebakan kerja; setelah 36 contoh disematkan dengan
- * voyage-4-lite, `npm run tes0` menemukan 15 pasangan template
- * BERBEDA yang skornya di atas 0,85. Contohnya:
+ * DITURUNKAN DARI 0,93 KE 0,50 PADA 8 SEPTEMBER 2026, dan angka 0,93
+ * itu kekeliruan saya yang perlu ditulis terang-terangan supaya tidak
+ * terulang.
  *
- *   0,882  "cara pakai petrogenol gimana?"  vs  "cara pakai neem oil gimana?"
- *   0,867  "cara pakai cocopeat gimana?"    vs  "cara pakai neem oil gimana?"
+ * 0,93 diturunkan dari `npm run tes0`, yang membandingkan contoh
+ * dengan contoh — dua-duanya disematkan sebagai "document". Yang
+ * terjadi sungguhan bukan itu: pesan pelanggan disematkan sebagai
+ * "query" lalu dibandingkan dengan contoh yang "document". Voyage
+ * mengkalibrasi kedua pasangan itu pada skala yang BERBEDA:
  *
- * Produknya berbeda sama sekali. Yang membuat skornya tinggi adalah
- * KERANGKA KALIMAT "cara pakai ... gimana?", yang ditimbang model
- * lebih berat daripada nama produknya. Pada ambang 0,85, pelanggan
- * yang bertanya soal cocopeat bisa menerima petunjuk pemakaian neem
- * oil — kesalahan dosis, bukan sekadar jawaban kurang tepat.
+ *   document vs document (tes0)     0,80 – 1,00
+ *   query vs document (kenyataan)   0,40 – 0,67
  *
- * 0,93 pun belum aman untuk semuanya. Dua tabrakan tetap lolos:
- * "cara pakai pH meter" vs "cara kalibrasi pH meter" (0,945) dan
- * [MIRACLE POWDER] vs [PRODUK MIRACLE] (0,932). Pasangan seperti itu
- * memang tidak bisa dipisahkan ambang mana pun — bedanya satu kata,
- * dan justru kata itu yang menentukan. Itulah pekerjaan Gerbang 3.
+ * Jadi 0,93 bukan sekadar terlalu tinggi — ia diambil dari
+ * pengukuran yang bentuknya berbeda dari yang berjalan sungguhan.
+ * Akibatnya nyata dan sempat terlihat: `npm run tes-ambang`
+ * menunjukkan 0 dari 19 kalimat akan dijawab. Gerbang 2 mati total
+ * tanpa satu pun pesan galat.
  *
- * Nilai sesungguhnya tetap harus diukur dengan chat asli berlabel
- * (Tes 2). Sampai itu ada, angka ini menyisakan lebih banyak ke
- * gerbang berikutnya — lebih mahal, tetapi salah jawab lebih mahal
- * lagi.
+ * Pelajarannya: ambang HARUS diturunkan dari pengukuran yang
+ * bentuknya sama persis dengan yang berjalan di produksi.
  */
-export const AMBANG_YAKIN = Number(process.env.AMBANG_YAKIN || 0.93);
+export const AMBANG_YAKIN = Number(process.env.AMBANG_YAKIN || 0.5);
+
+/**
+ * SYARAT KEDUA, dan ternyata yang lebih menentukan: jarak skor juara
+ * terhadap pesaing terdekat yang templatenya berbeda.
+ *
+ * Diturunkan dari `npm run tes-ambang` pada 8 September 2026, 19
+ * kalimat bergaya pelanggan. Angka-angkanya:
+ *
+ *   juara benar          17 dari 19
+ *   skor juara benar     0,404 – 0,672  (median 0,555)
+ *   skor tertinggi SALAH 0,621
+ *
+ * Perhatikan bahwa 0,621 yang salah itu lebih tinggi daripada 11 dari
+ * 17 juara yang benar. Ambang berupa skor tunggal karena itu tidak
+ * bisa memisahkan keduanya — berapa pun angkanya, ia akan menolak
+ * banyak yang benar atau meloloskan yang salah.
+ *
+ * Marginnya justru memisahkan dengan rapi:
+ *
+ *   margin dua yang SALAH    0,027 dan 0,061
+ *   margin juara yang benar  median 0,173
+ *
+ * Dengan syarat margin >= 0,10, kedua jawaban salah tertahan dan 12
+ * jawaban benar tetap lolos — tanpa satu pun kesalahan.
+ *
+ * Masuk akal secara sebab-akibat, bukan kebetulan angka: skor mutlak
+ * ikut naik-turun mengikuti bentuk kalimat, sedangkan margin mengukur
+ * hal yang benar-benar ditanyakan — apakah template ini menonjol
+ * dibanding tetangganya.
+ */
+export const AMBANG_MARGIN = Number(process.env.AMBANG_MARGIN || 0.1);
 
 /**
  * Di bawah ini dianggap tidak ada template yang cocok sama sekali.
  *
- * Perlu diketahui saat menyetel: pada contoh bootstrap, 513 dari 630
- * pasangan sudah berada di atas 0,6. Lantainya memang tinggi karena
- * kalimat contohnya seragam. Jangan menyimpulkan apa pun dari angka
- * itu sebelum ada contoh yang ditulis tim CS.
+ * DITURUNKAN DARI 0,6 KE 0,35 PADA 8 SEPTEMBER 2026, karena 0,6
+ * membuat gerbang ini diam untuk hampir semua pesan sungguhan.
+ * Sumber angka lamanya sama dengan kekeliruan di atas: sebaran
+ * document-vs-document. Pada skala query-vs-document yang sebenarnya,
+ * juara yang BENAR berkisar 0,404 – 0,672 — jadi 0,6 membuang
+ * sebagian besar kecocokan yang benar sebelum sempat dinilai, lalu
+ * melapor "tidak ada kandidat di atas ambang".
+ *
+ * Inilah yang membuat "nem oilnya dipakenya gmn kak" (0,438) terlihat
+ * seolah Gerbang 2 tidak menemukan apa-apa, padahal ia menemukan
+ * kandidat dan hanya dibuang oleh saringan ini.
+ *
+ * Angka ini sekarang berfungsi sebagai lantai kasar saja. Yang
+ * benar-benar memutuskan adalah AMBANG_YAKIN dan AMBANG_MARGIN.
  */
-export const AMBANG_RAGU = Number(process.env.AMBANG_RAGU || 0.6);
+export const AMBANG_RAGU = Number(process.env.AMBANG_RAGU || 0.35);
 
 /**
  * "bayangan" — Gerbang 2 menghitung dan mencatat, TETAPI tidak
@@ -88,8 +126,8 @@ export type Kandidat = {
 };
 
 export type HasilPengenal =
-  | { jenis: "yakin"; kandidat: Kandidat[]; token: number }
-  | { jenis: "ragu"; kandidat: Kandidat[]; token: number }
+  | { jenis: "yakin"; kandidat: Kandidat[]; margin: number; token: number }
+  | { jenis: "ragu"; kandidat: Kandidat[]; margin: number; token: number }
   | { jenis: "lewat"; alasan: string; token: number };
 
 /**
@@ -132,14 +170,30 @@ export async function kenaliMaksud(pesan: string): Promise<HasilPengenal> {
 
     if (error) return lewat(`cari_template gagal: ${error.message}`, token);
 
-    const kandidat = ((data ?? []) as Kandidat[]).filter(
-      (k) => Number.isFinite(k.skor) && k.skor >= AMBANG_RAGU,
-    );
-    if (kandidat.length === 0) return lewat("tidak ada kandidat di atas ambang", token);
+    const semua = ((data ?? []) as Kandidat[]).filter((k) => Number.isFinite(k.skor));
+    if (semua.length === 0 || semua[0].skor < AMBANG_RAGU) {
+      return lewat("tidak ada kandidat di atas ambang", token);
+    }
+
+    /* Pesaing terdekat yang TEMPLATENYA BERBEDA. Dua contoh dari
+       template yang sama menempati peringkat 1 dan 2 bukan
+       persaingan — itu justru tanda kecocokannya kuat.
+
+       Dihitung dari daftar YANG BELUM DISARING. Kalau pesaingnya
+       ikut terbuang lantai AMBANG_RAGU lebih dulu, marginnya jadi
+       palsu-besar dan syarat margin justru paling longgar tepat saat
+       skornya paling lemah — kebalikan dari yang dimaksud. */
+    const penantang = semua.find((k) => k.code !== semua[0].code);
+    const margin = semua[0].skor - (penantang?.skor ?? 0);
+
+    const kandidat = semua.filter((k) => k.skor >= AMBANG_RAGU);
+
+    const yakin = kandidat[0].skor >= AMBANG_YAKIN && margin >= AMBANG_MARGIN;
 
     return {
-      jenis: kandidat[0].skor >= AMBANG_YAKIN ? "yakin" : "ragu",
+      jenis: yakin ? "yakin" : "ragu",
       kandidat,
+      margin,
       token,
     };
   } catch (err) {

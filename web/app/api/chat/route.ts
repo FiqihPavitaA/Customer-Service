@@ -4,6 +4,7 @@ import { aiTerkunci, getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
 import { buildFaqBlock, getInvariantBlock, parseAction } from "@/lib/knowledge";
 import { ukurBalasan } from "@/lib/limits";
 import {
+  AMBANG_MARGIN,
   AMBANG_RAGU,
   AMBANG_YAKIN,
   kenaliMaksud,
@@ -132,7 +133,8 @@ export async function POST(req: Request) {
     jenis: "yakin" | "ragu" | "lewat";
     kandidat?: { code: string; contoh: string; skor: number }[];
     alasan?: string;
-    ambang: { yakin: number; ragu: number };
+    ambang: { yakin: number; ragu: number; margin: number };
+    margin?: number;
     mode: string;
     dipakai: boolean;
   } | null = null;
@@ -151,7 +153,8 @@ export async function POST(req: Request) {
               skor: k.skor,
             })),
       alasan: kenal.jenis === "lewat" ? kenal.alasan : undefined,
-      ambang: { yakin: AMBANG_YAKIN, ragu: AMBANG_RAGU },
+      ambang: { yakin: AMBANG_YAKIN, ragu: AMBANG_RAGU, margin: AMBANG_MARGIN },
+      margin: kenal.jenis === "lewat" ? undefined : kenal.margin,
       mode: MODE_PENGENAL,
       // Diisi ulang di bawah bila jawabannya benar-benar dikirim.
       dipakai: false,
