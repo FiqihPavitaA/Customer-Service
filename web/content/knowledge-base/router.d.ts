@@ -69,7 +69,40 @@ export type KeputusanAi = {
   alasan: string;
 };
 
-export type Keputusan = KeputusanTemplate | KeputusanAi;
+/** Hasil pemeriksaan Gerbang 0. */
+export type HasilSatpam = {
+  /** refund_retur | barang_bermasalah | sengketa | keamanan | tanaman_rusak | minta_manusia | luar_marketplace */
+  kategori: string;
+  /** Butir claude-core.md yang menjadi dasar penahanan. */
+  why: string;
+  /** Potongan teks yang memicu — ditampilkan ke CS agar sebabnya jelas. */
+  cocok: string;
+};
+
+/**
+ * Pesan dicegat Gerbang 0 dan wajib ditangani CS manusia.
+ * `teks` adalah balasan penerimaan singkat, bukan jawaban.
+ */
+export type KeputusanHandover = {
+  jenis: "handover";
+  kode: string;
+  teks: string;
+  action: "HANDOVER_TO_CS";
+  kategori: KategoriAtauKabur;
+  berkas: string[];
+  alasan: string;
+  satpam: HasilSatpam;
+};
+
+export type Keputusan = KeputusanTemplate | KeputusanAi | KeputusanHandover;
+
+/**
+ * Gerbang 0 — apakah pesan ini wajib langsung ke CS manusia?
+ * @returns null bila aman dilanjutkan ke gerbang berikutnya.
+ */
+export function periksaSatpam(pesanPelanggan: string): HasilSatpam | null;
+
+export function getKategoriSatpam(): { kategori: string; why: string }[];
 
 export function routeToCategory(pesanPelanggan: string): Keputusan;
 

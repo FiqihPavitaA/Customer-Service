@@ -79,6 +79,24 @@ app.post('/api/chat', async (req, res) => {
     // ikut ke system prompt (bukan keempat berkas sekaligus).
     const keputusan = routeToCategory(message);
 
+    // ---------- Gerbang 0: satpam ----------
+    // Wajib ada di sini juga. Server ini memakai routeToCategory()
+    // yang sama, jadi tanpa cabang ini pesan bertanda "handover"
+    // hanya gagal cocok dengan 'template' lalu JATUH KE CLAUDE —
+    // persis kebalikan dari yang dimaksud gerbangnya, dan berbayar.
+    if (keputusan.jenis === 'handover') {
+      logRouting(keputusan);
+      return res.json({
+        action: keputusan.action, // HANDOVER_TO_CS
+        reply: keputusan.teks,
+        model: null,
+        usage: null,
+        source: 'satpam',
+        templateCode: keputusan.kode,
+        satpam: keputusan.satpam,
+      });
+    }
+
     if (keputusan.jenis === 'template') {
       logRouting(keputusan);
       return res.json({

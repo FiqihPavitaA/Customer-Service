@@ -199,6 +199,155 @@ const TOLAK_DESKRIPSI = [
 const MINTA_PEMAKAIAN =
   /\b(cara (pakai|penggunaan|pake|aplikasi|menggunakan|hitung|menghitung|ngitung|kalibrasi|cangkok|stek|semai|tanam|rendam|merendam)|gimana (cara )?(pakai|pake|makai)|cara nya|caranya|dosis|takaran|kalibrasi|berapa (ml|gram|gr|sendok|sdm|sdt|tutup|sachet)|per liter|per l\b)/i;
 
+/* ===========================================================
+   GERBANG 0 — SATPAM
+   ===========================================================
+   Berjalan SEBELUM pencocokan template, dan mengalahkan seluruh
+   gerbang di belakangnya. Kalau satpam bilang sensitif, tidak ada
+   balasan otomatis — sepintar apa pun modelnya.
+
+   KENAPA HARUS DI DEPAN, BUKAN DISERAHKAN KE CLAUDE.
+   claude-core.md memang menyuruh Claude melakukan HANDOVER_TO_CS
+   untuk kasus-kasus ini, dan Claude umumnya menurut. Tetapi:
+
+     1. Berbayar. Menempuh jalur Claude untuk sampai pada kesimpulan
+        "ini harus ditangani manusia" membakar token untuk keputusan
+        yang bisa diambil gratis dan pasti.
+     2. Bergantung perilaku model. Instruksi prompt adalah imbauan,
+        bukan jaminan. Untuk refund dan keracunan, imbauan tidak
+        cukup — yang dibutuhkan adalah aturan yang tidak bisa
+        dibujuk.
+
+   ISI DAFTAR INI DITURUNKAN DARI claude-core.md bagian
+   "C. HANDOVER_TO_CS — Wajib gunakan jika", bukan dikarang. Tiap
+   entri menyebut butir asalnya di `why`.
+
+   YANG SENGAJA TIDAK MASUK: "belum sampai". Itu pertanyaan
+   pelacakan biasa dan jumlahnya paling banyak; memasukkannya akan
+   membanjiri CS manusia dengan pertanyaan yang jawabannya ada di
+   sistem pesanan (CHECK_ORDER_SYSTEM), bukan di tangan manusia.
+   Yang masuk hanya "tidak/belum pernah sampai" yang sudah bernada
+   kehilangan barang.
+
+   Bentuknya sama dengan RULES di bawah supaya sekali paham,
+   paham keduanya: when (ATAU), also (DAN), unless (pembatal).   */
+const SATPAM = [
+  {
+    kategori: "refund_retur",
+    when: [
+      /\b(refund|retur|pengembalian dana|uang kembali|balikin uang|kembalikan uang)\b/i,
+      /\b(kompensasi|ganti rugi|penggantian|tukar barang|tuker barang)\b/i,
+      /\b(batal(in|kan)?|cancel)\b/i,
+    ],
+    why: "claude-core.md: pelanggan meminta refund, retur, pembatalan, kompensasi, atau penggantian. Hanya CS manusia yang berwenang menjanjikan ini.",
+  },
+  {
+    kategori: "barang_bermasalah",
+    when: [
+      /\b(rusak|pecah|bocor|penyok|sobek|robek)\b/i,
+      /\b(salah (kirim|barang|produk)|beda (barang|produk)|bukan yang (saya|aku) pesan)\b/i,
+      /\b(tidak pernah sampai|nggak pernah sampai|gak pernah sampai|barang hilang|paket hilang)\b/i,
+      /\b(isi|barang|paket|pesanan)(nya)? kurang\b/i,
+      /\bkurang (satu|dua|tiga|\d+) (item|barang|pcs|botol|sachet|bungkus)\b/i,
+    ],
+    why: "claude-core.md: barang rusak, bocor, kurang, salah kirim, atau tidak sampai.",
+  },
+  {
+    kategori: "sengketa",
+    when: [
+      /\b(penipuan|nipu|menipu|ditipu|tipu-tipu)\b/i,
+      /\b(lapor(kan)?|somasi|tuntut|pengacara|polisi|ylki)\b/i,
+      /\b(bintang (1|satu)|rating (1|satu)|ulasan buruk|review jelek)\b/i,
+    ],
+    why: "claude-core.md: pelanggan marah, mengancam, atau menyampaikan sengketa. Kemarahan tanpa kata-kata di atas tidak ditangkap di sini — itu memang lebih baik dinilai manusia lewat halaman Chat.",
+  },
+  {
+    kategori: "keamanan",
+    when: [
+      /\b(keracunan|beracun|beracunkah|racunnya)\b/i,
+      /\b(tertelan|termakan|kena mata|terhirup)\b/i,
+      /\b(bayi|balita|anak kecil|kucing|anjing|hewan peliharaan|ternak)\b/i,
+      // "Konsumsi hasil panen" disebut eksplisit di claude-core.md.
+      // Ketahuan hilang saat menguji daftar ini terhadap kasus
+      // "sayurnya aman dimakan nggak kalau habis disemprot".
+      /\b(aman (di)?(makan|konsumsi|dimakan)|boleh dimakan|langsung dimakan|hasil panen)\b/i,
+    ],
+    why: "claude-core.md: pertanyaan menyangkut keamanan pestisida, keracunan, hewan peliharaan, anak-anak, atau konsumsi hasil panen. Dibiarkan lewat hanya bila jawabannya tertulis jelas di KB — dan satpam tidak bisa menilai itu, jadi selalu ditahan.",
+  },
+  {
+    kategori: "tanaman_rusak",
+    when: [/\b(mati|layu|gosong|terbakar|kering|rontok)\b/i],
+    also: /\b(setelah|sesudah|habis|gara-gara|gegara|karena|abis) (di)?(pakai|pake|semprot|siram|kasih|aplikasi)/i,
+    why: "claude-core.md: tanaman diduga rusak setelah menggunakan produk Infarm. Butuh `also` karena kata 'layu' sendirian adalah pertanyaan konsultasi biasa — yang menjadikannya sengketa adalah kaitan sebab-akibat dengan produk kami.",
+  },
+  {
+    kategori: "minta_manusia",
+    when: [
+      /\b(bicara|ngomong|chat|hubungi|sambung(kan)?) (dengan |sama |ke )?(cs|admin|orang|manusia|petugas)( asli| beneran| langsung)?\b/i,
+      /\b(ini (bot|robot|ai)|bukan bot|jangan bot|cs nya mana|admin nya mana|adminnya mana)\b/i,
+    ],
+    why: "claude-core.md: pelanggan secara eksplisit meminta berbicara dengan manusia. Menahannya di sini membuat permintaan itu dipenuhi seketika, bukan setelah satu putaran balasan otomatis lagi.",
+  },
+  {
+    kategori: "luar_marketplace",
+    when: [
+      /\b(transfer|rekening|no rek|norek|dana|gopay|ovo|shopeepay)\b/i,
+      /\b(wa|whatsapp|wa-?me|nomor hp|no hp|telegram|line)\b/i,
+      /\b(beli|order|pesan) (di ?)?(luar|langsung)\b/i,
+    ],
+    why: "claude-core.md: menghindari pengarahan transaksi di luar ekosistem marketplace. Melanggar ketentuan Shopee/TikTok, dan sanksinya menimpa toko — bukan pelanggan.",
+  },
+];
+
+/**
+ * Gerbang 0. Apakah pesan ini wajib langsung ke CS manusia?
+ *
+ * @param {string} pesanPelanggan
+ * @returns {{kategori: string, why: string, cocok: string} | null}
+ *   null berarti aman dilanjutkan ke gerbang berikutnya.
+ */
+export function periksaSatpam(pesanPelanggan) {
+  const pesan = String(pesanPelanggan ?? "");
+  if (!pesan.trim()) return null;
+
+  for (const s of SATPAM) {
+    if (s.unless && s.unless.some((p) => p.test(pesan))) continue;
+    if (s.also && !s.also.test(pesan)) continue;
+    const kena = s.when.find((p) => p.test(pesan));
+    if (!kena) continue;
+    return {
+      kategori: s.kategori,
+      why: s.why,
+      // Potongan teks yang memicu — dipakai halaman Chat supaya CS
+      // tahu KENAPA kasus ini mendarat di mejanya.
+      cocok: (pesan.match(kena) ?? [""])[0],
+    };
+  }
+  return null;
+}
+
+/** Daftar kategori satpam — untuk UI dan pengujian. */
+export function getKategoriSatpam() {
+  return SATPAM.map((s) => ({ kategori: s.kategori, why: s.why }));
+}
+
+/**
+ * Balasan penerimaan saat satpam menahan sebuah pesan.
+ *
+ * Menahan BUKAN berarti diam. claude-core.md mewajibkan dua hal yang
+ * tetap berlaku: balas kurang dari 15 menit, dan gelembung chat
+ * terakhir harus dari kita — keduanya dinilai marketplace. Jadi
+ * pelanggan tetap menerima satu kalimat penerimaan seketika,
+ * sementara kasusnya menunggu CS manusia.
+ *
+ * Teksnya sengaja ditaruh di berkas KB, bukan di kode, supaya tim CS
+ * bisa memperbaikinya sendiri lewat halaman Kelola Template.
+ * Kalimatnya juga sengaja netral — tidak diawali permintaan maaf —
+ * karena satpam juga menangkap hal yang bukan keluhan, misalnya
+ * permintaan nomor WhatsApp.
+ */
+const KODE_HANDOVER = "DITERUSKAN CS";
+
 /* Bentuk satu aturan:
      code    kode entri di berkas FAQ
      action  klasifikasi yang dilaporkan, setara keluaran AI
@@ -772,6 +921,28 @@ export function tentukanKategori(pesan) {
  *        kategori 'unclear' berarti keempat berkas ikut (fallback).
  */
 export function routeToCategory(pesanPelanggan) {
+  // --- Gerbang 0: satpam, mengalahkan semua yang di belakangnya ---
+  //
+  // Ditaruh paling depan dan TIDAK bisa dilewati. Bandingkan dengan
+  // jalur template, yang sengaja bisa dimatikan lewat
+  // useTemplates:false untuk membandingkan biaya di panel demo:
+  // gerbang ini bukan penghemat biaya, melainkan pengaman. Sesuatu
+  // yang bisa dimatikan untuk kenyamanan bukan pengaman.
+  const satpam = periksaSatpam(pesanPelanggan);
+  if (satpam) {
+    return {
+      jenis: "handover",
+      kode: KODE_HANDOVER,
+      teks: getTemplateLibrary().get(KODE_HANDOVER) ?? "",
+      action: "HANDOVER_TO_CS",
+      // Tidak ada berkas FAQ yang perlu dikirim: Claude tidak dipanggil.
+      kategori: "unclear",
+      berkas: [],
+      alasan: satpam.why,
+      satpam,
+    };
+  }
+
   // --- Lapis 1: template persis ---
   const template = matchTemplate(pesanPelanggan);
   if (template) {
@@ -826,6 +997,14 @@ export function totalKarakterFaq() {
  * berapa karakter FAQ yang dihemat dibanding mengirim keempatnya.
  */
 export function logRouting(keputusan, prefix = "[KB-ROUTER]") {
+  if (keputusan.jenis === "handover") {
+    console.log(
+      `${prefix} SATPAM ${keputusan.satpam.kategori} — dicegat "${keputusan.satpam.cocok}", ` +
+        `langsung ke CS manusia (Claude tidak dipanggil)`,
+    );
+    return { terkirim: 0, total: totalKarakterFaq(), hemat: totalKarakterFaq() };
+  }
+
   if (keputusan.jenis === "template") {
     console.log(
       `${prefix} template [${keputusan.kode}] dari ${keputusan.berkas[0] ?? "?"} — Claude tidak dipanggil (0 berkas FAQ terkirim)`,

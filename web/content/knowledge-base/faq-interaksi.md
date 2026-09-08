@@ -155,3 +155,6 @@ Mohon menyertakan syarat klaim saat melakukan komplain. Tidak menyertakan syarat
 
 ### [REQ RANDOM]
 Halo kak, untuk benih terkadang ada yang kosong ya kak🙏 jadi semisal nanti kaka req tbtb benih nya kebetulan lagi kosong akan kami kirimkan benih random ya kak😊 terimakasih🙏
+
+### [DITERUSKAN CS]
+Halo kak, terima kasih infonya 🙏 Untuk hal ini kakak akan dibantu langsung oleh tim CS kami ya, mohon ditunggu sebentar.

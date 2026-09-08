@@ -9,14 +9,14 @@
   ],
   "ringkasan": {
     "jumlah_berkas": 4,
-    "jumlah_entri": 153,
-    "jumlah_kode_unik": 153
+    "jumlah_entri": 154,
+    "jumlah_kode_unik": 154
   },
   "berkas": [
     {
       "file": "knowledge-base/faq-interaksi.md",
       "kategori": "Interaksi",
-      "jumlah_entri": 33,
+      "jumlah_entri": 34,
       "kode": [
         "BANTU",
         "BANTU LAGI",
@@ -50,7 +50,8 @@
         "OTW",
         "KOMPLAIN DATA",
         "GARANSI",
-        "REQ RANDOM"
+        "REQ RANDOM",
+        "DITERUSKAN CS"
       ]
     },
     {

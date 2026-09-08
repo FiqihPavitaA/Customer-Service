@@ -51,6 +51,28 @@ export async function POST(req: Request) {
   // Satu panggilan router memutuskan ketiga lapisan sekaligus.
   const keputusan = routeToCategory(message);
 
+  // ---------- Gerbang 0: satpam ----------
+  // Diperiksa lebih dulu dan TANPA syarat useTemplates. Saklar itu
+  // ada untuk membandingkan biaya di panel demo; membiarkannya juga
+  // mematikan pengaman berarti kasus refund dan keracunan bisa
+  // sampai ke balasan otomatis hanya karena seseorang mengubah satu
+  // bidang di permintaan.
+  if (keputusan.jenis === "handover") {
+    logRouting(keputusan);
+    return NextResponse.json({
+      action: keputusan.action, // HANDOVER_TO_CS
+      reply: keputusan.teks,
+      model: null,
+      usage: null,
+      source: "satpam",
+      templateCode: keputusan.kode,
+      templateWhy: keputusan.alasan,
+      kategori: keputusan.kategori,
+      satpam: keputusan.satpam,
+      panjang: ukurBalasan(keputusan.teks),
+    });
+  }
+
   if (useTemplates !== false && keputusan.jenis === "template") {
     logRouting(keputusan);
     return NextResponse.json({

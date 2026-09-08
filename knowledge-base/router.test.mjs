@@ -8,7 +8,7 @@
    Jalankan:  node knowledge-base/router.test.mjs
    =========================================================== */
 
-import { matchTemplate } from "./router.js";
+import { matchTemplate, periksaSatpam } from "./router.js";
 
 /** [pesan, kode yang diharapkan]. null = harus diserahkan ke AI. */
 const KASUS = [
@@ -75,9 +75,57 @@ const KASUS = [
   // ---------- Perilaku lama harus utuh ----------
   ["Halo kak", "BANTU"],
   ["makasih kak", "TQ"],
+  // Catatan: sejak Gerbang 0 dipasang, pesan ini TIDAK LAGI dijawab
+  // [KOMPLAIN] pada alur sungguhan — satpam menahannya lebih dulu
+  // (kategori barang_bermasalah). Kasus ini tetap di sini karena yang
+  // diuji matchTemplate, yaitu Gerbang 1 secara terpisah, dan aturan
+  // itu memang masih benar. Perilaku ujung-ke-ujungnya diuji di
+  // bagian KASUS_SATPAM di bawah.
   ["barang saya bocor", "KOMPLAIN"],
   ["mau lacak paket dong", "LACAK"],
   ["ada garansi nggak kak?", "GARANSI"],
+];
+
+/* ===========================================================
+   Gerbang 0 — satpam
+   ===========================================================
+   Dua sisi diuji, dan sisi kedua sama pentingnya:
+
+     1. Yang WAJIB DITAHAN. Kalau ini bocor, kasus refund atau
+        keracunan bisa dijawab otomatis.
+     2. Yang WAJIB LOLOS. Satpam yang kebablasan tidak terlihat
+        seperti kerusakan — ia hanya membanjiri CS manusia dengan
+        pertanyaan biasa, dan diam-diam menghapus seluruh manfaat
+        gerbang di belakangnya.
+
+   Sisi kedua itulah yang menjaga daftar kata tetap jujur.        */
+
+/** [pesan, kategori satpam yang diharapkan]. null = HARUS lolos. */
+const KASUS_SATPAM = [
+  // --- wajib ditahan ---
+  ["mau refund dong barangnya nggak sesuai", "refund_retur"],
+  ["tolong batalkan pesanan saya", "refund_retur"],
+  ["botolnya bocor semua pas sampai", "barang_bermasalah"],
+  ["isinya kurang 1 botol kak", "barang_bermasalah"],
+  ["salah kirim nih, bukan yang saya pesan", "barang_bermasalah"],
+  ["ini penipuan ya, saya lapor", "sengketa"],
+  ["kalau kena kucing bahaya nggak?", "keamanan"],
+  ["sayurnya aman dimakan nggak setelah disemprot?", "keamanan"],
+  ["cabai saya mati setelah disemprot produk ini", "tanaman_rusak"],
+  ["saya mau bicara sama cs manusia", "minta_manusia"],
+  ["boleh minta nomor whatsapp nya kak?", "luar_marketplace"],
+
+  // --- wajib lolos ---
+  ["dosis NPK berapa kak?", null],
+  ["cara pakai neem oil gimana?", null],
+  // Pelacakan biasa. Sengaja dibiarkan lewat: jawabannya ada di
+  // sistem pesanan, bukan di tangan manusia, dan jumlahnya paling
+  // banyak dari semua jenis pertanyaan.
+  ["paket saya belum sampai kak", null],
+  // "layu" tanpa kaitan sebab-akibat dengan produk kami adalah
+  // konsultasi tanaman biasa, bukan sengketa.
+  ["daun cabai saya layu kenapa ya?", null],
+  ["ada garansi nggak kak?", null],
 ];
 
 let lulus = 0;
@@ -90,7 +138,7 @@ for (const [pesan, harap] of KASUS) {
   else gagal.push({ pesan, harap, dapat });
 }
 
-console.log(`LULUS ${lulus}/${KASUS.length}`);
+console.log(`Gerbang 1 — template   : LULUS ${lulus}/${KASUS.length}`);
 for (const g of gagal) {
   console.log(
     `  GAGAL  "${g.pesan.slice(0, 55)}"` +
@@ -98,4 +146,25 @@ for (const g of gagal) {
   );
 }
 
-process.exit(gagal.length ? 1 : 0);
+let lulusSatpam = 0;
+const gagalSatpam = [];
+
+for (const [pesan, harap] of KASUS_SATPAM) {
+  const hasil = periksaSatpam(pesan);
+  const dapat = hasil ? hasil.kategori : null;
+  if (dapat === harap) lulusSatpam++;
+  else gagalSatpam.push({ pesan, harap, dapat, cocok: hasil ? hasil.cocok : null });
+}
+
+console.log(`Gerbang 0 — satpam     : LULUS ${lulusSatpam}/${KASUS_SATPAM.length}`);
+for (const g of gagalSatpam) {
+  console.log(
+    `  GAGAL  "${g.pesan.slice(0, 55)}"` +
+      `\n         dapat: ${g.dapat ?? "LOLOS"}${g.cocok ? ` (cocok: "${g.cocok}")` : ""}` +
+      ` | harap: ${g.harap ?? "LOLOS"}`,
+  );
+}
+
+const total = gagal.length + gagalSatpam.length;
+console.log(total ? `\n${total} KASUS GAGAL` : "\nSemua kasus lulus");
+process.exit(total ? 1 : 0);
