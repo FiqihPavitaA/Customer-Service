@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { aiTerkunci, getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
 import { buildFaqBlock, getInvariantBlock, parseAction } from "@/lib/knowledge";
 import { ukurBalasan } from "@/lib/limits";
+import { AMBANG_YAKIN, kenaliMaksud } from "@/lib/pengenal";
 // Router dipakai lewat pembungkus bertipe di lib/templates supaya
 // setKbDir() sudah dijalankan sebelum berkas KB dibaca.
 import "@/lib/templates";
@@ -91,6 +92,60 @@ export async function POST(req: Request) {
     });
   }
 
+  // ---------- Gerbang 2: Pengenal Maksud ----------
+  // Menangkap kalimat yang maksudnya sama tapi katanya beda —
+  // "nem oilnya dipakenya gmn kak" terhadap "cara pakai neem oil".
+  //
+  // Ikut dimatikan oleh useTemplates:false karena gerbang ini bagian
+  // dari lapisan penghemat biaya, bukan pengaman. Bandingkan dengan
+  // Gerbang 0 di atas, yang sengaja tidak bisa dimatikan.
+  //
+  // kenaliMaksud() tidak pernah melempar: bila Voyage atau Supabase
+  // bermasalah, hasilnya "lewat" dan permintaan diteruskan ke Claude
+  // seperti sebelum gerbang ini ada.
+  let pengenalToken = 0;
+  if (useTemplates !== false) {
+    const kenal = await kenaliMaksud(message);
+    pengenalToken = kenal.token;
+
+    if (kenal.jenis === "yakin") {
+      const pilih = kenal.kandidat[0];
+      console.log(
+        `[GERBANG-2] yakin ${pilih.skor.toFixed(3)} >= ${AMBANG_YAKIN} -> [${pilih.code}] ` +
+          `(lewat contoh: "${pilih.contoh}")`,
+      );
+      return NextResponse.json({
+        action: "AUTO_REPLY",
+        reply: pilih.body,
+        model: null,
+        usage: null,
+        source: "pengenal",
+        templateCode: pilih.code,
+        templateWhy: `Kemiripan ${pilih.skor.toFixed(3)} dengan contoh "${pilih.contoh}".`,
+        kategori: keputusan.kategori,
+        skor: pilih.skor,
+        kandidat: kenal.kandidat,
+        tokenVoyage: pengenalToken,
+        panjang: ukurBalasan(pilih.body),
+      });
+    }
+
+    if (kenal.jenis === "ragu") {
+      // Di sinilah Gerbang 3 (Claude Haiku) akan berdiri: memilih
+      // satu dari tiga kandidat, atau menjawab NONE. Selama gerbang
+      // itu belum ada, kandidatnya dicatat lalu permintaan jatuh ke
+      // Sonnet — sama seperti sebelumnya, hanya kini terlihat berapa
+      // sering zona ragu sebenarnya terjadi.
+      console.log(
+        `[GERBANG-2] ragu ${kenal.kandidat[0].skor.toFixed(3)} — kandidat: ` +
+          kenal.kandidat.map((k) => `[${k.code}] ${k.skor.toFixed(3)}`).join(", ") +
+          " -> diteruskan ke Sonnet (Gerbang 3 belum dibangun)",
+      );
+    } else {
+      console.log(`[GERBANG-2] lewat — ${kenal.alasan}`);
+    }
+  }
+
   // ---------- Penjaga saldo ----------
   // Diperiksa SEBELUM apa pun yang menyentuh Anthropic. Ditaruh
   // setelah jalur template supaya balasan gratis tetap jalan: yang
@@ -173,6 +228,11 @@ export async function POST(req: Request) {
       reply, // teks balasan untuk pelanggan
       model: MODEL,
       usage: response.usage, // jumlah token (untuk estimasi biaya)
+      // Voyage tetap ditagih walau permintaannya berakhir di Sonnet.
+      // Kalau tidak ikut dilaporkan, panel biaya akan menghitung
+      // Gerbang 2 seolah gratis setiap kali ia gagal menemukan
+      // kecocokan — justru kasus yang paling perlu terlihat.
+      tokenVoyage: pengenalToken,
       source: "ai",
       // Info routing — dipakai panel demo untuk menampilkan
       // berapa berkas KB yang benar-benar dikirim.
