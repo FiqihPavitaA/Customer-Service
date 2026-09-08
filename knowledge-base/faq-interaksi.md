@@ -134,7 +134,7 @@ Mohon berkenan menunggu, pesanan kakak akan kami maksimalkan agar bisa terkirim 
 Halo kak
 Kami cek pesanannya sedang dalam pengiriman, mohon ditunggu ya 😊🙏
 
-### [KOMPLAIN]
+### [KOMPLAIN DATA]
 Halo kak!
 
 Kami turut menyesal atas kendalanya 🙏

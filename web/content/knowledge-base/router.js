@@ -104,10 +104,15 @@ function muatPustaka() {
     const simpan = () => {
       if (!kode) return;
       const teks = buffer.join("\n").trim();
-      // Kode kembar (KOMPLAIN, IDUL FITRI, BERTAHAP — lihat
-      // index.json bidang kode_ganda): yang PERTAMA menang.
-      // Perilaku ini sama dengan templates.ts sebelumnya, jadi
-      // jawaban yang sudah berjalan tidak berubah.
+      // Yang PERTAMA menang bila ada kode kembar.
+      //
+      // Sejak 8 September 2026 tidak ada lagi kode kembar di berkas
+      // KB, tetapi penjaga ini dipertahankan sebagai jaring pengaman.
+      // Sebelumnya ada tiga ([KOMPLAIN], [BERTAHAP], [IDUL FITRI])
+      // dan akibatnya halus: versi kedua terbaca oleh tim CS di
+      // berkas, tetapi tidak pernah sekali pun terkirim ke pelanggan.
+      // Sekarang periksa-katalog.mjs yang menangkapnya, bukan
+      // pelanggan.
       if (teks && !pustaka.has(kode)) {
         pustaka.set(kode, teks);
         asalKode.set(kode, berkas);

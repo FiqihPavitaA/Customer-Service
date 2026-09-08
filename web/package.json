@@ -10,7 +10,8 @@
     "sync-kb": "node scripts/sync-kb.mjs",
     "seed-sql": "node --experimental-strip-types scripts/buat-seed-sql.mjs",
     "template-sql": "node scripts/buat-template-sql.mjs",
-    "periksa-sql": "node scripts/periksa-seed-sql.mjs"
+    "periksa-sql": "node scripts/periksa-seed-sql.mjs",
+    "periksa-katalog": "node ../knowledge-base/periksa-katalog.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",

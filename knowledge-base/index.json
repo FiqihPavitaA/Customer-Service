@@ -5,36 +5,13 @@
   "catatan": [
     "Dipakai router pemilih berkas KB: cocokkan kode template lalu muat hanya berkas yang memuatnya.",
     "Kode di sini persis heading `### [KODE]` di dalam berkas — jangan diubah tanpa mengubah berkasnya.",
-    "PERHATIAN: ada 3 kode yang dipakai lebih dari satu entri. Router harus memutuskan sendiri entri mana yang dipakai — lihat kolom kode_ganda."
+    "Sejak 8 September 2026 tidak ada lagi kode kembar. Penjaga di router.js tetap dipertahankan sebagai jaring pengaman."
   ],
   "ringkasan": {
     "jumlah_berkas": 4,
-    "jumlah_entri": 155,
-    "jumlah_kode_unik": 152
+    "jumlah_entri": 153,
+    "jumlah_kode_unik": 153
   },
-  "kode_ganda": [
-    {
-      "kode": "KOMPLAIN",
-      "jumlah_entri": 2,
-      "berkas": [
-        "faq-interaksi.md"
-      ]
-    },
-    {
-      "kode": "IDUL FITRI",
-      "jumlah_entri": 2,
-      "berkas": [
-        "faq-umum.md"
-      ]
-    },
-    {
-      "kode": "BERTAHAP",
-      "jumlah_entri": 2,
-      "berkas": [
-        "faq-umum.md"
-      ]
-    }
-  ],
   "berkas": [
     {
       "file": "knowledge-base/faq-interaksi.md",
@@ -71,7 +48,7 @@
         "KIRIM REGULER",
         "KIRIM INSTANT",
         "OTW",
-        "KOMPLAIN",
+        "KOMPLAIN DATA",
         "GARANSI",
         "REQ RANDOM"
       ]
@@ -111,7 +88,7 @@
     {
       "file": "knowledge-base/faq-umum.md",
       "kategori": "Umum",
-      "jumlah_entri": 104,
+      "jumlah_entri": 102,
       "kode": [
         "VOUCHER KOMPLAIN",
         "CANCEL",
@@ -206,8 +183,6 @@
         "CARA PAKAI ASAM AMINO",
         "TIPS SEMAI ANTI KUTILANG",
         "IDUL FITRI",
-        "IDUL FITRI",
-        "BERTAHAP",
         "BERTAHAP",
         "PAKAI AGK LENGKAP",
         "HARGANAIK",

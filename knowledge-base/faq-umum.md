@@ -492,14 +492,8 @@ Cara Pakai
 ### [IDUL FITRI]
 Halo kak 😊 Kami informasikan bahwa selama periode Lebaran, aktivitas terakhir seluruh warehouse dan cabang adalah pada tanggal 18 Maret 2026 pukul 17.00. Untuk operasional kembali, warehouse Surabaya akan mulai beroperasi pada 23 Maret 2026, sedangkan gudang cabang lainnya akan kembali beroperasi pada 26 Maret 2026. Selama periode tersebut, pesanan tetap bisa dilakukan, namun proses pengiriman akan menyesuaikan dengan jadwal operasional yang berlaku. Mohon pengertiannya ya kak, terima kasih🌱
 
-### [IDUL FITRI]
-Halo kak 😊 Kami informasikan bahwa selama periode Lebaran, aktivitas terakhir seluruh warehouse dan cabang adalah pada tanggal 18 Maret 2026 pukul 17.00. Untuk operasional kembali, warehouse Surabaya akan mulai beroperasi pada 23 Maret 2026, sedangkan gudang cabang lainnya akan kembali beroperasi pada 26 Maret 2026. Selama periode tersebut, pesanan tetap bisa dilakukan, namun proses pengiriman akan menyesuaikan dengan jadwal operasional yang berlaku. Mohon pengertiannya ya kak, terima kasih🌱
-
 ### [BERTAHAP]
 Halo kakak, pesanan sedang dalam proses harap ditunggu yaa akan dikirimkan secara bertahap
-
-### [BERTAHAP]
-hai kakak, harap ditunggu yaa pesanan kakak sudah di proses kak.. akan dikirimkan bertahap yaa 🙏
 
 ### [PAKAI AGK LENGKAP]
 Cara Pakai Singkat:
