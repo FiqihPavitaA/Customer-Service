@@ -58,6 +58,8 @@ export type SessionTotals = {
   voyageToken: number;
   /** Biayanya dalam USD, dihitung di server memakai tarif dari env. */
   voyageUsd: number;
+  /** Berapa kali Gerbang 2 benar-benar memanggil Voyage. */
+  voyageCalls: number;
 };
 
 export const EMPTY_SESSION: SessionTotals = {
@@ -68,6 +70,7 @@ export const EMPTY_SESSION: SessionTotals = {
   usdWithoutCache: 0,
   voyageToken: 0,
   voyageUsd: 0,
+  voyageCalls: 0,
 };
 
 export type LastResult =
@@ -239,11 +242,27 @@ export default function CostMeter({
           {session.voyageToken > 0 && (
             <Row
               label="Voyage (Gerbang 2)"
-              hint="embedding pertanyaan"
+              hint={`${session.voyageCalls} panggilan`}
+              /*
+               * Yang ditampilkan proyeksi per 1.000 chat, BUKAN total
+               * sesi. Total sesi untuk beberapa pertanyaan selalu
+               * membulat jadi "Rp 0,00" — dan baris yang selalu
+               * berbunyi nol justru mengajarkan hal yang salah, yaitu
+               * bahwa Voyage gratis.
+               *
+               * Angka per seribu chat bisa langsung dibandingkan
+               * dengan Claude yang ~Rp 30 sekali panggil, dan itulah
+               * perbandingan yang sebenarnya dipakai untuk memutuskan.
+               */
               value={
                 formatTokens(session.voyageToken) +
-                " tok · " +
-                formatIdr(session.voyageUsd * USD_TO_IDR)
+                " tok · ≈ " +
+                formatIdr(
+                  (session.voyageUsd / Math.max(1, session.voyageCalls)) *
+                    1000 *
+                    USD_TO_IDR,
+                ) +
+                " /1.000 chat"
               }
             />
           )}

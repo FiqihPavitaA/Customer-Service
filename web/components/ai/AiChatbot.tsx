@@ -236,6 +236,7 @@ export default function AiChatbot() {
           messages: s.messages + 1,
           voyageToken: s.voyageToken + (ok.voyage?.token ?? 0),
           voyageUsd: s.voyageUsd + (ok.voyage?.usd ?? 0),
+          voyageCalls: s.voyageCalls + (ok.voyage?.token ? 1 : 0),
         }));
         toast("Dilempar ke Claude — panggilan dibatalkan, saldo aman");
       } else if (ok.source === "template") {
@@ -246,6 +247,7 @@ export default function AiChatbot() {
           templateMessages: s.templateMessages + 1,
           voyageToken: s.voyageToken + (ok.voyage?.token ?? 0),
           voyageUsd: s.voyageUsd + (ok.voyage?.usd ?? 0),
+          voyageCalls: s.voyageCalls + (ok.voyage?.token ? 1 : 0),
         }));
         toast(`Dijawab template [${ok.templateCode}] — Rp 0 ⚡`);
       } else {
@@ -259,6 +261,7 @@ export default function AiChatbot() {
           usdWithoutCache: s.usdWithoutCache + cost.usdWithoutCache,
           voyageToken: s.voyageToken + (ok.voyage?.token ?? 0),
           voyageUsd: s.voyageUsd + (ok.voyage?.usd ?? 0),
+          voyageCalls: s.voyageCalls + (ok.voyage?.token ? 1 : 0),
         }));
         toast("Balasan dari Claude siap ✨");
       }
