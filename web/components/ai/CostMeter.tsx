@@ -54,6 +54,10 @@ export type SessionTotals = {
   templateMessages: number;
   usd: number;
   usdWithoutCache: number;
+  /** Token embedding Voyage (Gerbang 2), terkumpul sepanjang sesi. */
+  voyageToken: number;
+  /** Biayanya dalam USD, dihitung di server memakai tarif dari env. */
+  voyageUsd: number;
 };
 
 export const EMPTY_SESSION: SessionTotals = {
@@ -62,6 +66,8 @@ export const EMPTY_SESSION: SessionTotals = {
   templateMessages: 0,
   usd: 0,
   usdWithoutCache: 0,
+  voyageToken: 0,
+  voyageUsd: 0,
 };
 
 export type LastResult =
@@ -199,6 +205,17 @@ export default function CostMeter({
             value={`${session.templateMessages} · ${deflection}%`}
           />
           <Row label="Diteruskan ke Claude" value={String(session.aiMessages)} />
+          {session.voyageToken > 0 && (
+            <Row
+              label="Voyage (Gerbang 2)"
+              hint="embedding pertanyaan"
+              value={
+                formatTokens(session.voyageToken) +
+                " tok · " +
+                formatIdr(session.voyageUsd * USD_TO_IDR)
+              }
+            />
+          )}
           {session.aiMessages > 0 && (
             <Row
               label="Rata-rata per panggilan AI"

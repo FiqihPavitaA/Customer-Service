@@ -4,6 +4,7 @@ import { aiTerkunci, getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
 import { buildFaqBlock, getInvariantBlock, parseAction } from "@/lib/knowledge";
 import { ukurBalasan } from "@/lib/limits";
 import { AMBANG_YAKIN, kenaliMaksud, MODE_PENGENAL } from "@/lib/pengenal";
+import { perkiraanBiaya } from "@/lib/voyage";
 // Router dipakai lewat pembungkus bertipe di lib/templates supaya
 // setKbDir() sudah dijalankan sebelum berkas KB dibaca.
 import "@/lib/templates";
@@ -131,7 +132,7 @@ export async function POST(req: Request) {
           kategori: keputusan.kategori,
           skor: pilih.skor,
           kandidat: kenal.kandidat,
-          tokenVoyage: pengenalToken,
+          voyage: { token: pengenalToken, usd: perkiraanBiaya(pengenalToken).usd },
           panjang: ukurBalasan(pilih.body),
         });
       }
@@ -235,10 +236,14 @@ export async function POST(req: Request) {
       model: MODEL,
       usage: response.usage, // jumlah token (untuk estimasi biaya)
       // Voyage tetap ditagih walau permintaannya berakhir di Sonnet.
+      // Dikirim sebagai objek berisi token DAN rupiahnya, bukan token
+      // saja: tarif Voyage dibaca dari env di sisi server, dan menghitung
+      // ulang di peramban berarti ada dua sumber kebenaran yang bisa
+      // berbeda diam-diam.
       // Kalau tidak ikut dilaporkan, panel biaya akan menghitung
       // Gerbang 2 seolah gratis setiap kali ia gagal menemukan
       // kecocokan — justru kasus yang paling perlu terlihat.
-      tokenVoyage: pengenalToken,
+      voyage: { token: pengenalToken, usd: perkiraanBiaya(pengenalToken).usd },
       source: "ai",
       // Info routing — dipakai panel demo untuk menampilkan
       // berapa berkas KB yang benar-benar dikirim.

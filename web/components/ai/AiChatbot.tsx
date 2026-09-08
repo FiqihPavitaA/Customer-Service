@@ -63,6 +63,10 @@ type ChatResponse = {
   templateCode?: string;
   panjang?: { panjang: number; lewat: boolean; mepet: boolean; sisa: number };
   templateWhy?: string;
+  /** Gerbang 2. Ada walau balasannya berakhir di Claude: embedding
+      pertanyaan tetap ditagih Voyage meski tidak menemukan kecocokan. */
+  voyage?: { token: number; usd: number };
+  skor?: number;
 };
 
 export default function AiChatbot() {
@@ -132,6 +136,8 @@ export default function AiChatbot() {
           ...s,
           messages: s.messages + 1,
           templateMessages: s.templateMessages + 1,
+          voyageToken: s.voyageToken + (ok.voyage?.token ?? 0),
+          voyageUsd: s.voyageUsd + (ok.voyage?.usd ?? 0),
         }));
         toast(`Dijawab template [${ok.templateCode}] — Rp 0 ⚡`);
       } else {
@@ -143,6 +149,8 @@ export default function AiChatbot() {
           templateMessages: s.templateMessages,
           usd: s.usd + cost.usd,
           usdWithoutCache: s.usdWithoutCache + cost.usdWithoutCache,
+          voyageToken: s.voyageToken + (ok.voyage?.token ?? 0),
+          voyageUsd: s.voyageUsd + (ok.voyage?.usd ?? 0),
         }));
         toast("Balasan dari Claude siap ✨");
       }
