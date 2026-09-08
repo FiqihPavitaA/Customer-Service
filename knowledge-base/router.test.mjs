@@ -66,6 +66,23 @@ const KASUS = [
 
   // ---------- Enam aturan PRODUK * ----------
   ["halo kak, produk POC ini apa ya", "PRODUK POC"],
+
+  /* Cara bertanya "produk ini apa" yang sempat lolos ke Claude
+     (8 Sep 2026). Bukan kesalahan kode — MINTA_DESKRIPSI hanya
+     kurang lengkap, dan kekurangannya tidak pernah muncul sebagai
+     galat: pesan yang seharusnya gratis diam-diam jadi berbayar.
+     Dikunci di sini supaya tidak hilang lagi. */
+  ["poc tuh singkatan dari apa", "PRODUK POC"],
+  ["poc kepanjangan dari apa", "PRODUK POC"],
+  ["poc gunanya apa", "PRODUK POC"],
+  ["poc artinya apa", "PRODUK POC"],
+  ["poc maksudnya apa", "PRODUK POC"],
+
+  /* Sisi sebaliknya: perluasan di atas TIDAK boleh menyerap
+     pertanyaan stok, harga, atau dosis. */
+  ["poc digunakan untuk tanaman apa saja", null],
+  ["poc ready gak kak", null],
+  ["poc stok kosong ya", null],
   ["produk akar buat apa kak?", "PRODUK AKAR"],
   ["pestisida ini untuk apa ya kak", "PRODUK PESTISIDA"],
   ["seed booster manfaatnya apa?", "PRODUK SEEDBOOSTER"],

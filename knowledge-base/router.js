@@ -352,9 +352,32 @@ const BATAS_PANJANG = 180;
  * "apa ya" sengaja TIDAK dimasukkan: tanpa batas kata ia tercakup
  * di dalam "ber-apa ya-ng", dan dengan batas kata pun masih terlalu
  * longgar ("POC ada apa ya" bisa berarti menanyakan stok).
+ *
+ * DIPERLUAS 8 SEPTEMBER 2026 setelah "poc tuh singkatan dari apa"
+ * lolos ke Claude. Kodenya tidak salah — daftarnya saja yang kurang,
+ * dan kekurangan itu tidak pernah muncul sebagai galat: pesan yang
+ * seharusnya gratis diam-diam jadi berbayar.
+ *
+ * Empat rumpun yang ditambahkan, semuanya cara wajar bertanya
+ * "produk ini apa" yang sebelumnya tidak tercakup:
+ *
+ *   singkatan/kepanjangan  "poc tuh singkatan dari apa"
+ *   guna(nya)              "poc gunanya apa" — daftar lama hanya
+ *                          memuat "kegunaan(nya)", dan \b membuat
+ *                          keduanya tidak saling menutupi
+ *   arti(nya)              "poc artinya apa"
+ *   maksud(nya)            "poc maksudnya apa"
+ *
+ * Semuanya aman terhadap salah tangkap karena masih harus lolos
+ * `when` (nama produknya wajib disebut) DAN `unless` (pertanyaan
+ * dosis, stok, dan harga tetap dibuang).
+ *
+ * "digunakan" TIDAK ikut tertangkap oleh `guna(nya)?`: batas kata di
+ * depan pola menuntut huruf non-kata sebelum "guna", sedangkan pada
+ * "digunakan" huruf sebelumnya adalah "i".
  */
 const MINTA_DESKRIPSI =
-  /\b(apa itu|itu apa|ini apa|apa sih|apaan|fungsi(nya)?|manfaat(nya)?|kegunaan(nya)?|kandungan(nya)?|deskripsi(nya)?|jelasin|jelaskan|buat apa|untuk apa|produk apa)\b/i;
+  /\b(apa itu|itu apa|ini apa|apa sih|apaan|fungsi(nya)?|manfaat(nya)?|guna(nya)?|kegunaan(nya)?|kandungan(nya)?|deskripsi(nya)?|singkatan(nya)?|kepanjangan(nya)?|arti(nya)?|maksud(nya)?|jelasin|jelaskan|buat apa|untuk apa|produk apa)\b/i;
 
 /**
  * Pembatal bersama untuk keenam aturan PRODUK * di bawah.
