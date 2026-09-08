@@ -17,7 +17,7 @@ import {
 /* ===========================================================
    POST /api/chat — port dari app.post('/api/chat') di server.js.
 
-   Kontrak masuk : { message, history?, useTemplates? }
+   Kontrak masuk : { message, history?, useTemplates?, useClaude? }
    Kontrak keluar: { action, reply, model, usage, source, ... }
    Bidang lama (action, reply, model, usage) dijaga sama persis
    supaya UI lama (ai.js, dashboard.js) tetap jalan; bidang baru
@@ -35,14 +35,19 @@ export const dynamic = "force-dynamic";
 type IncomingMessage = { role?: string; content?: string };
 
 export async function POST(req: Request) {
-  let body: { message?: unknown; history?: unknown; useTemplates?: unknown };
+  let body: {
+    message?: unknown;
+    history?: unknown;
+    useTemplates?: unknown;
+    useClaude?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Body harus JSON yang valid." }, { status: 400 });
   }
 
-  const { message, history, useTemplates } = body ?? {};
+  const { message, history, useTemplates, useClaude } = body ?? {};
   if (!message || typeof message !== "string") {
     return NextResponse.json({ error: 'Field "message" wajib diisi.' }, { status: 400 });
   }
@@ -151,6 +156,35 @@ export async function POST(req: Request) {
     } else {
       console.log(`[GERBANG-2] lewat — ${kenal.alasan}`);
     }
+  }
+
+  // ---------- Saklar "Panggil Claude" dari panel uji ----------
+  // Dikirim halaman AI Chatbot saat penguji ingin melihat sampai mana
+  // sebuah pesan berjalan TANPA membayar Sonnet. Gerbang 0, 1, dan 2
+  // tetap berjalan penuh; yang dilewati hanya lapisan terakhir.
+  //
+  // INI KENYAMANAN, BUKAN PENGAMAN, dan bedanya penting: nilainya
+  // datang dari peramban, jadi siapa pun yang memanggil endpoint ini
+  // bisa saja tidak mengirimnya. Yang benar-benar mengunci saldo
+  // tetap AI_TEST_LOCK di bawah — dibaca dari env sisi server dan
+  // berlaku untuk semua pemanggil. Keduanya sengaja tidak digabung.
+  if (useClaude === false) {
+    const jejakTanpaClaude = logRouting(keputusan);
+    return NextResponse.json({
+      // Bukan AUTO_REPLY: tidak ada balasan untuk pelanggan di sini.
+      action: "HANDOVER_TO_CS",
+      reply: "",
+      model: null,
+      usage: null,
+      source: "tanpa-claude",
+      kategori: keputusan.kategori,
+      // Yang SEHARUSNYA dikirim ke Sonnet, supaya penguji tahu persis
+      // apa yang barusan tidak jadi dibayar.
+      berkas: keputusan.berkas,
+      alasan: keputusan.alasan,
+      faqKarakter: jejakTanpaClaude.terkirim,
+      voyage: { token: pengenalToken, usd: perkiraanBiaya(pengenalToken).usd },
+    });
   }
 
   // ---------- Penjaga saldo ----------

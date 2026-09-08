@@ -73,6 +73,18 @@ export const EMPTY_SESSION: SessionTotals = {
 export type LastResult =
   | { source: "template"; code: string }
   | { source: "ai"; cost: CostBreakdown; model: string }
+  /**
+   * Saklar "Panggil Claude" dimatikan. Pesannya berjalan penuh
+   * melewati Gerbang 0, 1, dan 2, lalu berhenti tepat sebelum
+   * lapisan berbayar — jadi yang terlihat adalah apa yang TIDAK
+   * jadi dibayar, bukan sekadar layar kosong.
+   */
+  | {
+      source: "tanpa-claude";
+      kategori: string;
+      berkas: string[];
+      faqKarakter: number;
+    }
   | null;
 
 export default function CostMeter({
@@ -116,6 +128,25 @@ export default function CostMeter({
             Balasan diambil langsung dari <code>faq-cs.md</code> kode{" "}
             <b>[{last.code}]</b>. Claude tidak dipanggil sama sekali, jadi tidak
             ada token yang terpakai.
+          </p>
+        </div>
+      )}
+
+      {last?.source === "tanpa-claude" && (
+        <div className="rounded-xl border border-[#f0c36d] bg-[#fdf3d8] p-4">
+          <div className="mb-1 text-sm font-bold text-[#8a5a00]">
+            ⏭️ Dilempar ke Claude — panggilan dibatalkan
+          </div>
+          <p className="m-0 text-[0.9rem] text-text-2">
+            Pesan ini tidak tertangkap Gerbang 0, 1, maupun 2, jadi pada
+            keadaan normal akan diteruskan ke Claude Sonnet. Karena saklar{" "}
+            <b>Panggil Claude</b> dimatikan, panggilannya dihentikan di server —
+            <b> saldo tidak terpotong</b>.
+          </p>
+          <p className="mt-2 mb-0 text-[0.86rem] text-muted">
+            Yang tidak jadi dikirim: kategori <b>{last.kategori}</b>,{" "}
+            {last.berkas.length} berkas FAQ ({formatTokens(last.faqKarakter)}{" "}
+            karakter).
           </p>
         </div>
       )}

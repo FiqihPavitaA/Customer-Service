@@ -59,7 +59,8 @@ type ChatResponse = {
   reply: string;
   model: string | null;
   usage: Usage | null;
-  source?: "ai" | "template";
+  source?: "ai" | "template" | "satpam" | "pengenal" | "tanpa-claude";
+  kategori?: string;
   templateCode?: string;
   panjang?: { panjang: number; lewat: boolean; mepet: boolean; sisa: number };
   templateWhy?: string;
@@ -67,6 +68,10 @@ type ChatResponse = {
       pertanyaan tetap ditagih Voyage meski tidak menemukan kecocokan. */
   voyage?: { token: number; usd: number };
   skor?: number;
+  /* Hanya terisi saat source === "tanpa-claude": isi permintaan yang
+     tidak jadi dikirim ke Sonnet. */
+  berkas?: string[];
+  faqKarakter?: number;
 };
 
 export default function AiChatbot() {
@@ -79,6 +84,10 @@ export default function AiChatbot() {
 
   const [aiOn, setAiOn] = useState(true);
   const [useTemplates, setUseTemplates] = useState(true);
+  /* Bawaannya HIDUP supaya perilaku halaman ini tidak berubah diam-diam
+     bagi yang tidak tahu saklarnya ada. Yang ingin menguji tanpa biaya
+     mematikannya secara sadar. */
+  const [useClaude, setUseClaude] = useState(true);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -115,7 +124,7 @@ export default function AiChatbot() {
         headers: { "Content-Type": "application/json" },
         // history sengaja kosong: tiap pengujian berdiri sendiri supaya
         // angka token bisa dibandingkan antar percobaan.
-        body: JSON.stringify({ message: msg, history: [], useTemplates }),
+        body: JSON.stringify({ message: msg, history: [], useTemplates, useClaude }),
       });
       const data = await r.json();
 
@@ -130,7 +139,21 @@ export default function AiChatbot() {
       const ok = data as ChatResponse;
       setResult(ok);
 
-      if (ok.source === "template") {
+      if (ok.source === "tanpa-claude") {
+        setLast({
+          source: "tanpa-claude",
+          kategori: ok.kategori ?? "?",
+          berkas: ok.berkas ?? [],
+          faqKarakter: ok.faqKarakter ?? 0,
+        });
+        setSession((s) => ({
+          ...s,
+          messages: s.messages + 1,
+          voyageToken: s.voyageToken + (ok.voyage?.token ?? 0),
+          voyageUsd: s.voyageUsd + (ok.voyage?.usd ?? 0),
+        }));
+        toast("Dilempar ke Claude — panggilan dibatalkan, saldo aman");
+      } else if (ok.source === "template") {
         setLast({ source: "template", code: ok.templateCode ?? "?" });
         setSession((s) => ({
           ...s,
@@ -162,7 +185,7 @@ export default function AiChatbot() {
     } finally {
       setBusy(false);
     }
-  }, [aiOn, message, toast, useTemplates]);
+  }, [aiOn, message, toast, useTemplates, useClaude]);
 
   // ---------- Status ringkas di kanan atas ----------
   let statusText = "memeriksa…";
@@ -319,6 +342,28 @@ export default function AiChatbot() {
                     (matikan untuk membandingkan biaya)
                   </span>
                 </label>
+
+                {/* Saklar ini kebalikan dari "Lapisan template": yang itu
+                    membuat lebih banyak pesan sampai ke Claude, yang ini
+                    memastikan tidak ada satu pun yang sampai. */}
+                <label className="flex items-center gap-2 text-[0.9rem] font-semibold text-text-2">
+                  <input
+                    type="checkbox"
+                    checked={useClaude}
+                    onChange={(e) => {
+                      setUseClaude(e.target.checked);
+                      toast(
+                        e.target.checked
+                          ? "Claude aktif — pertanyaan tak tertangkap gerbang akan dibayar"
+                          : "Claude dimatikan — saldo tidak akan terpotong",
+                      );
+                    }}
+                  />
+                  Panggil Claude
+                  <span className="text-xs font-normal text-muted">
+                    {useClaude ? "(berbayar)" : "(saldo aman)"}
+                  </span>
+                </label>
               </div>
 
               <textarea
@@ -391,19 +436,39 @@ export default function AiChatbot() {
                       <span className="rounded-md bg-green-mint px-1.5 py-0.5 text-[0.6rem] font-extrabold text-green-dark">
                         ⚡ TEMPLATE [{result.templateCode}] · Rp 0
                       </span>
+                    ) : result.source === "tanpa-claude" ? (
+                      <span className="rounded-md bg-[#fdf3d8] px-1.5 py-0.5 text-[0.6rem] font-extrabold text-[#8a5a00]">
+                        ⏭️ DILEMPAR KE CLAUDE · dibatalkan
+                      </span>
                     ) : (
                       <span className="text-xs text-muted">
                         🤖 Claude · {result.model}
                       </span>
                     )}
                   </div>
-                  <div className="whitespace-pre-wrap">{result.reply}</div>
+
+                  {/* Tanpa cabang ini kotaknya tampil kosong dengan label
+                      "Claude · null", seolah balasannya gagal. Padahal
+                      tidak ada yang gagal — panggilannya memang sengaja
+                      tidak dilakukan. */}
+                  {result.source === "tanpa-claude" ? (
+                    <p className="m-0 text-[0.9rem] text-text-2">
+                      Tidak ada balasan karena Claude tidak dipanggil. Pesan ini
+                      lolos dari Gerbang 0, 1, dan 2, jadi pada keadaan normal
+                      akan diteruskan ke Sonnet bersama{" "}
+                      <b>{result.berkas?.length ?? 0} berkas FAQ</b> kategori{" "}
+                      <b>{result.kategori}</b>.
+                    </p>
+                  ) : (
+                    <div className="whitespace-pre-wrap">{result.reply}</div>
+                  )}
 
                   {/* Batas 600 karakter diminta tim CS (4 Sep 2026).
                       Ditampilkan, bukan dipaksakan dengan memangkas:
                       balasan berisi dosis yang terpotong di tengah jauh
                       lebih berbahaya daripada balasan yang kepanjangan. */}
-                  {(() => {
+                  {result.source !== "tanpa-claude" &&
+                  (() => {
                     const u = result.panjang ?? ukurBalasan(result.reply);
                     return (
                       <p
