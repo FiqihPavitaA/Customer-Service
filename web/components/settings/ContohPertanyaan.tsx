@@ -370,6 +370,8 @@ type HasilBangun = {
   perkiraan: { contoh: number; token: number; idr: number; model: string };
   nyata?: { token: number; idr: number };
   tersimpan?: number;
+  /** Contoh yang masih antre sesudah sekali jalan. */
+  sisa?: number;
   gagal?: string[];
 };
 
@@ -461,6 +463,13 @@ export function BangunVektor({ bolehJalan }: { bolehJalan: boolean }) {
           {hasil.nyata && (
             <p className="mt-1.5 mb-0 font-mono text-[0.76rem] text-green-dark">
               biaya nyata: Rp {hasil.nyata.idr.toFixed(4)} · {hasil.nyata.token} token
+            </p>
+          )}
+          {typeof hasil.sisa === "number" && hasil.sisa > 0 && (
+            <p className="mt-1.5 mb-0 text-[0.78rem] text-[#8a5a00]">
+              Masih ada <b>{hasil.sisa}</b> contoh yang antre. Batas laju Voyage
+              membuat sekali tekan dibatasi 256 contoh — tekan lagi untuk
+              melanjutkan.
             </p>
           )}
           {hasil.gagal && hasil.gagal.length > 0 && (

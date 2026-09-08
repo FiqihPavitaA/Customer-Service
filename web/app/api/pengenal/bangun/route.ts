@@ -46,9 +46,25 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Menunggu antar-batch bisa mencapai puluhan detik saat kena batas
+// laju Voyage. Bawaan Vercel 10 detik akan memutusnya di tengah.
+export const maxDuration = 120;
 
-/** Sekali bangun dibatasi supaya tidak ada permintaan yang menggantung. */
-const BATAS_SEKALI = 500;
+/**
+ * Sekali bangun dibatasi supaya tidak ada permintaan yang menggantung.
+ *
+ * 256 = dua batch (128 per permintaan Voyage). Angkanya diturunkan
+ * dari 500 pada 8 September 2026 setelah kena HTTP 429 sungguhan:
+ * akun Voyage tanpa metode pembayaran dibatasi 3 PERMINTAAN PER
+ * MENIT. Empat batch berarti menunggu 63 detik di dalam satu
+ * permintaan HTTP — cukup lama untuk kena batas waktu serverless dan
+ * gagal setelah sebagian vektor terlanjur ditulis.
+ *
+ * Dengan 256, sekali tekan paling lama menunggu ~21 detik. Sisanya
+ * dilaporkan lewat `sisa` supaya Admin tahu harus menekan lagi, bukan
+ * mengira sudah selesai.
+ */
+const BATAS_SEKALI = 256;
 
 type BarisKosong = {
   id: string;
@@ -74,9 +90,12 @@ export async function POST(req: Request) {
   const jalankan = badan.jalankan === true;
 
   /* ---------- Daftar kerja ---------- */
-  const { data, error } = await sb
+  // count: "exact" supaya sisa antrean bisa dilaporkan tanpa
+  // permintaan kedua — Admin perlu tahu apakah masih harus menekan
+  // lagi, bukan mengira sudah selesai.
+  const { data, error, count } = await sb
     .from("template_examples")
-    .select("id, teks, template_id")
+    .select("id, teks, template_id", { count: "exact" })
     .is("embedding", null)
     .order("created_at", { ascending: true })
     .limit(BATAS_SEKALI);
@@ -175,6 +194,11 @@ export async function POST(req: Request) {
     hasil = await embed(
       antre.map((b) => b.teks),
       "document",
+      // Tidak ada pelanggan yang menunggu di sini, jadi kena batas
+      // laju cukup ditunggu — jauh lebih baik daripada memaksa Admin
+      // menekan tombolnya berkali-kali dan tidak pernah tahu berapa
+      // yang sudah masuk.
+      { ulangSaatPadat: true },
     );
   } catch (err) {
     return NextResponse.json(
@@ -219,10 +243,12 @@ export async function POST(req: Request) {
   }
 
   const biayaNyata = perkiraanBiaya(hasil.token);
+  const sisa = Math.max(0, (count ?? antre.length) - tersimpan);
 
   return NextResponse.json({
     jalan: true,
     tersimpan,
+    sisa,
     gagal,
     perkiraan,
     nyata: {
@@ -234,6 +260,9 @@ export async function POST(req: Request) {
     pesan:
       `${tersimpan} contoh kini punya vektor. Biaya nyata ` +
       `Rp ${biayaNyata.idr.toFixed(4)} (${hasil.token} token).` +
-      (gagal.length ? ` ${gagal.length} gagal ditulis.` : ""),
+      (gagal.length ? ` ${gagal.length} gagal ditulis.` : "") +
+      (sisa > 0
+        ? ` Masih ada ${sisa} yang antre — tekan sekali lagi untuk melanjutkan.`
+        : ""),
   });
 }

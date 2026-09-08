@@ -97,9 +97,98 @@ export class VoyageTerkunciError extends Error {
  *                 pesan galat.
  * @throws VoyageTerkunciError bila saklar pengaman aktif.
  */
+/**
+ * Voyage menolak karena batas laju, bukan karena salah konfigurasi.
+ *
+ * Dipisahkan jadi kelas sendiri karena tindakannya berlawanan dengan
+ * galat lain: yang ini cukup ditunggu, sedangkan salah kunci atau
+ * salah nama model tidak akan pernah membaik walau dicoba seribu
+ * kali.
+ */
+export class VoyagePadatError extends Error {
+  /** Detik yang disarankan Voyage lewat header Retry-After, bila ada. */
+  readonly tungguDetik: number;
+  constructor(pesan: string, tungguDetik: number) {
+    super(pesan);
+    this.name = "VoyagePadatError";
+    this.tungguDetik = tungguDetik;
+  }
+}
+
+/**
+ * Ubah status HTTP jadi kalimat yang menunjuk sebab yang benar.
+ *
+ * Versi pertama berkas ini menjawab SEMUA status dengan "Periksa nama
+ * model dan kunci API". Itu menyesatkan pada kasus yang justru paling
+ * sering terjadi: HTTP 429 sama sekali bukan soal kunci — kunci dan
+ * modelnya benar, hanya kuotanya sedang habis. Pesan yang menuduh
+ * bagian yang benar membuat orang mengubah yang tidak perlu diubah.
+ */
+function galatVoyage(status: number, detail: string): Error {
+  const potong = detail.slice(0, 300);
+
+  if (status === 429) {
+    // Akun Voyage tanpa metode pembayaran dibatasi 3 permintaan per
+    // menit dan 10.000 token per menit. Batas itu berlaku walau
+    // kuota gratis 200 juta token masih utuh — keduanya hal yang
+    // berbeda, dan itulah yang paling membingungkan di sini.
+    const cocok = /(\d+)\s*RPM/i.exec(detail);
+    const rpm = cocok ? cocok[1] : "3";
+    return new VoyagePadatError(
+      `Voyage sedang membatasi laju (HTTP 429) — bukan masalah kunci ` +
+        `maupun nama model. Akun tanpa metode pembayaran dibatasi ${rpm} ` +
+        `permintaan per menit. Tunggu sekitar satu menit lalu coba lagi, ` +
+        `atau tambahkan metode pembayaran di dashboard.voyageai.com untuk ` +
+        `membuka batas standar. Kuota gratisnya sendiri tidak berkurang ` +
+        `karena permintaan yang ditolak. ${potong}`,
+      60,
+    );
+  }
+
+  if (status === 401 || status === 403) {
+    return new Error(
+      `Voyage menolak kunci API (HTTP ${status}). Periksa VOYAGE_API_KEY ` +
+        `di web/.env.local, lalu jalankan ulang server — nilai env dibaca ` +
+        `sekali saat modul dimuat. ${potong}`,
+    );
+  }
+
+  if (status === 400 || status === 404) {
+    return new Error(
+      `Voyage menolak permintaan (HTTP ${status}). Kemungkinan terbesar ` +
+        `nama model salah: sekarang terpasang "${VOYAGE_MODEL}". Cocokkan ` +
+        `dengan nama persis di dashboard.voyageai.com. ${potong}`,
+    );
+  }
+
+  return new Error(
+    `Voyage menolak permintaan (HTTP ${status}). ${potong}`,
+  );
+}
+
+const tidur = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export type OpsiEmbed = {
+  /**
+   * Tunggu lalu ulangi bila kena batas laju (HTTP 429).
+   *
+   * Bawaannya false, dan itu disengaja. Jalur yang dipakai
+   * /api/chat harus GAGAL CEPAT: Gerbang 2 adalah penghemat biaya,
+   * dan menahan pelanggan 60 detik demi menghemat Rp 30 adalah
+   * tukar-tambah yang salah arah. Di sana kegagalan berarti
+   * "teruskan ke Claude seperti sebelum gerbang ini ada".
+   *
+   * Yang membangun vektor secara borongan justru sebaliknya: tidak
+   * ada pelanggan yang menunggu, dan mengulang jauh lebih baik
+   * daripada memaksa Admin menekan tombolnya berkali-kali.
+   */
+  ulangSaatPadat?: boolean;
+};
+
 export async function embed(
   teks: string[],
   jenis: "document" | "query",
+  opsi: OpsiEmbed = {},
 ): Promise<HasilEmbedding> {
   if (voyageTerkunci()) throw new VoyageTerkunciError();
 
@@ -119,28 +208,55 @@ export async function embed(
   const vektor: number[][] = [];
   let token = 0;
 
+  /** Maksimal berapa kali satu batch diulang saat kena batas laju. */
+  const MAKS_ULANG = opsi.ulangSaatPadat ? 3 : 0;
+
   for (let i = 0; i < bersih.length; i += UKURAN_BATCH) {
     const batch = bersih.slice(i, i + UKURAN_BATCH);
 
-    const res = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        input: batch,
-        model: VOYAGE_MODEL,
-        input_type: jenis,
-      }),
-    });
+    /* Beri jarak antar-batch saat memborong. Batas laju bawaan
+       Voyage adalah 3 permintaan per menit; menembakkan empat batch
+       beruntun dijamin kena 429 pada batch keempat, dan mengulang
+       sesudah ditolak lebih lambat daripada menunggu sejak awal. */
+    if (opsi.ulangSaatPadat && i > 0) await tidur(21_000);
 
-    if (!res.ok) {
+    let res: Response | null = null;
+    for (let percobaan = 0; percobaan <= MAKS_ULANG; percobaan++) {
+      res = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          input: batch,
+          model: VOYAGE_MODEL,
+          input_type: jenis,
+        }),
+      });
+
+      if (res.ok) break;
+
       const detail = await res.text().catch(() => "");
-      throw new Error(
-        `Voyage menolak permintaan (HTTP ${res.status}). ` +
-          `Periksa nama model "${VOYAGE_MODEL}" dan kunci API. ${detail.slice(0, 300)}`,
+      const galat = galatVoyage(res.status, detail);
+
+      // Hanya 429 yang layak diulang. Kunci salah atau nama model
+      // salah tidak akan membaik walau dicoba seribu kali — mengulang
+      // hanya menunda pesan galat yang justru perlu dibaca.
+      if (!(galat instanceof VoyagePadatError) || percobaan === MAKS_ULANG) {
+        throw galat;
+      }
+
+      const jeda = galat.tungguDetik * 1000 * (percobaan + 1);
+      console.warn(
+        `[VOYAGE] batas laju — menunggu ${Math.round(jeda / 1000)} detik ` +
+          `lalu mengulang (percobaan ${percobaan + 1}/${MAKS_ULANG}).`,
       );
+      await tidur(jeda);
+    }
+
+    if (!res || !res.ok) {
+      throw new Error("Voyage tidak menjawab setelah beberapa percobaan.");
     }
 
     const json = (await res.json()) as {
