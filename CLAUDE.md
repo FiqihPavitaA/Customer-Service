@@ -40,6 +40,7 @@ pemilik proyek menjawab.
 | `node knowledge-base/router.test.mjs` | 48 kasus pencocokan template |
 | `node knowledge-base/periksa-katalog.mjs` | Tidak ada kode kembar, index.json sinkron, semua balasan <= 600 karakter |
 | `node knowledge-base/uji-sumber-luar.mjs` | 23 kasus lapisan sumber tabel: tabel menang atas berkas, tabel kosong kembali ke berkas, pola rusak dibuang satuan |
+| `node knowledge-base/audit-voyage.mjs` | Audit kesiapan data Gerbang 2: jumlah contoh, gaya bahasa, kode ganda, kemiripan antar-template |
 | `POST /api/templates/uji` | Pesan tertentu kena template mana |
 | `POST /api/pengenal/uji` | **BERBAYAR ~Rp 0,003** — uji Gerbang 2 tanpa memanggil Claude |
 | `npm run tes0` | Kebingungan antar-contoh dari vektor yang sudah ada |
