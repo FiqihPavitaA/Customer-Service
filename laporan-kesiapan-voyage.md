@@ -19,8 +19,8 @@ pelanggan.
 
 Tiga hal yang harus dibereskan lebih dulu, berurutan:
 
-1. **`[DITERUSKAN CS]` hilang dari tabel Supabase** — pelanggan yang minta refund
-   akan menerima pesan KOSONG begitu sumber tabel dinyalakan. Sudah diverifikasi.
+1. ~~**`[DITERUSKAN CS]` hilang dari tabel Supabase**~~ — pelanggan yang minta
+   refund akan menerima pesan KOSONG. **✅ sudah dibereskan**, lihat K1.
 2. **Perbaiki kontradiksi jam kirim** antara `[INSTANT]`, `[KIRIM INSTANT]`, dan
    `[KIRIM REGULER]` — satu di antaranya bahkan bertentangan dengan dirinya sendiri.
 3. **Tim CS menulis 3 contoh pertanyaan** untuk tiap template INTI, dengan gaya
@@ -54,7 +54,7 @@ Tiga hal yang harus dibereskan lebih dulu, berurutan:
 | | |
 |---|---|
 | Template di berkas `.md` | **154** |
-| Template di `seed-templates.sql` | **152** ← tertinggal 2 |
+| Template di `seed-templates.sql` | **154** ✅ *(152 saat audit; sudah dibangkitkan ulang)* |
 | Aturan kata kunci (Gerbang 1) | 43 |
 | Template tanpa kata kunci | 111 |
 | Total contoh pertanyaan | **36** |
@@ -68,6 +68,13 @@ Tiga hal yang harus dibereskan lebih dulu, berurutan:
 Hal yang membuat sistem **salah menjawab pelanggan**.
 
 ### K1. `[DITERUSKAN CS]` tidak ada di Supabase — balasan Gerbang 0 jadi kosong
+
+> ✅ **SUDAH DIBERESKAN 8 September 2026** (commit sesudah audit ini).
+> Seed dibangkitkan ulang jadi 154 baris, DAN router diberi jaring
+> pengaman berlapis. Repro asli kini berbunyi `panjang=121`, bukan `0`.
+> Rinciannya di bagian [Tindak lanjut](#tindak-lanjut-k1) di bawah.
+> Uraian di bawah ini dibiarkan apa adanya sebagai catatan keadaan
+> saat audit dijalankan.
 
 **Ini yang paling berbahaya di seluruh laporan, dan bisa aktif hari ini juga.**
 
@@ -109,6 +116,45 @@ ringan karena tidak dirujuk kode.
 **Tindakan:** bangkitkan ulang seed (`npm run template-sql`) lalu jalankan, ATAU
 tambahkan pengaman di router: bila `KODE_HANDOVER` tidak ada di sumber aktif,
 ambil dari berkas `.md`.
+
+<h4 id="tindak-lanjut-k1">Tindak lanjut — dikerjakan, bukan hanya diusulkan</h4>
+
+Keduanya dikerjakan, bukan salah satu. Membangkitkan ulang seed menutup
+kejadian **ini**; jaring pengaman menutup **seluruh keluarga** kejadian
+serupa — dan keluarga itu akan tumbuh, karena berkas `.md` dan tabel akan
+terus bergerak dengan kecepatan berbeda.
+
+1. **Seed dibangkitkan ulang** — `npm run template-sql`, dari 152 jadi 154
+   baris. `[DITERUSKAN CS]` dan `[KOMPLAIN DATA]` kini masuk.
+
+2. **`teksHandover()` di `knowledge-base/router.js`** menggantikan
+   `getTemplateLibrary().get(KODE_HANDOVER) ?? ""`. Tiga tingkat, tiap
+   penurunan disertai peringatan di log:
+
+   | Urutan | Sumber | Bila terpakai |
+   |---|---|---|
+   | 1 | sumber aktif (tabel/berkas) | jalur normal, senyap |
+   | 2 | berkas `.md` | ⚠️ peringatan: seed tertinggal |
+   | 3 | teks tetap di kode | ⛔ galat: katalog perlu diperiksa |
+
+   Tingkat 3 adalah satu-satunya teks balasan yang ditulis di kode, dan
+   pengecualiannya disengaja: setiap teks lain boleh hilang karena
+   Gerbang 1 tinggal menyerah dan meneruskan ke AI. Yang satu ini tidak
+   punya jalan menyerah — Gerbang 0 sudah memutuskan Claude **tidak**
+   dipanggil.
+
+3. **`npm run periksa-sql` sekarang menurunkan jumlah tuple dari katalog**,
+   bukan dari angka 195 yang ditulis tangan. Angka tetap itulah yang membuat
+   pemeriksaan buta terhadap satu-satunya hal yang perlu dijaga. Ia juga kini
+   menuntut `DITERUSKAN CS` benar-benar ada di dalam seed.
+
+4. **6 kasus uji baru** di `uji-sumber-luar.mjs` (23 → 29), termasuk keadaan
+   yang sesungguhnya terjadi: tabel aktif yang **tidak** memuat kode itu.
+
+**Yang masih perlu Anda lakukan:** jalankan `supabase/seed-templates.sql`
+yang baru di SQL Editor. Aman dijalankan ulang selama tim CS belum menyunting
+lewat halaman Kelola Template — dan per hari ini belum ada satu pun suntingan
+yang tersimpan.
 
 ---
 
@@ -414,8 +460,8 @@ Urut berdasarkan dampak dibagi usaha.
 
 | # | Tindakan | Usaha | Dampak |
 |---|---|---|---|
-| 1 | Bangkitkan ulang `seed-templates.sql` (`npm run template-sql`) lalu jalankan, sehingga `[DITERUSKAN CS]` dan `[KOMPLAIN DATA]` masuk tabel | 5 menit | **mencegah balasan kosong ke pelanggan komplain** |
-| 2 | Tambahkan pengaman di `router.js`: bila `KODE_HANDOVER` tidak ada di sumber aktif, ambil dari berkas `.md` dan tulis peringatan | 20 menit | menutup K1 secara permanen, bukan sekali ini saja |
+| 1 | ✅ **selesai** — seed dibangkitkan ulang jadi 154 baris. Tersisa: jalankan `supabase/seed-templates.sql` di SQL Editor | 5 menit | **mencegah balasan kosong ke pelanggan komplain** |
+| 2 | ✅ **selesai** — `teksHandover()` tiga tingkat + `periksa-sql` menurunkan jumlah tuple dari katalog + 6 kasus uji baru | 20 menit | menutup K1 secara permanen, bukan sekali ini saja |
 | 3 | Putuskan batas jam instant yang benar bersama tim operasional | keputusan | membuka jalan tindakan 4 |
 | 4 | Gabungkan `[INSTANT]` + `[KIRIM INSTANT]`; perbaiki `[KIRIM REGULER]`; perbaiki salah ketik "dikiirm" di ketiganya | 15 menit | menghapus 3 dari 4 pasangan ≥ 0,80 |
 | 5 | Keluarkan `[BANTU]`, `[TQ]`, dan seluruh kelas OUTBOUND/BROADCAST/SENSITIF dari pool Gerbang 2 | 30 menit | mengecilkan pool dari 154 ke ±105, mengurangi tabrakan |

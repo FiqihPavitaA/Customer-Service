@@ -525,6 +525,74 @@ export function getKategoriSatpam() {
  */
 const KODE_HANDOVER = "DITERUSKAN CS";
 
+/* Balasan terakhir bila [DITERUSKAN CS] tidak ada di sumber mana pun.
+
+   Ditulis di kode — satu-satunya teks balasan di berkas ini yang
+   tidak datang dari berkas KB, dan pengecualian itu disengaja.
+
+   Semua teks lain boleh hilang tanpa membahayakan: Gerbang 1 yang
+   kodenya tidak ketemu cukup menyerah dan menyerahkan pesan ke AI.
+   Yang satu ini tidak punya jalan menyerah. Ia dipakai justru pada
+   pesan yang paling tidak boleh didiamkan — refund, barang rusak,
+   dugaan keracunan, pelanggan yang marah — dan pada saat itu
+   Gerbang 0 sudah memutuskan Claude TIDAK akan dipanggil. Kalau
+   teksnya kosong, yang sampai ke pelanggan adalah layar kosong. */
+const CADANGAN_HANDOVER =
+  "Halo kak, terima kasih infonya \u{1F64F} Untuk hal ini kakak akan " +
+  "dibantu langsung oleh tim CS kami ya, mohon ditunggu sebentar.";
+
+/** Supaya peringatan yang sama tidak membanjiri log tiap pesan. */
+let sudahMengeluhHandover = false;
+
+/**
+ * Teks penerimaan Gerbang 0, dengan dua jaring pengaman.
+ *
+ * KENAPA INI ADA — kejadian 8 September 2026, terukur bukan dugaan.
+ *
+ * [DITERUSKAN CS] ditambahkan ke faq-interaksi.md setelah
+ * seed-templates.sql dibangkitkan, jadi kodenya ada di berkas tetapi
+ * TIDAK ada di tabel. Begitu router berpindah membaca tabel,
+ * `.get()` mengembalikan undefined dan `?? ""` mengubahnya jadi
+ * balasan kosong:
+ *
+ *   SUMBER BERKAS   : panjang=121
+ *   SUMBER SUPABASE : panjang=0
+ *
+ * Gerbang 0 tetap menahan pesannya dengan benar. Yang hilang justru
+ * kalimat yang memberi tahu pelanggan bahwa kasusnya sedang
+ * ditangani — dan hilangnya tanpa satu pun pesan galat.
+ *
+ * Urutannya: sumber aktif -> berkas .md -> teks di kode. Turun satu
+ * tingkat selalu disertai peringatan, karena jatuh ke cadangan
+ * berarti ada yang harus dibetulkan; yang tidak boleh adalah
+ * pelanggan ikut menanggung akibatnya sementara itu.
+ */
+function teksHandover() {
+  const dariSumber = pustakaAktif().get(KODE_HANDOVER);
+  if (dariSumber && dariSumber.trim()) return dariSumber;
+
+  const dariBerkas = muatPustaka().get(KODE_HANDOVER);
+  if (dariBerkas && dariBerkas.trim()) {
+    if (!sudahMengeluhHandover) {
+      console.warn(
+        `[KB-ROUTER] [${KODE_HANDOVER}] tidak ada di sumber "${sumberAktif}" — ` +
+          `memakai berkas .md. Jalankan "npm run template-sql" lalu seed ulang.`,
+      );
+      sudahMengeluhHandover = true;
+    }
+    return dariBerkas;
+  }
+
+  if (!sudahMengeluhHandover) {
+    console.error(
+      `[KB-ROUTER] [${KODE_HANDOVER}] tidak ada di sumber mana pun — ` +
+        `memakai teks cadangan di kode. Katalog KB perlu diperiksa.`,
+    );
+    sudahMengeluhHandover = true;
+  }
+  return CADANGAN_HANDOVER;
+}
+
 /* Bentuk satu aturan:
      code    kode entri di berkas FAQ
      action  klasifikasi yang dilaporkan, setara keluaran AI
@@ -1113,7 +1181,7 @@ export function routeToCategory(pesanPelanggan) {
     return {
       jenis: "handover",
       kode: KODE_HANDOVER,
-      teks: getTemplateLibrary().get(KODE_HANDOVER) ?? "",
+      teks: teksHandover(),
       action: "HANDOVER_TO_CS",
       // Tidak ada berkas FAQ yang perlu dikirim: Claude tidak dipanggil.
       kategori: "unclear",

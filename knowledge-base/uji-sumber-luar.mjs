@@ -15,7 +15,7 @@
    bentuk kerusakan yang tidak akan tertangkap 48 kasus yang sudah
    ada, karena semuanya berjalan pada sumber berkas.
 
-   Yang dijaga di sini ada lima, dan tiap satunya pernah jadi cara
+   Yang dijaga di sini ada enam, dan tiap satunya pernah jadi cara
    sistem seperti ini gagal diam-diam:
 
      1. tabel menang atas berkas
@@ -23,7 +23,9 @@
      3. pola rusak membuang SATU aturan, bukan seluruh pencocok
      4. urutan aturan ditegakkan dari priority, bukan dari urutan
         baris yang kebetulan datang
-     5. bersihkanSumberLuar() benar-benar memulihkan keadaan semula
+     5. balasan Gerbang 0 TIDAK PERNAH kosong, sumber apa pun yang
+        dipakai — ini yang benar-benar terjadi pada 8 September 2026
+     6. bersihkanSumberLuar() benar-benar memulihkan keadaan semula
    =========================================================== */
 
 import { dirname, join } from "node:path";
@@ -33,6 +35,7 @@ const KB = dirname(fileURLToPath(import.meta.url));
 const {
   bersihkanSumberLuar,
   getAsalKode,
+  routeToCategory,
   getSumberAktif,
   getTemplateLibrary,
   getPustakaBerkas,
@@ -206,9 +209,60 @@ periksa(
 );
 
 /* ---------------------------------------------------------------
-   5. Pemulihan penuh
+   5. Balasan Gerbang 0 tidak pernah kosong
+   ---------------------------------------------------------------
+   Kejadian 8 September 2026: [DITERUSKAN CS] ada di berkas tetapi
+   tidak ada di seed-templates.sql. Begitu router membaca tabel,
+   pelanggan yang minta refund menerima string kosong — Gerbang 0
+   menahan dengan benar, tetapi kalimat penerimaannya lenyap tanpa
+   satu pun pesan galat.
+
+   Yang diuji di sini bukan "apakah kodenya ada", melainkan "apakah
+   pelanggan tetap menerima kalimat" pada tiga keadaan sumber. --- */
+console.log("\n5. Balasan Gerbang 0 tidak pernah kosong");
+
+const PESAN_SATPAM = "saya mau refund barangnya rusak";
+
+bersihkanSumberLuar();
+const g1 = routeToCategory(PESAN_SATPAM);
+periksa("berkas: dicegat Gerbang 0", g1.jenis === "handover", g1.jenis);
+periksa("berkas: teksnya tidak kosong", (g1.teks ?? "").length > 0, `panjang ${(g1.teks ?? "").length}`);
+
+/* Tabel yang TIDAK memuat [DITERUSKAN CS] — inilah keadaan yang
+   sesungguhnya terjadi, bukan keadaan buatan. */
+setSumberLuar(BARIS);
+const g2 = routeToCategory(PESAN_SATPAM);
+periksa("tabel tanpa kode itu: tetap dicegat", g2.jenis === "handover", g2.jenis);
+periksa(
+  "tabel tanpa kode itu: teks TETAP terisi",
+  (g2.teks ?? "").length > 0,
+  `panjang ${(g2.teks ?? "").length} — pelanggan menerima layar kosong`,
+);
+periksa(
+  "teksnya jatuh ke berkas, bukan ke teks kode",
+  g2.teks === g1.teks,
+  "cadangan di kode terpakai padahal berkas masih ada",
+);
+
+/* Tabel yang MEMUAT kode itu dengan teks berbeda — sumber aktif
+   harus menang, supaya suntingan tim CS benar-benar terpakai. */
+setSumberLuar([
+  ...BARIS,
+  {
+    code: "DITERUSKAN CS",
+    body: "Versi dari TABEL.",
+    action: "HANDOVER_TO_CS",
+    category_slug: "interaksi",
+    priority: null,
+  },
+]);
+const g3 = routeToCategory(PESAN_SATPAM);
+periksa("tabel dengan kode itu: teks tabel yang menang", g3.teks === "Versi dari TABEL.", g3.teks);
+
+/* ---------------------------------------------------------------
+   6. Pemulihan penuh
    --------------------------------------------------------------- */
-console.log("\n5. bersihkanSumberLuar memulihkan keadaan semula");
+console.log("\n6. bersihkanSumberLuar memulihkan keadaan semula");
 setSumberLuar(BARIS);
 bersihkanSumberLuar();
 periksa('sumber "berkas"', getSumberAktif() === "berkas");

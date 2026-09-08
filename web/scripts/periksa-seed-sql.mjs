@@ -139,11 +139,47 @@ function periksa(namaBerkas, harap) {
   }
 }
 
-/* 152 template + 43 aturan = 195 tuple. */
+/* ---------------------------------------------------------------
+   Jumlah tuple DITURUNKAN dari katalog, bukan ditulis tangan.
+
+   Sebelum 8 September 2026 angkanya di-hardcode 195 (152 template +
+   43 aturan). Itu bukan sekadar merepotkan saat katalog bertambah —
+   ia membuat pemeriksaan ini BUTA terhadap satu-satunya hal yang
+   paling perlu dijaga: apakah seed masih sepadan dengan berkas .md.
+
+   Akibatnya terbukti mahal. Dua template ([DITERUSKAN CS] dan
+   [KOMPLAIN DATA]) ditambahkan ke berkas setelah seed dibangkitkan,
+   dan tidak ada satu pun pemeriksaan yang menyadarinya. Salah
+   satunya adalah balasan Gerbang 0 — begitu router membaca dari
+   tabel, pelanggan yang minta refund menerima pesan kosong.
+
+   Dengan angka yang diturunkan dari katalog, seed yang tertinggal
+   langsung terlihat di sini, jauh sebelum sampai ke pelanggan.
+   --------------------------------------------------------------- */
+
+const { getTemplateLibrary, jumlahAturan, setKbDir } = await import(
+  "../content/knowledge-base/router.js"
+);
+setKbDir(join(AKAR, "knowledge-base"));
+
+const jumlahTemplate = getTemplateLibrary().size;
+const jumlahRules = jumlahAturan();
+
+console.log(
+  `\nKatalog .md saat ini: ${jumlahTemplate} template + ${jumlahRules} aturan ` +
+    `= ${jumlahTemplate + jumlahRules} tuple`,
+);
+
 periksa("seed-templates.sql", {
-  tuple: 195,
+  tuple: jumlahTemplate + jumlahRules,
   // Apostrof di dalam pola regex — pembuktian escaping bekerja.
-  memuat: ["assalamu'alaikum", "Cara penggunaan POC:"],
+  memuat: [
+    "assalamu'alaikum",
+    "Cara penggunaan POC:",
+    // Balasan Gerbang 0. Wajib ada: bila hilang, pelanggan yang
+    // dicegat satpam menerima balasan KOSONG.
+    "DITERUSKAN CS",
+  ],
 });
 
 /* 6 percakapan + 1 eskalasi + 3 flag = 10 tuple. */

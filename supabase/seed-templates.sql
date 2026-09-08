@@ -5,7 +5,7 @@
 -- Prasyarat: supabase/schema.sql dan schema-kb.sql sudah
 -- dijalankan lebih dulu.
 --
--- Isi: 152 template, 43 aturan pemicu.
+-- Isi: 154 template, 43 aturan pemicu.
 --
 -- Ini BUKAN data karangan — isinya balasan CS yang sungguhan
 -- dipakai, disalin apa adanya dari keempat berkas FAQ.
@@ -96,6 +96,12 @@ Pesanan instant yang masuk dibawah jam 13.00 WIB akan dikirim di hari yang sama,
 Mohon berkenan menunggu, pesanan kakak akan kami maksimalkan agar bisa terkirim sesuai jadwal 🥰🥰🥰', 'AUTO_REPLY', true, false, NULL),
   ('OTW', 'interaksi', 'Halo kak
 Kami cek pesanannya sedang dalam pengiriman, mohon ditunggu ya 😊🙏', 'AUTO_REPLY', true, false, NULL),
+  ('KOMPLAIN DATA', 'interaksi', 'Halo kak!
+
+Kami turut menyesal atas kendalanya 🙏
+Mungkin bisa dibantu data pengiriman meliputi nama, alamat lengkap, dan nomor yang bisa dihubungi
+
+Kami tunggu informasi dari kakak lebih lanjut 😊🙏', 'AUTO_REPLY', true, false, NULL),
   ('GARANSI', 'interaksi', 'Halo kak 🥰🥰🥰
 
 Untuk menjamin kepuasan dari pelanggan infarm, kami menyediakan garansi selama 7 hari.
@@ -106,6 +112,7 @@ Syarat klaim:
 
 Mohon menyertakan syarat klaim saat melakukan komplain. Tidak menyertakan syarat komplain, toko dapat menolak komplain 🙏🙏🙏', 'AUTO_REPLY', true, false, NULL),
   ('REQ RANDOM', 'interaksi', 'Halo kak, untuk benih terkadang ada yang kosong ya kak🙏 jadi semisal nanti kaka req tbtb benih nya kebetulan lagi kosong akan kami kirimkan benih random ya kak😊 terimakasih🙏', 'AUTO_REPLY', true, false, NULL),
+  ('DITERUSKAN CS', 'interaksi', 'Halo kak, terima kasih infonya 🙏 Untuk hal ini kakak akan dibantu langsung oleh tim CS kami ya, mohon ditunggu sebentar.', 'AUTO_REPLY', true, false, NULL),
   ('PAKAI ABMB', 'cara-pakai', 'Cara Penggunaan AB MIX
 1. Larutkan semua nutrisi A ke Aquades hingga volume 500 ml
 2. Larutkan semua nutrisi B ke Aquades hingga volume 500ml
@@ -645,7 +652,7 @@ commit;
 -- ===========================================================
 -- Periksa hasilnya
 -- ===========================================================
--- select count(*) as template from public.templates;          -- harus 152
+-- select count(*) as template from public.templates;          -- harus 154
 -- select count(*) as aturan   from public.template_rules;     -- harus 43
 --
 -- Template yang BELUM punya pemicu — ini daftar kerja tim CS,
