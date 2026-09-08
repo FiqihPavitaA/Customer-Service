@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { aiTerkunci, getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
 import { buildFaqBlock, getInvariantBlock, parseAction } from "@/lib/knowledge";
 import { ukurBalasan } from "@/lib/limits";
-import { AMBANG_YAKIN, kenaliMaksud, MODE_PENGENAL } from "@/lib/pengenal";
+import {
+  AMBANG_RAGU,
+  AMBANG_YAKIN,
+  kenaliMaksud,
+  MODE_PENGENAL,
+} from "@/lib/pengenal";
 import { perkiraanBiaya } from "@/lib/voyage";
 // Router dipakai lewat pembungkus bertipe di lib/templates supaya
 // setKbDir() sudah dijalankan sebelum berkas KB dibaca.
@@ -110,9 +115,47 @@ export async function POST(req: Request) {
   // bermasalah, hasilnya "lewat" dan permintaan diteruskan ke Claude
   // seperti sebelum gerbang ini ada.
   let pengenalToken = 0;
+
+  /**
+   * Keputusan Gerbang 2, dibawa keluar dari blok di bawah supaya ikut
+   * dilaporkan pada jawaban mana pun — termasuk saat permintaannya
+   * berakhir di Sonnet.
+   *
+   * Tanpa ini, satu-satunya jejak Gerbang 2 adalah log dev server.
+   * Akibatnya dari layar tidak ada bedanya antara "Voyage menemukan
+   * kecocokan tapi ditahan mode bayangan" dan "Voyage tidak menemukan
+   * apa-apa" — padahal dua keadaan itu menuntut tindakan yang
+   * berlawanan: yang pertama berarti ambangnya bisa diturunkan, yang
+   * kedua berarti contoh pertanyaannya yang kurang.
+   */
+  let pengenal: {
+    jenis: "yakin" | "ragu" | "lewat";
+    kandidat?: { code: string; contoh: string; skor: number }[];
+    alasan?: string;
+    ambang: { yakin: number; ragu: number };
+    mode: string;
+    dipakai: boolean;
+  } | null = null;
+
   if (useTemplates !== false) {
     const kenal = await kenaliMaksud(message);
     pengenalToken = kenal.token;
+    pengenal = {
+      jenis: kenal.jenis,
+      kandidat:
+        kenal.jenis === "lewat"
+          ? undefined
+          : kenal.kandidat.map((k) => ({
+              code: k.code,
+              contoh: k.contoh,
+              skor: k.skor,
+            })),
+      alasan: kenal.jenis === "lewat" ? kenal.alasan : undefined,
+      ambang: { yakin: AMBANG_YAKIN, ragu: AMBANG_RAGU },
+      mode: MODE_PENGENAL,
+      // Diisi ulang di bawah bila jawabannya benar-benar dikirim.
+      dipakai: false,
+    };
 
     if (kenal.jenis === "yakin") {
       const pilih = kenal.kandidat[0];
@@ -126,6 +169,7 @@ export async function POST(req: Request) {
       // Sonnet, dan itulah yang menentukan kapan gerbang ini layak
       // diaktifkan. Lihat MODE_PENGENAL di lib/pengenal.ts.
       if (MODE_PENGENAL === "aktif") {
+        pengenal.dipakai = true;
         return NextResponse.json({
           action: "AUTO_REPLY",
           reply: pilih.body,
@@ -136,7 +180,7 @@ export async function POST(req: Request) {
           templateWhy: `Kemiripan ${pilih.skor.toFixed(3)} dengan contoh "${pilih.contoh}".`,
           kategori: keputusan.kategori,
           skor: pilih.skor,
-          kandidat: kenal.kandidat,
+          pengenal,
           voyage: { token: pengenalToken, usd: perkiraanBiaya(pengenalToken).usd },
           panjang: ukurBalasan(pilih.body),
         });
@@ -183,6 +227,7 @@ export async function POST(req: Request) {
       berkas: keputusan.berkas,
       alasan: keputusan.alasan,
       faqKarakter: jejakTanpaClaude.terkirim,
+      pengenal,
       voyage: { token: pengenalToken, usd: perkiraanBiaya(pengenalToken).usd },
     });
   }
@@ -278,6 +323,11 @@ export async function POST(req: Request) {
       // Gerbang 2 seolah gratis setiap kali ia gagal menemukan
       // kecocokan — justru kasus yang paling perlu terlihat.
       voyage: { token: pengenalToken, usd: perkiraanBiaya(pengenalToken).usd },
+      // Keputusan Gerbang 2 ikut dilaporkan justru pada jalur INI —
+      // di sinilah bedanya paling perlu terlihat: apakah Voyage
+      // sebenarnya menemukan kecocokan lalu ditahan mode bayangan,
+      // atau memang tidak menemukan apa-apa.
+      pengenal,
       source: "ai",
       // Info routing — dipakai panel demo untuk menampilkan
       // berapa berkas KB yang benar-benar dikirim.

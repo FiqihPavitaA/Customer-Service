@@ -72,7 +72,92 @@ type ChatResponse = {
      tidak jadi dikirim ke Sonnet. */
   berkas?: string[];
   faqKarakter?: number;
+  /* Keputusan Gerbang 2. Ada pada setiap jawaban yang melewatinya,
+     termasuk yang berakhir di Claude — itulah justru kasus yang
+     paling perlu dibedakan. */
+  pengenal?: {
+    jenis: "yakin" | "ragu" | "lewat";
+    kandidat?: { code: string; contoh: string; skor: number }[];
+    alasan?: string;
+    ambang: { yakin: number; ragu: number };
+    mode: string;
+    dipakai: boolean;
+  } | null;
 };
+
+/* ===========================================================
+   Panel Gerbang 2.
+
+   Menjawab satu pertanyaan yang sebelumnya hanya bisa dijawab
+   dengan membaca log dev server: pertanyaan ini dibantu Voyage
+   atau tidak?
+
+   Tiga keadaan sengaja dibedakan tegas, karena tindak lanjutnya
+   berlawanan:
+     yakin + bayangan -> Voyage SUDAH benar, ambangnya yang menahan
+     ragu             -> kandidatnya ada tapi kurang yakin
+     lewat            -> Voyage tidak menemukan apa pun
+   Yang pertama berarti ambang boleh diturunkan; yang ketiga berarti
+   contoh pertanyaannya yang kurang. Menyamakan keduanya membuat
+   penyetelan berjalan ke arah yang salah.
+   =========================================================== */
+function PanelPengenal({ p }: { p: NonNullable<ChatResponse["pengenal"]> }) {
+  const nada =
+    p.jenis === "lewat"
+      ? { bg: "bg-[#f1f5f9]", garis: "border-line", teks: "text-muted" }
+      : p.dipakai
+        ? { bg: "bg-green-mint", garis: "border-green", teks: "text-green-dark" }
+        : { bg: "bg-[#fdf3d8]", garis: "border-[#f0c36d]", teks: "text-[#8a5a00]" };
+
+  const judul =
+    p.jenis === "lewat"
+      ? "🧭 Gerbang 2 — tidak menemukan kecocokan"
+      : p.dipakai
+        ? "🧭 Gerbang 2 — balasan ini dari Voyage"
+        : p.jenis === "yakin"
+          ? "🧭 Gerbang 2 — cocok, TETAPI ditahan mode bayangan"
+          : "🧭 Gerbang 2 — zona ragu, diteruskan";
+
+  return (
+    <div className={`mt-3 rounded-xl border ${nada.garis} ${nada.bg} p-3`}>
+      <div className={`mb-1 text-[0.82rem] font-bold ${nada.teks}`}>{judul}</div>
+
+      {p.jenis === "lewat" ? (
+        <p className="m-0 text-[0.84rem] text-text-2">{p.alasan}</p>
+      ) : (
+        <>
+          <ul className="m-0 list-none space-y-0.5 p-0 text-[0.84rem]">
+            {(p.kandidat ?? []).map((k, i) => (
+              <li key={k.code + i} className="flex items-baseline gap-2">
+                <span
+                  className={`font-mono tabular-nums ${
+                    k.skor >= p.ambang.yakin ? "font-bold text-green-dark" : "text-muted"
+                  }`}
+                >
+                  {k.skor.toFixed(3)}
+                </span>
+                <b>[{k.code}]</b>
+                <span className="min-w-0 truncate text-muted">
+                  mirip &ldquo;{k.contoh}&rdquo;
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 mb-0 text-[0.78rem] text-muted">
+            Ambang yakin {p.ambang.yakin} · ragu {p.ambang.ragu} · mode {p.mode}
+            {!p.dipakai && p.jenis === "yakin" && (
+              <>
+                {" "}
+                — set <code>PENGENAL_MODE=aktif</code> agar balasan ini benar-benar
+                dikirim
+              </>
+            )}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function AiChatbot() {
   const toast = useToast();
@@ -451,6 +536,8 @@ export default function AiChatbot() {
                       "Claude · null", seolah balasannya gagal. Padahal
                       tidak ada yang gagal — panggilannya memang sengaja
                       tidak dilakukan. */}
+                  {result.pengenal && <PanelPengenal p={result.pengenal} />}
+
                   {result.source === "tanpa-claude" ? (
                     <p className="m-0 text-[0.9rem] text-text-2">
                       Tidak ada balasan karena Claude tidak dipanggil. Pesan ini
