@@ -539,6 +539,33 @@ export async function PATCH(req: Request) {
  * disunting. Yang lama juga tetap terbaca saat menelusuri "kenapa
  * dulu pesan ini tertangkap".
  *
+ * ----------------------------------------------------------
+ * `also` DAN `unless` DIBAWA SERTA — INI BUKAN KERAPIAN
+ * ----------------------------------------------------------
+ * Versi pertama fungsi ini menyusun aturan baru HANYA dari kata
+ * kunci, dan itu menghapus dua pengaman yang tidak pernah terlihat
+ * di layar. Akibatnya nyata dan terukur pada 8 September 2026:
+ *
+ *   [PRODUK POC] di berkas
+ *     when   \bpoc\b
+ *     also   \b(apa itu|itu apa|fungsi|manfaat|buat apa|...)\b
+ *     unless \b(cara pakai|dosis|takaran|...)\b, \b(stok|harga|...)\b
+ *
+ *   [PRODUK POC] sesudah disimpan lewat halaman
+ *     when   \b(apa\s+itu\s+poc)\b
+ *     also   (hilang)
+ *     unless (hilang)
+ *
+ * "halo kak, poc itu apa" berhenti tertangkap Gerbang 1 — urutan
+ * katanya tidak cocok dengan frasa baku itu — lalu jatuh ke Gerbang 2
+ * dan berakhir zona ragu. Tidak ada satu pun pesan galat.
+ *
+ * Akar masalahnya: keKataKunci() memang SATU ARAH dan sudah ditandai
+ * begitu, tetapi jalur simpan memperlakukan hasilnya seolah bisa
+ * dibolak-balik. Yang dilihat tim CS hanyalah `when` yang sudah
+ * disederhanakan; `also` dan `unless` tidak pernah ditampilkan, jadi
+ * tidak mungkin mereka sadar sedang membuangnya.
+ *
  * @returns pesan galat, atau null bila berhasil.
  */
 async function simpanAturan(
@@ -547,6 +574,19 @@ async function simpanAturan(
   templateId: string,
   kataKunci: string[],
 ): Promise<string | null> {
+  // Baca dulu yang lama — pengaman yang tidak tampil di layar hanya
+  // bisa dipertahankan kalau diketahui sebelum ditimpa.
+  const { data: lama, error: galatBaca } = await sb
+    .from("template_rules")
+    .select("also_pattern, unless_patterns, why")
+    .eq("template_id", templateId)
+    .eq("is_active", true)
+    .order("priority", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (galatBaca) return jelaskanGalat(galatBaca.message, galatBaca.code);
+
   const { error: galatMati } = await sb
     .from("template_rules")
     .update({ is_active: false, updated_by: uid })
@@ -562,7 +602,12 @@ async function simpanAturan(
     template_id: templateId,
     priority: await prioritasBerikutnya(sb),
     when_patterns: [pola],
-    why: `Diubah lewat halaman Kelola Template. Kata kunci: ${kataKunci.join(", ")}.`,
+    // Dibawa apa adanya dari aturan sebelumnya.
+    also_pattern: lama?.also_pattern ?? null,
+    unless_patterns: lama?.unless_patterns ?? null,
+    why:
+      `Kata kunci diubah lewat halaman Kelola Template: ${kataKunci.join(", ")}. ` +
+      (lama?.why ? `Alasan sebelumnya: ${lama.why}` : ""),
     updated_by: uid,
   });
 

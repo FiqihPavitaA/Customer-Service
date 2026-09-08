@@ -203,6 +203,85 @@ P(
 
 writeFileSync(join(AKAR, "supabase", "seed-templates.sql"), baris.join("\n") + "\n");
 
+/* ===========================================================
+   Berkas kedua: perbaiki-aturan.sql — HANYA aturan pemicu
+   ===========================================================
+
+   KENAPA ADA DUA BERKAS
+
+   seed-templates.sql menimpa ISI TEMPLATE juga, jadi menjalankannya
+   ulang membuang setiap perbaikan kalimat yang sudah ditulis tim CS.
+   Peringatan itu sudah tertulis di kepalanya.
+
+   Tetapi ada satu keadaan yang menuntut pemulihan tanpa menyentuh
+   isi template: aturan pemicu yang rusak. Terjadi sungguhan pada
+   8 September 2026 — menyimpan [PRODUK POC] lewat halaman Kelola
+   Template membuang `also` dan `unless`-nya, dan "halo kak, poc itu
+   apa" berhenti tertangkap Gerbang 1.
+
+   Berkas ini memulihkan ke-43 aturan dari berkas .md dan TIDAK
+   menyentuh satu pun baris `templates`. Aman dijalankan kapan saja,
+   termasuk setelah tim CS mulai menyunting isi jawaban.
+   =========================================================== */
+
+const barisPerbaikan = [];
+const R = (...x) => barisPerbaikan.push(...x);
+
+R(
+  "-- ===========================================================",
+  "-- Infarm CS — pulihkan aturan pemicu dari berkas .md",
+  "--",
+  "-- Isi: " + aturan.length + " aturan. TIDAK menyentuh tabel templates,",
+  "-- jadi perbaikan kalimat yang sudah ditulis tim CS tetap utuh.",
+  "--",
+  "-- Kapan dipakai: bila `npm run periksa-aturan` melaporkan ada",
+  "-- aturan yang menyimpang dari berkas — biasanya karena `also`",
+  "-- atau `unless` hilang saat template disimpan lewat halaman.",
+  "--",
+  "-- Cara pakai: SQL Editor -> tempel seluruh isi -> Run",
+  "-- Sifat     : idempoten, aman dijalankan berulang kali.",
+  "-- ===========================================================",
+  "",
+  "begin;",
+  "",
+  "-- Aturan lama DIHAPUS, bukan sekadar dinonaktifkan.",
+  "--",
+  "-- Menonaktifkan terasa lebih hati-hati dan justru tidak bisa:",
+  "-- `priority` punya batasan UNIQUE yang berlaku untuk SEMUA baris,",
+  "-- aktif maupun tidak. Baris mati bernomor 37 tetap memblokir",
+  "-- aturan baru bernomor 37, dan seluruh transaksi ini akan gagal.",
+  "--",
+  "-- Menghapus aman di sini karena aturan pemicu adalah data turunan",
+  "-- dari berkas .md — bisa dibangkitkan ulang kapan saja lewat",
+  "-- `npm run template-sql`. Yang benar-benar butuh jejak adalah ISI",
+  "-- template (dosis), dan itu disimpan terpisah di",
+  "-- template_revisions oleh trigger, tidak tersentuh berkas ini.",
+  "--",
+  "-- ⚠️  Perubahan kata kunci yang ditulis tim CS lewat halaman Kelola",
+  "-- Template IKUT tergantikan versi dari berkas .md. Itu memang",
+  "-- maksudnya: berkas ini untuk memulihkan aturan yang rusak.",
+  "delete from public.template_rules;",
+  "",
+  "insert into public.template_rules",
+  "  (template_id, priority, when_patterns, also_pattern, unless_patterns, why)",
+  "select t.id, v.priority, v.when_patterns, v.also_pattern, v.unless_patterns, v.why",
+  "from (values",
+  barisAturan.join(",\n"),
+  ") as v(code, priority, when_patterns, also_pattern, unless_patterns, why)",
+  "join public.templates t on t.code = v.code;",
+  "",
+  "commit;",
+  "",
+  "-- Periksa sesudahnya, dari folder web/:",
+  "--   npm run periksa-aturan",
+  "-- Keluarannya harus berbunyi \"Semua aturan sepadan\".",
+);
+
+writeFileSync(
+  join(AKAR, "supabase", "perbaiki-aturan.sql"),
+  barisPerbaikan.join("\n") + "\n",
+);
+
 /* ---------------- Laporan & pemeriksaan ---------------- */
 
 const tanpaAturan = pustaka.size - new Set(aturan.map((a) => a.code)).size;

@@ -240,10 +240,21 @@ function Detail({
       // benar-benar tersimpan. Versi sebelumnya menembak lalu
       // langsung menampilkan "disimpan" — kalimat yang benar hanya
       // karena tidak ada yang pernah memeriksanya.
+      /* kataKunci hanya dikirim bila BENAR-BENAR berubah.
+         undefined = jangan disentuh; [] = cabut pemicunya.
+
+         Bedanya penting: mengirimnya selalu berarti menyunting isi
+         jawaban ikut menulis ulang aturan pemicu — dan penulisan
+         ulang itu menyusunnya dari kata kunci yang sudah
+         disederhanakan, bukan dari pola aslinya. Menyimpan perbaikan
+         satu huruf pada dosis bisa mempersempit pemicunya tanpa satu
+         pun tanda di layar. */
+      const kataBerubah = kata.join("|") !== item.kataKunci.join("|");
+
       const galat = await simpanTemplate(item.code, {
         kategori,
         body,
-        kataKunci: kata,
+        kataKunci: kataBerubah ? kata : undefined,
       });
       if (galat) {
         toast(galat);
@@ -349,6 +360,38 @@ function Detail({
         {/* ---- Kata kunci ---- */}
         <div className="mb-4">
           <Label>Kata kunci pemicu</Label>
+
+          {/* Syarat tambahan yang TIDAK bisa disunting di sini.
+              Ditampilkan karena pernah hilang tanpa ada yang tahu:
+              menyimpan [PRODUK POC] lewat halaman ini membuang
+              `also` dan `unless`-nya, dan "halo kak, poc itu apa"
+              berhenti tertangkap Gerbang 1. Sekarang keduanya ikut
+              dibawa saat menyimpan — tetapi tetap perlu terlihat,
+              supaya tidak ada yang mengira daftar frasa di bawah
+              adalah keseluruhan aturannya. */}
+          {(item.also || item.unless.length > 0) && (
+            <div className="mb-2 rounded-[10px] border border-line bg-green-soft px-3 py-2 text-[0.76rem] leading-relaxed text-text-2">
+              <b>Aturan ini punya syarat tambahan yang tidak bisa diubah di
+              sini</b>, dan syarat itu ikut menentukan kapan template terkirim:
+              <ul className="mt-1 mb-0 list-disc pl-4">
+                {item.also && (
+                  <li>
+                    <b>Wajib ikut cocok:</b> pesan juga harus memuat salah satu
+                    dari pola <code className="break-all">{item.also}</code>
+                  </li>
+                )}
+                {item.unless.length > 0 && (
+                  <li>
+                    <b>Dibatalkan bila cocok:</b>{" "}
+                    <code className="break-all">{item.unless.join(" · ")}</code>
+                  </li>
+                )}
+              </ul>
+              <span className="mt-1 block text-muted">
+                Keduanya tetap tersimpan saat Anda mengubah kata kunci di bawah.
+              </span>
+            </div>
+          )}
           <div className="mb-2 flex flex-wrap gap-1.5">
             {/* Tiga keadaan, bukan dua. Sebagian pemicu terlalu rumit
                 untuk diringkas jadi frasa — 8 dari 43 pada 4 Sep 2026,

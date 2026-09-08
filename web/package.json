@@ -11,6 +11,7 @@
     "uji-sumber": "node ../knowledge-base/uji-sumber-luar.mjs",
     "uji-mutu": "node --experimental-strip-types scripts/uji-mutu-contoh.mjs",
     "periksa-sumber": "node --env-file-if-exists=.env.local scripts/periksa-sumber.mjs",
+    "periksa-aturan": "node --env-file-if-exists=.env.local scripts/periksa-aturan.mjs",
     "seed-sql": "node --experimental-strip-types scripts/buat-seed-sql.mjs",
     "template-sql": "node scripts/buat-template-sql.mjs",
     "periksa-sql": "node scripts/periksa-seed-sql.mjs",
