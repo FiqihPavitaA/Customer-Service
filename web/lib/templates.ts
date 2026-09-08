@@ -16,11 +16,14 @@ import { join } from "node:path";
 import {
   matchTemplate as routerMatch,
   getTemplateLibrary as routerLibrary,
+  getPustakaBerkas as routerPustakaBerkas,
   getAsalKode as routerAsal,
   getRules as routerRules,
+  getSumberAktif as routerSumber,
   jelaskanTidakCocok as routerJelaskan,
   periksaSatpam as routerSatpam,
   ujiDraf as routerUjiDraf,
+  buatPolaDariFrasa as routerBuatPola,
   jumlahAturan,
   setKbDir,
 } from "@/content/knowledge-base/router.js";
@@ -63,9 +66,44 @@ export function matchTemplate(message: string): TemplateMatch | null {
   return routerMatch(message) as TemplateMatch | null;
 }
 
-/** Peta { KODE → isi balasan } dari keempat berkas FAQ. */
+/**
+ * Peta { KODE → isi balasan } dari sumber yang sedang berlaku —
+ * tabel `templates` bila sudah dipasang, berkas .md bila belum.
+ */
 export function getTemplateLibrary(): Map<string, string> {
   return routerLibrary();
+}
+
+/**
+ * Peta { KODE → isi balasan } dari BERKAS saja.
+ *
+ * Bedanya dengan getTemplateLibrary() baru terasa setelah tabel
+ * dipakai: yang di atas ikut berpindah sumber, yang ini tidak.
+ * Dipakai /api/templates sebagai cadangan yang harus tetap berupa
+ * cadangan, bukan cermin dari sumber yang sedang diuji.
+ */
+export function getPustakaBerkas(): Map<string, string> {
+  return routerPustakaBerkas();
+}
+
+/**
+ * Sumber yang sedang dipakai Lapis 1: "berkas" atau "supabase".
+ * Ditampilkan di halaman Kelola Template dan /api/health.
+ */
+export function sumberTemplate(): "berkas" | "supabase" {
+  return routerSumber() as "berkas" | "supabase";
+}
+
+/**
+ * Susun pola pemicu dari frasa biasa yang diketik tim CS.
+ *
+ * Diteruskan dari router, bukan ditulis ulang, karena di sinilah
+ * seluruh karakter khusus di-escape. Salinan kedua yang lupa
+ * meng-escape akan mengubah "12.12" jadi pola liar, dan itu bukan
+ * kesalahan yang terlihat sampai ada yang mengetiknya.
+ */
+export function buatPolaDariFrasa(frasa: string[]): string | null {
+  return routerBuatPola(frasa) as string | null;
 }
 
 /** Peta { KODE -> nama berkas asalnya }. */

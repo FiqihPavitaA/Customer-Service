@@ -30,6 +30,47 @@ export function getTemplateLibrary(): Map<string, string>;
 export function getAsalKode(): Map<string, string>;
 export function jumlahAturan(): number;
 
+/* -----------------------------------------------------------
+   Sumber luar — pustaka & aturan dari tabel Supabase
+   ----------------------------------------------------------- */
+
+/** Satu baris keluaran fungsi public.pustaka_router(). */
+export type BarisPustakaRouter = {
+  code: string;
+  body: string;
+  action?: ActionCode;
+  category_slug?: Kategori;
+  /** null bila template ini belum punya aturan pemicu. */
+  priority?: number | null;
+  when_patterns?: string[] | null;
+  also_pattern?: string | null;
+  unless_patterns?: string[] | null;
+  flags?: string | null;
+  why?: string | null;
+};
+
+export type HasilSumberLuar = {
+  templates: number;
+  aturan: number;
+  /** Aturan yang dibuang karena polanya tidak sah, beserta sebabnya. */
+  ditolak: string[];
+};
+
+/**
+ * Pasang pustaka & aturan dari tabel, menggantikan berkas .md.
+ * Daftar kosong berarti kembali ke berkas.
+ */
+export function setSumberLuar(baris: BarisPustakaRouter[]): HasilSumberLuar;
+
+/** Kembali membaca berkas .md. */
+export function bersihkanSumberLuar(): HasilSumberLuar;
+
+/** Sumber yang sedang dipakai Lapis 1. */
+export function getSumberAktif(): "berkas" | "supabase";
+
+/** Pustaka dari BERKAS saja, mengabaikan sumber luar. */
+export function getPustakaBerkas(): Map<string, string>;
+
 export type TemplateHit = {
   code: string;
   action: ActionCode;

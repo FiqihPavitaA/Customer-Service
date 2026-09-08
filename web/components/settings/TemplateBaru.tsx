@@ -231,7 +231,10 @@ export default function TemplateBaru({
   };
 
   /* ---- Simpan ---- */
-  const simpan = () => {
+  const simpan = async () => {
+    if (sibuk) return;
+    setSibuk(true);
+    try {
     const item: TemplateItem = {
       code: kodeRapi,
       kategori,
@@ -249,13 +252,20 @@ export default function TemplateBaru({
       lastUsedAt: null,
       baru: true,
     };
-    const galat = tambahTemplate(item);
-    if (galat) {
-      toast(galat);
-      return;
+      // Menunggu jawaban server, bukan sekadar menaruh di memori.
+      // Sebelum 8 September 2026 fungsi ini mengembalikan null
+      // seketika dan tidak menulis ke mana pun — layar berkata
+      // "ditambahkan", database tidak pernah tahu.
+      const galat = await tambahTemplate(item);
+      if (galat) {
+        toast(galat);
+        return;
+      }
+      toast(`Template [${kodeRapi}] tersimpan`);
+      onSelesai(kodeRapi);
+    } finally {
+      setSibuk(false);
     }
-    toast(`Template [${kodeRapi}] ditambahkan`);
-    onSelesai(kodeRapi);
   };
 
   return (

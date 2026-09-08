@@ -5,36 +5,38 @@
 
    Dipisah dari store.ts karena sumbernya berbeda. store.ts
    berangkat dari seed di memori; berkas ini berangkat dari
-   /api/templates, yang membaca berkas .md yang SAMA dengan yang
-   dipakai pencocok template dan system prompt.
+   /api/templates.
 
    ----------------------------------------------------------
-   BATASAN YANG DISENGAJA — DIBERITAHUKAN, BUKAN DISEMBUNYIKAN
+   RIWAYAT YANG PERLU DIINGAT, KARENA MENJELASKAN BENTUKNYA
    ----------------------------------------------------------
-   Perubahan yang disimpan di sini hidup di memori satu tab saja.
-   Berkas .md TIDAK ikut berubah, dan muat ulang halaman
-   mengembalikan semuanya seperti semula.
+   Sampai 8 September 2026 seluruh fungsi di bawah hanya mengubah
+   array di memori satu tab. Menekan "Simpan" terasa berhasil —
+   template muncul di daftar, muncul toast — tetapi tidak ada yang
+   tertulis ke mana pun, dan muat ulang halaman mengembalikan
+   semuanya. Halaman ini memberi tahu keadaannya lewat lencana biru
+   dan banner "belum tersimpan ke mana pun", tetapi kedua tanda itu
+   ternyata terlalu mudah terlewat.
 
-   Ini bukan kelalaian, melainkan keadaan sementara: sumber data
-   yang dituju adalah tabel `templates` + `template_rules` di
-   Supabase (sudah dirancang di supabase/schema-kb.sql), dan pada
-   4 Sep 2026 project Supabase belum bisa dibuat karena gangguan
-   sistem di sisi Supabase.
+   Sekarang ketiga fungsinya benar-benar menulis ke tabel
+   `templates` di Supabase, dan yang gagal dilaporkan sebagai galat
+   — bukan sebagai keberhasilan yang menghilang belakangan.
 
-   Menulis balik ke berkas .md sengaja TIDAK dipilih sebagai jalan
-   pintas: berkas ada di repo, jadi setiap perubahan tetap butuh
-   commit dan deploy — yaitu tetap butuh developer, yang justru
-   masalah yang ingin dihapus halaman ini.
+   ----------------------------------------------------------
+   KENAPA TOKEN DIKIRIM MANUAL
+   ----------------------------------------------------------
+   Sesi Supabase disimpan di localStorage, bukan cookie, jadi route
+   handler tidak melihatnya sendiri. Tanpa header Authorization,
+   penulisan berjalan sebagai anon dan ditolak kebijakan
+   `templates_write ... using (public.is_admin())`.
 
-   Yang harus dikerjakan saat Supabase menyala:
-     hydrate       -> select * from templates join template_rules
-     simpanTemplate-> update templates ... (trigger mencatat versi)
-     tambahTemplate-> insert into templates
-     hapusTemplate -> update templates set is_active = false
-                      (BUKAN delete — routing_log merujuk kodenya)
+   Yang menolak tetap database. Kalau suatu hari token itu tidak
+   ikut terkirim, akibatnya adalah galat 401 yang terbaca — bukan
+   penulisan diam-diam oleh orang yang tidak berhak.
    =========================================================== */
 
 import { useCallback, useSyncExternalStore } from "react";
+import { getSupabase } from "@/lib/supabase/client";
 import type {
   RingkasanTemplate,
   TemplateItem,
@@ -48,8 +50,12 @@ type State = {
   items: TemplateItem[];
   ringkasan: RingkasanTemplate | null;
   error: string | null;
-  /** Berapa perubahan yang belum tersimpan ke mana pun. */
-  perubahanLokal: number;
+  /** Dari mana daftar ini dibaca; ditampilkan apa adanya di halaman. */
+  sumber: "berkas" | "supabase";
+  /** Catatan non-fatal dari server (mis. tabel tidak terbaca). */
+  peringatan: string | null;
+  /** true selama satu penulisan sedang berjalan. */
+  menyimpan: boolean;
 };
 
 let state: State = {
@@ -57,7 +63,9 @@ let state: State = {
   items: [],
   ringkasan: null,
   error: null,
-  perubahanLokal: 0,
+  sumber: "berkas",
+  peringatan: null,
+  menyimpan: false,
 };
 
 const listeners = new Set<() => void>();
@@ -85,16 +93,57 @@ export function useTemplates() {
   return useTemplateStore(pilihSemua);
 }
 
+/* ===========================================================
+   Header
+   =========================================================== */
+
+/**
+ * Header permintaan, lengkap dengan token bila ada sesi.
+ *
+ * Sengaja TIDAK melempar saat sesi tidak ada: membaca daftar
+ * template harus tetap bisa dilakukan (jatuh ke berkas .md), dan
+ * yang menolak penulisan sebaiknya database dengan pesannya sendiri
+ * — bukan tebakan di sisi peramban tentang siapa yang berhak.
+ */
+async function header(): Promise<HeadersInit> {
+  const dasar: Record<string, string> = { "Content-Type": "application/json" };
+  const sb = getSupabase();
+  if (!sb) return dasar;
+  try {
+    const { data } = await sb.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) dasar.Authorization = `Bearer ${token}`;
+  } catch {
+    // Sesi tidak terbaca — biarkan tanpa token; server akan menjawab 401.
+  }
+  return dasar;
+}
+
+/** Ambil pesan galat dari jawaban server, apa pun bentuknya. */
+async function pesanGalat(r: Response): Promise<string> {
+  try {
+    const d = (await r.json()) as { error?: string; peringatan?: string };
+    return d.error ?? d.peringatan ?? `Server menjawab ${r.status}.`;
+  } catch {
+    return `Server menjawab ${r.status}.`;
+  }
+}
+
+/* ===========================================================
+   Membaca
+   =========================================================== */
+
 let sedangMuat: Promise<void> | null = null;
 
 /** Ambil daftar template dari server. Aman dipanggil berulang. */
-export function muatTemplates(): Promise<void> {
+export function muatTemplates(paksa = false): Promise<void> {
   if (sedangMuat) return sedangMuat;
-  if (state.status === "siap") return Promise.resolve();
+  if (state.status === "siap" && !paksa) return Promise.resolve();
 
   setState({ status: "memuat", error: null });
 
-  sedangMuat = fetch("/api/templates")
+  sedangMuat = header()
+    .then((h) => fetch("/api/templates", { headers: h, cache: "no-store" }))
     .then((r) => r.json() as Promise<TemplatesResponse>)
     .then((d) => {
       if (d.error) {
@@ -105,6 +154,8 @@ export function muatTemplates(): Promise<void> {
         status: "siap",
         items: d.items,
         ringkasan: d.ringkasan,
+        sumber: d.sumber,
+        peringatan: d.peringatan ?? null,
         error: null,
       });
     })
@@ -118,41 +169,70 @@ export function muatTemplates(): Promise<void> {
   return sedangMuat;
 }
 
-/** Hitung ulang ringkasan setelah daftar berubah. */
-function hitungRingkasan(items: TemplateItem[]): RingkasanTemplate {
-  const perKategori = {
-    interaksi: { total: 0, punyaPemicu: 0 },
-    "cara-pakai": { total: 0, punyaPemicu: 0 },
-    produk: { total: 0, punyaPemicu: 0 },
-    umum: { total: 0, punyaPemicu: 0 },
-  } as RingkasanTemplate["perKategori"];
+/* ===========================================================
+   Menulis
+   =========================================================== */
 
-  for (const i of items) {
-    perKategori[i.kategori].total++;
-    if (i.urutanAturan !== null) perKategori[i.kategori].punyaPemicu++;
+/**
+ * Simpan perubahan satu template.
+ *
+ * @returns pesan galat, atau null bila berhasil.
+ */
+export async function simpanTemplate(
+  code: string,
+  patch: Partial<TemplateItem>,
+): Promise<string | null> {
+  setState({ menyimpan: true });
+  try {
+    const r = await fetch("/api/templates", {
+      method: "PATCH",
+      headers: await header(),
+      body: JSON.stringify({
+        code,
+        body: patch.body,
+        action: patch.action,
+        kategori: patch.kategori,
+        catatan: patch.catatan,
+        // undefined = jangan disentuh; [] = cabut pemicunya. Dua hal
+        // yang berbeda, jadi jangan diratakan jadi satu di sini.
+        kataKunci: patch.kataKunci,
+        aktif: patch.nonaktif === undefined ? undefined : !patch.nonaktif,
+      }),
+    });
+
+    if (r.status === 207) {
+      // Isinya tersimpan, kata kuncinya tidak. Segarkan daftar supaya
+      // yang benar-benar tersimpan terlihat, lalu teruskan
+      // peringatannya — penyuntingnya perlu tahu bagian mana yang
+      // masih harus diulang.
+      const d = (await r.json()) as { peringatan?: string };
+      await muatTemplates(true);
+      return d.peringatan ?? "Sebagian tersimpan.";
+    }
+    if (!r.ok) return await pesanGalat(r);
+
+    // Daftar diambil ulang, bukan ditambal di memori. Menambal
+    // membuat layar menampilkan hasil yang DIHARAPKAN, sedangkan
+    // yang perlu dilihat penyunting adalah yang benar-benar
+    // tersimpan — termasuk kolom yang diubah trigger di database.
+    await muatTemplates(true);
+    return null;
+  } catch (e) {
+    return (e as Error).message;
+  } finally {
+    setState({ menyimpan: false });
   }
-
-  const punyaPemicu = items.filter((i) => i.urutanAturan !== null).length;
-  return {
-    total: items.length,
-    punyaPemicu,
-    tanpaPemicu: items.length - punyaPemicu,
-    perKategori,
-  };
 }
 
-/** Simpan perubahan satu template (sementara: memori saja). */
-export function simpanTemplate(code: string, patch: Partial<TemplateItem>) {
-  const items = state.items.map((i) => (i.code === code ? { ...i, ...patch } : i));
-  setState({
-    items,
-    ringkasan: hitungRingkasan(items),
-    perubahanLokal: state.perubahanLokal + 1,
-  });
-}
-
-/** Tambah template baru. @returns pesan galat, atau null bila berhasil. */
-export function tambahTemplate(item: TemplateItem): string | null {
+/**
+ * Tambah template baru.
+ *
+ * @returns pesan galat, atau null bila berhasil. Peringatan
+ *          separuh-berhasil (template masuk tetapi kata kuncinya
+ *          gagal) ikut dikembalikan sebagai teks, karena
+ *          penyuntingnya perlu tahu tanpa mengira harus mengulang.
+ */
+export async function tambahTemplate(item: TemplateItem): Promise<string | null> {
   const kode = item.code.trim().toUpperCase();
   if (!kode) return "Kode template belum diisi.";
   if (state.items.some((i) => i.code === kode)) {
@@ -160,27 +240,65 @@ export function tambahTemplate(item: TemplateItem): string | null {
   }
   if (!item.body.trim()) return "Isi jawaban belum diisi.";
 
-  const items = [{ ...item, code: kode }, ...state.items];
-  setState({
-    items,
-    ringkasan: hitungRingkasan(items),
-    perubahanLokal: state.perubahanLokal + 1,
-  });
-  return null;
+  setState({ menyimpan: true });
+  try {
+    const r = await fetch("/api/templates", {
+      method: "POST",
+      headers: await header(),
+      body: JSON.stringify({
+        code: kode,
+        kategori: item.kategori,
+        body: item.body,
+        action: item.action,
+        kataKunci: item.kataKunci,
+        catatan: item.catatan ?? null,
+      }),
+    });
+
+    if (r.status === 207) {
+      // Templatenya tersimpan, aturannya tidak. Daftar tetap
+      // disegarkan supaya template yang sudah ada tidak terlihat
+      // hilang, lalu peringatannya diteruskan apa adanya.
+      const d = (await r.json()) as { peringatan?: string };
+      await muatTemplates(true);
+      return d.peringatan ?? "Sebagian tersimpan.";
+    }
+    if (!r.ok) return await pesanGalat(r);
+
+    await muatTemplates(true);
+    return null;
+  } catch (e) {
+    return (e as Error).message;
+  } finally {
+    setState({ menyimpan: false });
+  }
 }
 
 /**
- * Hapus template.
+ * Matikan template.
  *
- * Di Supabase nanti ini menjadi `is_active = false`, bukan DELETE:
- * routing_log menyimpan kode template yang pernah menjawab, dan
- * menghapus barisnya membuat riwayat biaya kehilangan artinya.
+ * Di database ini `is_active = false`, BUKAN DELETE: routing_log
+ * menyimpan kode template yang pernah menjawab, dan menghapus
+ * barisnya membuat riwayat biaya kehilangan artinya. Riwayat
+ * penyuntingan dosis di template_revisions pun ikut terhapus lewat
+ * ON DELETE CASCADE — justru saat paling dibutuhkan, yaitu setelah
+ * sebuah template ditarik.
+ *
+ * @returns pesan galat, atau null bila berhasil.
  */
-export function hapusTemplate(code: string) {
-  const items = state.items.filter((i) => i.code !== code);
-  setState({
-    items,
-    ringkasan: hitungRingkasan(items),
-    perubahanLokal: state.perubahanLokal + 1,
-  });
+export async function hapusTemplate(code: string): Promise<string | null> {
+  setState({ menyimpan: true });
+  try {
+    const r = await fetch(`/api/templates?code=${encodeURIComponent(code)}`, {
+      method: "DELETE",
+      headers: await header(),
+    });
+    if (!r.ok) return await pesanGalat(r);
+    await muatTemplates(true);
+    return null;
+  } catch (e) {
+    return (e as Error).message;
+  } finally {
+    setState({ menyimpan: false });
+  }
 }

@@ -15,6 +15,10 @@ import { perkiraanBiaya } from "@/lib/voyage";
 // setKbDir() sudah dijalankan sebelum berkas KB dibaca.
 import "@/lib/templates";
 import {
+  siapkanSumberTemplate,
+  statusSumberTemplate,
+} from "@/lib/db/templatesServer";
+import {
   bacaBerkasFaq,
   logRouting,
   routeToCategory,
@@ -58,6 +62,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Field "message" wajib diisi.' }, { status: 400 });
   }
 
+  // ---------- Sumber template ----------
+  // Pastikan router memakai isi tabel `templates` bila tabelnya
+  // sudah terisi; bila tidak, ia tetap membaca berkas .md seperti
+  // sebelumnya. Menunggu di sini disengaja: memutuskan balasan
+  // dengan pustaka yang setengah berganti lebih buruk daripada
+  // menunggu satu perjalanan ke Supabase yang hasilnya di-cache 60
+  // detik. Fungsinya tidak pernah melempar.
+  await siapkanSumberTemplate();
+  const sumberTemplate = statusSumberTemplate().sumber;
+
   // ---------- Lapisan 1: template baku ----------
   // Dilewati bila pemanggil mengirim useTemplates:false — dipakai
   // panel demo untuk membandingkan biaya dengan dan tanpa lapisan ini.
@@ -82,6 +96,7 @@ export async function POST(req: Request) {
       templateWhy: keputusan.alasan,
       kategori: keputusan.kategori,
       satpam: keputusan.satpam,
+      sumberTemplate,
       panjang: ukurBalasan(keputusan.teks),
     });
   }
@@ -97,6 +112,7 @@ export async function POST(req: Request) {
       templateCode: keputusan.kode,
       templateWhy: keputusan.alasan,
       kategori: keputusan.kategori,
+      sumberTemplate,
       // Ke-152 template sudah di bawah 600 karakter saat aturan ini
       // dibuat; diukur juga di sini supaya template baru yang
       // melanggar langsung ketahuan, bukan setelah sampai pelanggan.

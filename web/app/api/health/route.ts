@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { aiTerkunci, getClient, MAX_TOKENS, MODEL } from "@/lib/claude";
 import { getKnowledge } from "@/lib/knowledge";
 import { templateStats } from "@/lib/templates";
+import {
+  siapkanSumberTemplate,
+  statusSumberTemplate,
+} from "@/lib/db/templatesServer";
 
 /* ===========================================================
    GET /api/health — port dari app.get('/api/health') di server.js.
@@ -13,7 +17,11 @@ export const runtime = "nodejs";
 // Jangan di-cache: jawabannya bergantung env & berkas saat diminta.
 export const dynamic = "force-dynamic";
 
-export function GET() {
+export async function GET() {
+  // Panggil dulu supaya yang dilaporkan adalah keadaan sekarang,
+  // bukan sisa pemuatan terakhir yang mungkin belum pernah terjadi.
+  await siapkanSumberTemplate();
+
   const { stats } = getKnowledge();
   const missing = Object.entries(stats.files)
     .filter(([, chars]) => chars === 0)
@@ -34,5 +42,11 @@ export function GET() {
     kbFiles: stats.files,
     missingKbFiles: missing,
     templates: templateStats(),
+    // Dari mana Lapis 1 membaca template: "supabase" atau "berkas".
+    // Dilaporkan di sini karena inilah satu-satunya cara memastikan
+    // dari luar bahwa penyuntingan tim CS benar-benar sampai ke
+    // pelanggan — sumber yang berganti diam-diam tidak akan pernah
+    // muncul sebagai galat.
+    sumberTemplate: statusSumberTemplate(),
   });
 }

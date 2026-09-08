@@ -78,6 +78,29 @@ export type TemplateItem = {
    * jadi ia belum aktif, dan menandainya "tanpa pemicu" pun keliru.
    */
   baru?: boolean;
+
+  /**
+   * `is_active = false` di tabel: teksnya tetap tersimpan dan tetap
+   * bisa disalin CS manusia, tetapi router melewatinya.
+   *
+   * Hanya terisi bila sumbernya tabel. Dari berkas .md keadaan ini
+   * tidak bisa dinyatakan sama sekali — sebuah entri ada atau tidak
+   * ada, tidak ada yang di antaranya. Itulah salah satu alasan
+   * pindah ke tabel.
+   */
+  nonaktif?: boolean;
+
+  /**
+   * Berisi nomor rekening atau nomor telepon ([REKENING], [CS WA],
+   * [CS KOMPLAIN]). claude-core.md melarang mengarahkan transaksi ke
+   * luar marketplace, jadi ketiganya tidak pernah keluar lewat
+   * balasan otomatis — pustaka_router() menyaringnya di database,
+   * bukan di sini.
+   */
+  sensitif?: boolean;
+
+  /** Catatan bebas untuk tim CS; kolom `note`. */
+  catatan?: string | null;
 };
 
 export type RingkasanTemplate = {
@@ -93,6 +116,16 @@ export type TemplatesResponse = {
   ringkasan: RingkasanTemplate | null;
   items: TemplateItem[];
   error?: string;
+  /**
+   * Catatan non-fatal: daftarnya tetap terkirim, tetapi ada yang
+   * perlu diketahui — misalnya tabel `templates` tidak terbaca
+   * sehingga isinya diambil dari berkas .md.
+   *
+   * Dipisahkan dari `error` karena tindakannya berbeda: `error`
+   * berarti halaman tidak punya isi, `peringatan` berarti halaman
+   * punya isi tetapi mungkin bukan yang dikira penyuntingnya.
+   */
+  peringatan?: string;
 };
 
 /** Hasil uji terhadap aturan yang SUDAH tersimpan. */

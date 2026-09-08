@@ -8,6 +8,7 @@
     "start": "next start -p 3100",
     "lint": "eslint",
     "sync-kb": "node scripts/sync-kb.mjs",
+    "uji-sumber": "node ../knowledge-base/uji-sumber-luar.mjs",
     "seed-sql": "node --experimental-strip-types scripts/buat-seed-sql.mjs",
     "template-sql": "node scripts/buat-template-sql.mjs",
     "periksa-sql": "node scripts/periksa-seed-sql.mjs",

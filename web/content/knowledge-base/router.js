@@ -59,6 +59,171 @@ export function getKbDir() {
   return kbDir;
 }
 
+/* ===========================================================
+   SUMBER LUAR — pustaka & aturan dari tabel Supabase
+   ===========================================================
+
+   Sampai 8 September 2026 satu-satunya sumber template adalah
+   keempat berkas .md. Akibatnya halaman Kelola Template tidak bisa
+   berbuat apa-apa: menyimpan berarti menulis ke berkas di dalam
+   repo, yaitu tetap butuh commit, deploy, dan seorang developer —
+   persis pekerjaan yang halaman itu dibuat untuk menghapusnya.
+
+   Blok ini menambah sumber KEDUA. Bila diisi, ia menang atas
+   berkas; bila tidak, semuanya berjalan seperti sebelumnya.
+
+   TIGA HAL YANG SENGAJA TIDAK DILAKUKAN DI SINI
+
+   1. Berkas .md TIDAK dihapus dan TIDAK berhenti dibaca.
+      Ia jadi cadangan. Supabase mati, kunci belum diisi, tabel
+      masih kosong — ketiganya harus berujung pada balasan yang
+      tetap terkirim, bukan pada pelanggan yang didiamkan. Sumber
+      yang dipakai dilaporkan lewat getSumberAktif() supaya
+      perpindahannya tidak pernah diam-diam.
+
+   2. Teks FAQ yang dikirim ke Claude TIDAK ikut pindah.
+      bacaBerkasFaq() tetap membaca berkas. Jadi template baru
+      buatan tim CS langsung bekerja di Lapis 1 (dicocokkan dan
+      dikirim, Rp 0), tetapi Claude belum mengetahuinya. Itu
+      keterbatasan yang diketahui, bukan yang terlupa — memindahkan
+      blok FAQ berarti menyusun ulang teks per kategori sekaligus
+      kosakata penentu kategori, dan itu pekerjaan tersendiri.
+
+   3. Pola regex dari database TIDAK dipercaya begitu saja.
+      new RegExp() bisa melempar, dan pola yang buruk bisa
+      menggantung server. Setiap pola disusun di dalam try/catch dan
+      yang gagal dibuang beserta peringatan — satu aturan rusak
+      tidak boleh mematikan seluruh pencocok. Frasa yang diketik tim
+      CS sendiri sudah aman lebih dulu karena buatPolaDariFrasa()
+      meng-escape seluruh karakter khusus.
+   =========================================================== */
+
+/** Peta { KODE -> teks } dari tabel, atau null bila memakai berkas. */
+let pustakaLuar = null;
+/** Peta { KODE -> nama berkas } padanan, supaya kategori tetap terbaca. */
+let asalLuar = null;
+/** Aturan hasil susun ulang dari tabel; null berarti pakai RULES bawaan. */
+let aturanLuar = null;
+
+/** Dari mana Lapis 1 sedang membaca: "berkas" atau "supabase". */
+let sumberAktif = "berkas";
+
+/** Slug kategori di tabel -> nama berkas .md padanannya. */
+const BERKAS_SLUG = {
+  interaksi: "faq-interaksi.md",
+  "cara-pakai": "faq-cara-pakai.md",
+  produk: "faq-produk.md",
+  umum: "faq-umum.md",
+};
+
+/**
+ * Pasang pustaka & aturan dari tabel Supabase.
+ *
+ * @param {Array<{
+ *   code: string, body: string, action?: string, category_slug?: string,
+ *   priority?: number|null, when_patterns?: string[]|null,
+ *   also_pattern?: string|null, unless_patterns?: string[]|null,
+ *   flags?: string|null, why?: string|null
+ * }>} baris keluaran fungsi public.pustaka_router()
+ * @returns {{templates: number, aturan: number, ditolak: string[]}}
+ */
+export function setSumberLuar(baris) {
+  if (!Array.isArray(baris) || baris.length === 0) {
+    // Tabel kosong bukan alasan untuk mendiamkan pelanggan. Kembali
+    // ke berkas, dan katakan begitu lewat getSumberAktif().
+    return bersihkanSumberLuar();
+  }
+
+  const pustaka = new Map();
+  const asal = new Map();
+  const aturan = [];
+  const ditolak = [];
+
+  for (const b of baris) {
+    const code = String(b?.code ?? "").trim();
+    if (!code) continue;
+
+    // Baris pertama untuk sebuah kode yang menentukan teksnya. Satu
+    // template bisa muncul beberapa kali karena LEFT JOIN ke aturan.
+    if (!pustaka.has(code)) {
+      pustaka.set(code, String(b.body ?? "").trim());
+      asal.set(code, BERKAS_SLUG[b.category_slug] ?? "faq-umum.md");
+    }
+
+    // Baris tanpa priority = template tanpa pemicu. Teksnya tetap
+    // dipakai (Gerbang 2 membutuhkannya), aturannya memang tidak ada.
+    if (b.priority === null || b.priority === undefined) continue;
+
+    const bendera = String(b.flags ?? "i") || "i";
+    const susun = (sumber) => new RegExp(String(sumber), bendera);
+
+    try {
+      const when = (b.when_patterns ?? []).map(susun);
+      if (!when.length) {
+        ditolak.push(`[${code}] aturan tanpa pola`);
+        continue;
+      }
+      aturan.push({
+        code,
+        action: b.action ?? "AUTO_REPLY",
+        when,
+        also: b.also_pattern ? susun(b.also_pattern) : null,
+        unless: (b.unless_patterns ?? []).map(susun),
+        why: b.why ?? "",
+        priority: Number(b.priority),
+      });
+    } catch (e) {
+      // Satu pola rusak membuang SATU aturan, bukan seluruh pencocok.
+      ditolak.push(`[${code}] pola tidak sah: ${e.message}`);
+    }
+  }
+
+  // Urutan aturan adalah logika — tegakkan di sini, jangan bersandar
+  // pada urutan baris yang kebetulan datang dari jaringan.
+  aturan.sort((a, b) => a.priority - b.priority);
+
+  pustakaLuar = pustaka;
+  asalLuar = asal;
+  aturanLuar = aturan;
+  sumberAktif = "supabase";
+
+  if (ditolak.length) {
+    console.warn(`[KB-ROUTER] ${ditolak.length} aturan dibuang: ${ditolak.join("; ")}`);
+  }
+  return { templates: pustaka.size, aturan: aturan.length, ditolak };
+}
+
+/** Kembali membaca berkas .md. */
+export function bersihkanSumberLuar() {
+  pustakaLuar = null;
+  asalLuar = null;
+  aturanLuar = null;
+  sumberAktif = "berkas";
+  return { templates: 0, aturan: 0, ditolak: [] };
+}
+
+/**
+ * Sumber yang sedang dipakai Lapis 1: "berkas" atau "supabase".
+ *
+ * Dilaporkan ke UI dan /api/health. Perpindahan sumber yang tidak
+ * terlihat adalah kegagalan paling mahal di sini: tim CS menyunting
+ * template di database, router diam-diam masih membaca berkas, dan
+ * tidak ada satu pun pesan galat yang menjelaskannya.
+ */
+export function getSumberAktif() {
+  return sumberAktif;
+}
+
+/** Pustaka yang berlaku sekarang — tabel bila ada, berkas bila tidak. */
+function pustakaAktif() {
+  return pustakaLuar ?? muatPustaka();
+}
+
+/** Aturan yang berlaku sekarang. */
+function aturanAktif() {
+  return aturanLuar ?? RULES;
+}
+
 export const CATEGORY_FILES = {
   interaksi: "faq-interaksi.md",
   "cara-pakai": "faq-cara-pakai.md",
@@ -143,12 +308,24 @@ function muatPustaka() {
 
 /** Peta { KODE -> nama berkas }. */
 export function getAsalKode() {
+  if (asalLuar) return asalLuar;
   muatPustaka();
   return asalKode;
 }
 
 /** Peta { KODE -> teks balasan }. */
 export function getTemplateLibrary() {
+  return pustakaAktif();
+}
+
+/**
+ * Pustaka dari BERKAS saja, mengabaikan sumber luar.
+ *
+ * Dipakai /api/templates untuk menunjukkan selisih antara isi berkas
+ * dan isi tabel. Tanpa pintu ini, begitu tabel dipakai tidak ada lagi
+ * cara melihat apa yang masih tertinggal di berkas .md.
+ */
+export function getPustakaBerkas() {
   return muatPustaka();
 }
 
@@ -728,18 +905,21 @@ export function matchTemplate(pesan) {
   if (BUTUH_PENILAIAN.test(msg)) return null;
   if (msg.length > BATAS_PANJANG) return null;
 
-  const lib = muatPustaka();
+  const lib = pustakaAktif();
 
-  for (const rule of RULES) {
+  for (const rule of aturanAktif()) {
     if (rule.unless?.some((re) => re.test(msg))) continue;
     if (!rule.when.some((re) => re.test(msg))) continue;
     if (rule.also && !rule.also.test(msg)) continue;
 
     const reply = lib.get(rule.code);
     if (!reply) {
-      // Kode tidak ada di berkas FAQ (mis. judulnya diubah) — jangan
-      // mengarang, serahkan saja ke AI.
-      console.warn(`[KB-ROUTER] Kode [${rule.code}] tidak ada di berkas FAQ mana pun`);
+      // Kode tidak ada di sumber yang sedang dipakai (mis. judulnya
+      // diubah, atau templatenya dinonaktifkan sementara aturannya
+      // tertinggal) — jangan mengarang, serahkan saja ke AI.
+      console.warn(
+        `[KB-ROUTER] Kode [${rule.code}] tidak ada di sumber "${sumberAktif}"`,
+      );
       continue;
     }
     return { code: rule.code, action: rule.action, reply, why: rule.why };
@@ -1098,7 +1278,7 @@ export function ujiDraf(pesan, frasa) {
 
 /** Jumlah aturan pencocokan template (dipakai /api/health). */
 export function jumlahAturan() {
-  return RULES.length;
+  return aturanAktif().length;
 }
 
 /**
@@ -1116,7 +1296,7 @@ export function jumlahAturan() {
  */
 export function getRules() {
   const sumber = (re) => (re instanceof RegExp ? re.source : String(re));
-  return RULES.map((r, i) => ({
+  return aturanAktif().map((r, i) => ({
     urutan: i + 1,
     code: r.code,
     action: r.action,

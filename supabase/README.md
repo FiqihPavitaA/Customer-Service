@@ -136,13 +136,35 @@ edit kode dan deploy ulang, dan tim CS tidak bisa memperbaikinya sendiri.
    `templates`, `template_rules`, `template_revisions`, `routing_log`.
    `kb_categories` sudah berisi 4 baris; empat tabel lain sengaja **kosong**.
 
-### Kenapa tabelnya dibiarkan kosong
+### Kalau tabelnya masih kosong
 
-Skrip pengisi (`.md` → Supabase) belum dibuat. Menulisnya sekarang berarti
-menyerahkan skrip yang belum pernah dijalankan, karena mengujinya butuh URL dan
-key yang baru ada setelah project berdiri. Selama tabel kosong, `router.js`
-tetap membaca berkas `.md` seperti biasa — **aplikasi berjalan normal**, tidak
-ada yang rusak. Pengisian adalah langkah terpisah setelah kredensial siap.
+Selama tabel kosong, `router.js` tetap membaca berkas `.md` seperti biasa —
+**aplikasi berjalan normal**, tidak ada yang rusak. Yang tidak berjalan hanya
+halaman Kelola Template: ia menampilkan spanduk kuning "hanya bisa dibaca" dan
+menolak penyimpanan, karena tidak ada tabel untuk menampungnya.
+
+Untuk menyalakannya, jalankan tiga berkas ini berurutan di SQL Editor:
+
+| Urutan | Berkas | Isinya |
+|---|---|---|
+| 1 | [`schema-kb.sql`](schema-kb.sql) | tabel `templates`, `template_rules`, `template_revisions` |
+| 2 | [`seed-templates.sql`](seed-templates.sql) | 152 template + 43 aturan, dari berkas `.md` |
+| 3 | [`schema-templates-baca.sql`](schema-templates-baca.sql) | fungsi `pustaka_router()` — **tanpa ini `/api/chat` tetap membaca berkas** |
+
+Langkah 3 paling mudah terlupa karena gejalanya tidak terlihat seperti galat:
+halaman Kelola Template berpindah ke hijau "Sumber: tabel", penyimpanan
+berhasil, tetapi pelanggan tetap dijawab isi berkas `.md`. Sebabnya kebijakan
+`templates_read` berbunyi `to authenticated`, sedangkan `/api/chat` memanggil
+Supabase dengan kunci anon tanpa sesi — sesi console disimpan di localStorage,
+bukan cookie, jadi route handler tidak pernah melihatnya.
+
+Cara memastikan langkah 3 berhasil, tanpa memanggil API berbayar:
+
+```
+GET /api/health  ->  "sumberTemplate": { "sumber": "supabase", ... }
+```
+
+Bila isinya `"berkas"`, field `alasan` menyebutkan sebabnya.
 
 | Tabel | Menggantikan / menambah | Hak tulis |
 |---|---|---|
@@ -165,9 +187,14 @@ lolos `node knowledge-base/router.test.mjs` lebih dulu.
 
 **Template jangan dibaca dari database di tiap pesan.** Satu perjalanan ke
 Supabase per chat menambah latensi pada jalur yang sekarang berbiaya Rp 0 dan
-nol jaringan. Rencananya: baca sekali, simpan di memori proses, segarkan lewat
-langganan Realtime `templates` & `template_rules` yang sudah dinyalakan skema
-ini.
+nol jaringan.
+
+*Sudah dikerjakan pada 8 September 2026* — `web/lib/db/templatesServer.ts`
+membaca sekali lalu menyimpan potretnya di memori proses selama **60 detik**
+(`TEMPLATE_TTL_DETIK`). Penulisan lewat `/api/templates` menghapus potret itu
+seketika, jadi penyunting melihat hasilnya langsung; proses lain menyusul
+paling lambat satu menit. Langganan Realtime belum dipakai — TTL sudah cukup
+dan tidak menambah koneksi yang harus dijaga.
 
 ### Yang tetap di berkas, bukan di database
 

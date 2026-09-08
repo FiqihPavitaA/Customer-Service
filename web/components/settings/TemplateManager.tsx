@@ -204,14 +204,15 @@ function Detail({
   const { isAdmin, isDemo } = useAuth();
   const bolehUbah = isDemo || isAdmin;
 
-  const [code, setCode] = useState(item.code);
+  // Kode tidak bisa diubah (lihat catatan di kolom Kode di bawah),
+  // jadi cukup nilai tetap — bukan state.
+  const code = item.code;
   const [kategori, setKategori] = useState<KategoriTemplate>(item.kategori);
   const [body, setBody] = useState(item.body);
   const [kata, setKata] = useState<string[]>(item.kataKunci);
   const [kataBaru, setKataBaru] = useState("");
 
   const berubah =
-    code !== item.code ||
     kategori !== item.kategori ||
     body !== item.body ||
     kata.join("|") !== item.kataKunci.join("|");
@@ -227,16 +228,46 @@ function Detail({
     setKataBaru("");
   };
 
-  const simpan = () => {
-    simpanTemplate(item.code, { code, kategori, body, kataKunci: kata });
-    toast(`[${item.code}] disimpan`);
-    onTutup();
+  const [sibuk, setSibuk] = useState(false);
+
+  const simpan = async () => {
+    if (sibuk) return;
+    setSibuk(true);
+    try {
+      // Menunggu jawaban server, dan hanya menutup panel bila
+      // benar-benar tersimpan. Versi sebelumnya menembak lalu
+      // langsung menampilkan "disimpan" — kalimat yang benar hanya
+      // karena tidak ada yang pernah memeriksanya.
+      const galat = await simpanTemplate(item.code, {
+        kategori,
+        body,
+        kataKunci: kata,
+      });
+      if (galat) {
+        toast(galat);
+        return;
+      }
+      toast(`[${item.code}] tersimpan`);
+      onTutup();
+    } finally {
+      setSibuk(false);
+    }
   };
 
-  const hapus = () => {
-    hapusTemplate(item.code);
-    toast(`[${item.code}] dihapus dari daftar`);
-    onTutup();
+  const hapus = async () => {
+    if (sibuk) return;
+    setSibuk(true);
+    try {
+      const galat = await hapusTemplate(item.code);
+      if (galat) {
+        toast(galat);
+        return;
+      }
+      toast(`[${item.code}] dinonaktifkan`);
+      onTutup();
+    } finally {
+      setSibuk(false);
+    }
   };
 
   return (
@@ -276,14 +307,25 @@ function Detail({
         <div className="mb-4 grid grid-cols-2 gap-3.5 max-mini:grid-cols-1">
           <div>
             <Label>Kode</Label>
+            {/* Sengaja tidak bisa diubah. Kode template dirujuk tiga
+                tempat lain sebagai TEKS, bukan sebagai kunci asing:
+                routing_log (riwayat biaya), template_examples (contoh
+                pertanyaan Gerbang 2), dan aturan pemicu. Menggantinya
+                di sini akan memutus ketiganya tanpa satu pun pesan
+                galat — bentuk kerusakan yang baru terlihat berminggu
+                kemudian sebagai statistik yang tidak masuk akal. */}
             <input
               type="text"
               value={code}
-              disabled={!bolehUbah}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="PAKAI POC"
-              className="w-full rounded-xl border border-line bg-green-soft px-3 py-2 font-mono text-[0.88rem] outline-none focus:bg-white disabled:opacity-60"
+              disabled
+              readOnly
+              title="Kode tidak bisa diubah — dirujuk routing_log, contoh Gerbang 2, dan aturan pemicu."
+              className="w-full rounded-xl border border-line bg-green-soft px-3 py-2 font-mono text-[0.88rem] outline-none disabled:opacity-60"
             />
+            <p className="mt-1 mb-0 text-[0.72rem] text-muted">
+              Kode tidak bisa diganti. Untuk mengganti, buat template baru
+              lalu nonaktifkan yang ini.
+            </p>
           </div>
           <div>
             <Label>Kategori</Label>
@@ -464,7 +506,7 @@ function Detail({
           <button
             type="button"
             onClick={simpan}
-            disabled={!berubah}
+            disabled={!berubah || sibuk}
             className="cursor-pointer rounded-xl border-none bg-green px-5 py-2.5 font-bold text-white transition hover:bg-green-hover disabled:opacity-50"
           >
             Simpan Perubahan
@@ -478,7 +520,7 @@ function Detail({
 /* ---------------- Halaman ---------------- */
 
 export default function TemplateManager() {
-  const { status, items, ringkasan, error, perubahanLokal } = useTemplates();
+  const { status, items, ringkasan, error, sumber, peringatan } = useTemplates();
 
   const [cari, setCari] = useState("");
   const [kategori, setKategori] = useState<KategoriTemplate | "semua">("semua");
@@ -546,22 +588,39 @@ export default function TemplateManager() {
 
   return (
     <div>
-      {/* ---- Pemberitahuan sumber data ---- */}
-      <div className="mb-4 rounded-xl border border-dashed border-green/40 bg-green-soft px-3.5 py-2.5 text-[0.8rem] leading-relaxed text-text-2">
-        <b className="text-green-dark">Sumber: berkas .md (sementara).</b>{" "}
-        Perubahan di halaman ini hidup di memori tab ini saja — berkasnya tidak
-        ikut berubah dan muat ulang mengembalikan semuanya. Tujuannya tabel{" "}
-        <code>templates</code> di Supabase, yang belum bisa dibuat karena gangguan
-        di sisi Supabase.
-        {perubahanLokal > 0 && (
-          <>
-            {" "}
-            <b className="text-[#b91c1c]">
-              {perubahanLokal} perubahan belum tersimpan ke mana pun.
-            </b>
-          </>
-        )}
-      </div>
+      {/* ---- Pemberitahuan sumber data ----
+           Ditampilkan permanen, dan bukan sekadar hiasan: sumber yang
+           berganti tanpa terlihat adalah kegagalan paling mahal di
+           halaman ini — tim CS menyunting di satu tempat sementara
+           pelanggan dijawab dari tempat lain. */}
+      {sumber === "supabase" ? (
+        <div className="mb-4 rounded-xl border border-dashed border-green/40 bg-green-soft px-3.5 py-2.5 text-[0.8rem] leading-relaxed text-text-2">
+          <b className="text-green-dark">
+            Sumber: tabel <code>templates</code> di Supabase.
+          </b>{" "}
+          Perubahan tersimpan sungguhan dan langsung dipakai menjawab
+          pelanggan (paling lambat 60 detik, mengikuti masa simpan potret
+          router). Setiap penyuntingan isi jawaban ikut tercatat di{" "}
+          <code>template_revisions</code> beserta siapa yang mengubahnya.
+        </div>
+      ) : (
+        <div className="mb-4 rounded-xl border border-dashed border-[#f0c36d] bg-[#fdf3d8] px-3.5 py-2.5 text-[0.8rem] leading-relaxed text-[#8a5a00]">
+          <b>
+            Sumber: berkas <code>.md</code> — halaman ini hanya bisa dibaca.
+          </b>{" "}
+          Tabel <code>templates</code> belum terisi, jadi daftarnya dibaca dari
+          berkas di dalam repo dan penyimpanan akan ditolak. Untuk
+          menyalakannya: jalankan <code>supabase/schema-kb.sql</code>,{" "}
+          <code>supabase/seed-templates.sql</code>, lalu{" "}
+          <code>supabase/schema-templates-baca.sql</code> di SQL Editor.
+        </div>
+      )}
+
+      {peringatan && (
+        <div className="mb-4 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-3.5 py-2.5 text-[0.8rem] leading-relaxed text-[#b91c1c]">
+          ⚠️ {peringatan}
+        </div>
+      )}
 
       {/* ---- Baris pencarian ---- */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
