@@ -53,7 +53,7 @@ begin;
 -- pustakanya belum ikut berubah.
 --
 -- Template tanpa aturan tetap ikut terbawa (LEFT JOIN, priority
--- null). Itu disengaja: 109 dari 152 template memang belum punya
+-- null). Itu disengaja: 108 dari 151 template memang belum punya
 -- pemicu, dan Gerbang 2 (Voyage) tetap perlu teks balasannya.
 
 create or replace function public.pustaka_router()
@@ -117,17 +117,35 @@ grant execute on function public.pustaka_router() to anon, authenticated;
 -- ===========================================================
 -- Pemeriksaan cepat sesudah Run
 -- ===========================================================
--- Jalankan terpisah di SQL Editor:
+-- Cara termudah, gratis, dari folder web/:
 --
---   select count(*) from public.templates;        -- harap 152
---   select count(*) from public.pustaka_router(); -- harap <= 152
+--   npm run periksa-sumber
+--   npm run periksa-sumber -- "DITERUSKAN"
+--
+-- Atau langsung di SQL Editor:
+--
+--   select count(*) from public.templates;        -- harap 154
+--   select count(*) from public.pustaka_router(); -- harap 151
 --   select code, priority from public.pustaka_router()
 --     where priority is not null order by priority limit 10;
 --
--- Selisih antara kedua hitungan pertama adalah template yang
--- sengaja disaring: is_active=false, is_sensitive=true, atau masa
--- berlakunya lewat. Selisih itu WAJAR — yang tidak wajar adalah
--- hitungan kedua bernilai 0, yang berarti seluruh isinya tersaring
--- dan router akan diam-diam kembali ke berkas .md.
+-- Selisih 3 antara kedua hitungan pertama adalah [REKENING],
+-- [CS WA], dan [CS KOMPLAIN] — ketiganya is_sensitive=true dan
+-- is_active=false karena memuat nomor rekening atau telepon.
+-- Selisih itu WAJAR; nanti bisa bertambah bila ada template promo
+-- yang masa berlakunya lewat.
+--
+-- Yang TIDAK wajar adalah hitungan kedua bernilai 0: itu berarti
+-- seluruh isinya tersaring dan router akan diam-diam kembali ke
+-- berkas .md.
+--
+-- Satu kode yang wajib ikut terbaca:
+--
+--   select code from public.pustaka_router() where code = 'DITERUSKAN CS';
+--
+-- Itu balasan Gerbang 0. Bila hilang, pelanggan yang minta refund
+-- atau melaporkan barang rusak menerima balasan KOSONG. Router
+-- sekarang punya jaring pengaman untuk keadaan itu (teksHandover()),
+-- tetapi jaring pengaman bukan alasan membiarkannya hilang.
 
 commit;
