@@ -191,7 +191,20 @@ function gayaChat(teks) {
   // bisa diandalkan pada data ini.
   if (/[.?!]$/.test(t)) return false;
 
-  return t === t.toLowerCase() || kataKata.some((k) => PARTIKEL.includes(k));
+  // Nama produk berhuruf kapital (POC, NPK, TDS, EM4) TIDAK dihitung
+  // sebagai tanda tulisan rapi — menulisnya kapital justru wajar di
+  // chat pelanggan. Sepadan dengan web/lib/mutuContoh.ts.
+  const tanpaNamaProduk = t
+    .split(/\s+/)
+    .filter((k) => {
+      const bersih = k.replace(/[^\p{L}\p{N}]/gu, "");
+      return bersih && bersih !== bersih.toUpperCase();
+    })
+    .join(" ");
+
+  const hurufKecilSemua =
+    tanpaNamaProduk.length > 0 && tanpaNamaProduk === tanpaNamaProduk.toLowerCase();
+  return hurufKecilSemua || kataKata.some((k) => PARTIKEL.includes(k));
 }
 
 /* ---- B5: duplikat lintas template ---- */

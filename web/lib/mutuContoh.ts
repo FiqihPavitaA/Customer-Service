@@ -119,7 +119,29 @@ export function bergayaChat(teks: string): boolean {
   const ditutupTandaBaca = /[.?!]$/.test(t);
   if (ditutupTandaBaca) return false;
 
-  const hurufKecilSemua = t === t.toLowerCase();
+  /* Nama produk berhuruf kapital TIDAK dihitung sebagai tanda
+     tulisan rapi.
+
+     Ditemukan dari pemakaian sungguhan: "POC cara pke nya gimana"
+     ditandai "terlalu rapi" hanya karena "POC" kapital, padahal
+     kalimatnya jelas gaya pelanggan. Menulis nama produk dengan
+     kapital — POC, NPK, TDS, EM4, AB Mix — justru wajar di chat.
+
+     Yang dicari sebenarnya adalah kapital di awal KALIMAT, ciri
+     orang yang menulis rapi. Token yang seluruhnya kapital (atau
+     kapital bercampur angka) dibuang dulu supaya tidak tertukar. */
+  const tanpaNamaProduk = t
+    .split(/\s+/)
+    .filter((k) => {
+      const bersih = k.replace(/[^\p{L}\p{N}]/gu, "");
+      if (!bersih) return false;
+      // Token yang tidak punya huruf kecil sama sekali = nama produk.
+      return bersih !== bersih.toUpperCase();
+    })
+    .join(" ");
+
+  const hurufKecilSemua =
+    tanpaNamaProduk.length > 0 && tanpaNamaProduk === tanpaNamaProduk.toLowerCase();
   const adaPartikel = kataKata.some((k) => PARTIKEL.includes(k));
   return hurufKecilSemua || adaPartikel;
 }

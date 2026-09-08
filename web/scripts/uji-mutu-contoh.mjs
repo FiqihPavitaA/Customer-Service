@@ -56,6 +56,11 @@ const PELANGGAN = [
   "em4 dipakenya gmn ya",
   "pelebat tuh paket apa",
   "barangnya blm sampe nih min",
+  // Nama produk kapital di tengah kalimat gaya pelanggan.
+  // Ditemukan dari pemakaian sungguhan 8 Sep 2026: kalimat ini
+  // ditandai "terlalu rapi" hanya karena "POC" kapital.
+  "POC cara pke nya gimana",
+  "NPK nya brp dosisnya",
 ];
 
 console.log("\n1. Kalimat rapi HARUS ditandai");
