@@ -1,23 +1,36 @@
 /* ===========================================================
    Aturan jeda AI setelah handover ke CS — logika murni.
 
-   TIDAK ADA jaringan, TIDAK ADA env, TIDAK ADA akses database di
-   berkas ini. Itu disengaja, dua alasan:
+   TIDAK ADA jaringan dan TIDAK ADA akses database di berkas ini,
+   supaya semuanya bisa diuji dengan `npm run uji-handover` seharga
+   Rp 0 — termasuk kasus tepi tengah malam dan stempel rusak.
 
-   1. Berkas ini diimpor peramban DAN server. Kalau lamanya jeda
-      dibaca dari process.env di sini, sisi peramban akan diam-diam
-      memakai angka bawaan sementara server memakai angka env —
-      dua kebenaran yang berbeda tanpa ada yang memberi tahu.
-      Karena itu lamanya jeda selalu DIKIRIM sebagai parameter,
-      tidak pernah dibaca sendiri. Yang membacanya cuma
-      lib/db/handoverServer.ts, dan hanya di sisi server.
+   SATU-SATUNYA env DI SINI BERAWALAN NEXT_PUBLIC_, DAN ITU PENTING
 
-   2. Semuanya bisa diuji dengan `npm run uji-handover` seharga
-      Rp 0 — termasuk kasus tepi tengah malam dan stempel rusak.
+   Berkas ini diimpor peramban DAN server. Keduanya perlu tahu
+   lamanya jeda: server memasangnya saat handover, peramban
+   memajukannya saat CS membalas. Kalau namanya bukan NEXT_PUBLIC_,
+   Next.js hanya mengisinya di sisi server — peramban diam-diam
+   memakai angka bawaan sementara server memakai angka env. Tidak
+   ada galat, tidak ada peringatan; jedanya cuma berbeda tergantung
+   siapa yang terakhir menulisnya.
+
+   Angka ini bukan rahasia (24), jadi tidak ada yang dikorbankan
+   dengan membuatnya publik.
    =========================================================== */
 
 /** Lama jeda bawaan, dalam jam. Lihat supabase/handover-jeda-ai.sql. */
 export const JAM_JEDA_BAWAAN = 24;
+
+/**
+ * Lama jeda yang benar-benar dipakai. Bisa diperpendek lewat
+ * NEXT_PUBLIC_JEDA_HANDOVER_JAM saat menguji — menunggu 24 jam
+ * sungguhan untuk membuktikan jedanya berakhir bukan pengujian,
+ * itu penantian.
+ */
+export const JAM_JEDA = Number(
+  process.env.NEXT_PUBLIC_JEDA_HANDOVER_JAM || JAM_JEDA_BAWAAN,
+);
 
 const SEJAM_MS = 60 * 60 * 1000;
 
@@ -35,7 +48,8 @@ const SEJAM_MS = 60 * 60 * 1000;
  * Jeda yang sah paling lama 24 jam ke depan, diperpanjang 24 jam
  * setiap balasan CS. Tiga puluh hari sudah jauh di luar apa pun
  * yang bisa dihasilkan aturan itu. Catatan untuk yang mengubah
- * JEDA_HANDOVER_JAM: nilai di atas 720 jam akan tertahan di sini.
+ * NEXT_PUBLIC_JEDA_HANDOVER_JAM: nilai di atas 720 jam akan
+ * tertahan di sini.
  */
 const BATAS_MASUK_AKAL_MS = 30 * 24 * SEJAM_MS;
 
@@ -123,4 +137,34 @@ export function menitMenunggu(
   const mulai = Date.parse(sejak);
   if (Number.isNaN(mulai)) return 0;
   return Math.max(0, Math.floor((sekarang.getTime() - mulai) / 60000));
+}
+
+/**
+ * Batas SLA: `claude-core.md` menuntut balasan di bawah 15 menit.
+ * Badge memerah di 10 supaya masih ada waktu bertindak, bukan
+ * memberi tahu setelah terlambat.
+ */
+export const MENIT_GENTING = 10;
+
+/**
+ * Lama menunggu dalam bahasa manusia, untuk badge antrean.
+ *
+ * Naik satuan supaya tetap terbaca: menit di bawah sejam, jam di
+ * bawah sehari, lalu hari. "1.437 menit" secara teknis benar tetapi
+ * tidak memberi tahu apa pun kepada orang yang sedang memilih mana
+ * yang harus dikerjakan lebih dulu.
+ */
+export function teksMenunggu(menit: number): string {
+  if (menit < 1) return "baru saja";
+  if (menit < 60) return `${menit} menit`;
+
+  const jam = Math.floor(menit / 60);
+  if (jam < 24) {
+    const sisa = menit % 60;
+    return sisa === 0 ? `${jam} jam` : `${jam} jam ${sisa} menit`;
+  }
+
+  const hari = Math.floor(jam / 24);
+  const sisaJam = jam % 24;
+  return sisaJam === 0 ? `${hari} hari` : `${hari} hari ${sisaJam} jam`;
 }

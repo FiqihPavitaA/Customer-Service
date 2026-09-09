@@ -32,6 +32,7 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import { hitungJedaSampai, JAM_JEDA } from "@/lib/handover";
 import {
   DEMO_USER,
   SEED_AI_FLAGS,
@@ -307,6 +308,42 @@ export function appendMessage(id: string, content: string) {
   if (!target) return;
   const messages = [...target.messages, msg];
 
+  /* --- Jeda AI dimajukan, tapi hanya bila percakapan ini memang
+     pernah dialihkan ---------------------------------------------
+
+     Syarat `ai_paused_until` tidak null itu inti aturannya. Tanpa
+     syarat itu, CS yang membalas manual pertanyaan biasa — "dosis
+     NPK berapa" — akan mematikan AI di percakapan itu selama 24 jam
+     tanpa ada yang pernah meminta.
+
+     Sebaliknya, setiap balasan CS pada percakapan yang SUDAH
+     dialihkan memang harus memajukannya. Kasus refund yang alot
+     bisa berjalan seharian; kalau jamnya dihitung kaku sejak
+     handover, AI akan menyala tepat saat CS masih bolak-balik
+     dengan orangnya.
+
+     Pesan pelanggan sengaja tidak lewat sini sama sekali — kalau
+     pelanggan bisa menahan AI hanya dengan mengetik, satu orang
+     yang rajin menulis bisa mematikannya selamanya. */
+  const jedaBaru = target.ai_paused_until ? hitungJedaSampai(JAM_JEDA) : null;
+
+  /* --- Eskalasi ditutup oleh balasan pertama dari manusia --------
+
+     Inilah alasan role 'cs' harus ada. Selama balasan CS dan
+     balasan AI sama-sama tercatat 'assistant', tidak ada satu pun
+     titik di kode ini yang tahu bahwa seorang manusia baru saja
+     menangani kasusnya.
+
+     Perhatikan yang TIDAK ikut berubah: `ai_paused_until` tetap
+     berjalan walau eskalasinya sudah resolved. Keduanya sengaja
+     dipisah — "selesai" itu urusan antrean dan statistik, "AI
+     diam" itu urusan keselamatan. Menggabungkannya berarti AI
+     menyala lagi begitu CS menulis "boleh minta nomor pesanannya
+     kak?", dan menjawab sendiri saat pelanggan membalas "12345". */
+  const adaTerbuka = state.escalations.some(
+    (e) => e.conversation_id === id && e.status === "open",
+  );
+
   setState({
     conversations: state.conversations.map((c) =>
       c.id === id
@@ -316,19 +353,45 @@ export function appendMessage(id: string, content: string) {
             chat_count: messages.length,
             updated_at: now,
             last_message_at: now,
+            ai_paused_until: jedaBaru ?? c.ai_paused_until,
           }
         : c,
     ),
+    ...(adaTerbuka
+      ? {
+          escalations: state.escalations.map((e) =>
+            e.conversation_id === id && e.status === "open"
+              ? { ...e, status: "resolved" as const }
+              : e,
+          ),
+        }
+      : {}),
   });
 
   if (!PAKAI_SUPABASE) return;
-  void getSupabase()
-    ?.from("conversations")
+  const sb = getSupabase();
+  if (!sb) return;
+
+  void sb
+    .from("conversations")
     // updated_at diisi trigger conversations_touch, jadi tidak dikirim.
-    .update({ messages, last_message_at: now })
+    .update({
+      messages,
+      last_message_at: now,
+      ...(jedaBaru ? { ai_paused_until: jedaBaru } : {}),
+    })
     .eq("id", id)
     .select("id")
     .then(({ error, data }) => periksaTulis("balasan", error, data));
+
+  if (!adaTerbuka) return;
+  void sb
+    .from("escalations")
+    .update({ status: "resolved" })
+    .eq("conversation_id", id)
+    .eq("status", "open")
+    .select("id")
+    .then(({ error, data }) => periksaTulis("penutupan eskalasi", error, data));
 }
 
 /** Perbarui panel saran AI setelah /api/chat menjawab. */

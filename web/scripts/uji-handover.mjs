@@ -22,11 +22,13 @@
 
 const {
   JAM_JEDA_BAWAAN,
+  MENIT_GENTING,
   hitungJedaSampai,
   sedangDijeda,
   sisaJedaMs,
   teksSisaJeda,
   menitMenunggu,
+  teksMenunggu,
 } = await import("../lib/handover.ts");
 
 let lulus = 0;
@@ -136,6 +138,32 @@ periksa("baru saja -> 0", menitMenunggu(dari(0), ACUAN) === 0);
 periksa("stempel masa depan -> 0, bukan negatif", menitMenunggu(dari(SEJAM), ACUAN) === 0);
 periksa("null -> 0", menitMenunggu(null, ACUAN) === 0);
 periksa("stempel rusak -> 0", menitMenunggu("entah", ACUAN) === 0);
+
+console.log("\n6. teksMenunggu — naik satuan supaya tetap terbaca");
+/* Angka menit mentah pada antrean yang tertinggal semalam menjadi
+   "1437 menit": benar secara teknis, tapi tidak membantu siapa pun
+   memutuskan mana yang harus dikerjakan lebih dulu. */
+const kasusTunggu = [
+  [0, "baru saja"],
+  [1, "1 menit"],
+  [23, "23 menit"],
+  [59, "59 menit"],
+  [60, "1 jam"],
+  [95, "1 jam 35 menit"],
+  [1439, "23 jam 59 menit"],
+  [1440, "1 hari"],
+  [1500, "1 hari 1 jam"],
+  [2880, "2 hari"],
+];
+for (const [menit, harap] of kasusTunggu) {
+  const dapat = teksMenunggu(menit);
+  periksa(`${menit} menit -> "${harap}"`, dapat === harap, `dapat "${dapat}"`);
+}
+
+periksa(
+  `ambang genting ${MENIT_GENTING} menit, di bawah batas 15 menit claude-core.md`,
+  MENIT_GENTING < 15,
+);
 
 console.log(`\n${"-".repeat(52)}`);
 console.log(`Jeda handover : ${gagal === 0 ? "LULUS" : "GAGAL"} ${lulus}/${lulus + gagal}`);

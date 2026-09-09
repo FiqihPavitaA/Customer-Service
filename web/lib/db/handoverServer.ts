@@ -39,14 +39,7 @@
    =========================================================== */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { hitungJedaSampai, JAM_JEDA_BAWAAN } from "@/lib/handover";
-
-/**
- * Lama jeda dalam jam. Bisa diperpendek lewat env saat menguji —
- * menunggu 24 jam sungguhan untuk membuktikan jedanya berakhir
- * bukan pengujian, itu penantian.
- */
-export const JAM_JEDA = Number(process.env.JEDA_HANDOVER_JAM || JAM_JEDA_BAWAAN);
+import { hitungJedaSampai, JAM_JEDA } from "@/lib/handover";
 
 /** Apa yang diketahui saat handover diputuskan. */
 export type BahanHandover = {

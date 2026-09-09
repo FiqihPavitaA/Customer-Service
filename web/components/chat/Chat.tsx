@@ -36,14 +36,23 @@ import IntegrateModal, { type PlatformName } from "./IntegrateModal";
 import {
   appendMessage,
   markRead,
+  selectEscalations,
   setAiSuggestion,
   useConversations,
+  useDb,
 } from "@/lib/db";
 import type { ActionCode, Conversation } from "@/lib/db/types";
 import { catalogStatusText, searchProducts, useCatalog } from "@/lib/catalog";
 import { inisial, jam, stempel, tanggalPanjang } from "@/lib/format";
 import { useSearch, type SearchScope } from "@/lib/search";
 import { headerBerSesi } from "@/lib/supabase/header";
+import {
+  MENIT_GENTING,
+  menitMenunggu,
+  sedangDijeda,
+  teksMenunggu,
+  teksSisaJeda,
+} from "@/lib/handover";
 
 /* ---------------- Peta klasifikasi (ACTIONS di dashboard.js) --------------- */
 
@@ -170,6 +179,41 @@ function ShopsPanel({
   );
 }
 
+/* ---------------- Badge lama menunggu ---------------- */
+
+/**
+ * Berdetak sendiri tiap 30 detik.
+ *
+ * Tanpa itu angkanya membeku pada saat halaman dimuat. CS yang
+ * membiarkan tab terbuka sepanjang shift — yang memang kebiasaan
+ * normal — akan melihat "2 menit" pada kasus yang sebenarnya sudah
+ * menunggu satu jam, persis kebalikan dari gunanya badge ini.
+ *
+ * 30 detik dipilih karena satuan terkecil yang ditampilkan adalah
+ * menit; memperbarui lebih sering hanya menghabiskan render tanpa
+ * mengubah satu huruf pun di layar.
+ */
+function BadgeMenunggu({ sejak }: { sejak: string }) {
+  const [, tik] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tik((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  const menit = menitMenunggu(sejak);
+  const genting = menit >= MENIT_GENTING;
+  return (
+    <span
+      title={`Menunggu CS sejak ${stempel(sejak)}`}
+      className={`shrink-0 rounded-md px-1.5 py-0.5 text-[0.6rem] font-extrabold ${
+        genting ? "bg-[#fee2e2] text-[#b91c1c]" : "bg-green-mint text-green-dark"
+      }`}
+    >
+      ⏳ {teksMenunggu(menit)}
+    </span>
+  );
+}
+
 /* ---------------- Panel: daftar percakapan ---------------- */
 
 type FilterKey = "all" | "unread" | "cs";
@@ -182,6 +226,7 @@ function ConversationsPanel({
   query,
   setQuery,
   counts,
+  menungguSejak,
   onPick,
   onClose,
 }: {
@@ -192,6 +237,8 @@ function ConversationsPanel({
   query: string;
   setQuery: (q: string) => void;
   counts: { unread: number; cs: number };
+  /** id percakapan -> sejak kapan eskalasinya terbuka. */
+  menungguSejak: Map<string, string>;
   onPick: (id: string) => void;
   onClose?: () => void;
 }) {
@@ -263,7 +310,13 @@ function ConversationsPanel({
       <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
         {rows.length === 0 && (
           <li className="px-4 py-8 text-center text-[0.84rem] text-muted">
-            Tidak ada percakapan yang cocok.
+            {/* Antrean kosong itu kabar baik, bukan hasil pencarian
+                yang nihil. Kalimatnya harus berbeda supaya CS tahu
+                bedanya "tidak ada yang menunggu" dari "filternya
+                terlalu sempit". */}
+            {filter === "cs"
+              ? "Tidak ada yang menunggu CS 🎉"
+              : "Tidak ada percakapan yang cocok."}
           </li>
         )}
         {rows.map((c) => (
@@ -295,12 +348,22 @@ function ConversationsPanel({
                 </span>
                 <span className="mt-1 flex items-center justify-between gap-2">
                   <span className="truncate text-[0.78rem] text-muted">{snippet(c)}</span>
-                  {c.action && (
-                    <span
-                      className={`shrink-0 rounded-md px-1.5 py-0.5 text-[0.6rem] font-extrabold ${actionTagClass(c.action)}`}
-                    >
-                      {ACTION_META[c.action].tag}
-                    </span>
+                  {/* Lama menunggu menggantikan lencana tindakan pada
+                      percakapan yang sedang mengantre. Menampilkan
+                      keduanya berarti mengulang hal yang sama: sebuah
+                      eskalasi terbuka SELALU ber-action HANDOVER, jadi
+                      lencana itu tidak menambah satu pun informasi —
+                      sementara "sudah 23 menit" menambah banyak. */}
+                  {menungguSejak.has(c.id) ? (
+                    <BadgeMenunggu sejak={menungguSejak.get(c.id)!} />
+                  ) : (
+                    c.action && (
+                      <span
+                        className={`shrink-0 rounded-md px-1.5 py-0.5 text-[0.6rem] font-extrabold ${actionTagClass(c.action)}`}
+                      >
+                        {ACTION_META[c.action].tag}
+                      </span>
+                    )
                   )}
                 </span>
               </span>
@@ -475,6 +538,19 @@ function InfoPanel({
       {/* Ringkasan handover internal — format dari claude.md */}
       <div className="border-t border-line p-3.5">
         <div className="mb-2 text-[0.82rem] font-bold">📝 Ringkasan Internal CS</div>
+
+        {/* Keadaan jeda ditampilkan terpisah dari ringkasan, karena
+            ia satu-satunya baris di panel ini yang berubah sendiri
+            seiring waktu — sisanya beku sejak handover dibuat.
+            Tanpa baris ini CS tidak punya cara mengetahui bahwa
+            balasan otomatis sedang dimatikan untuk pelanggan ini. */}
+        {sedangDijeda(c.ai_paused_until) && (
+          <p className="mt-0 mb-2.5 rounded-xl bg-green-mint px-2.5 py-2 text-[0.76rem] leading-relaxed text-green-dark">
+            <b>🤖 AI dijeda</b> — balasan otomatis dimatikan untuk percakapan ini.
+            Aktif lagi {teksSisaJeda(c.ai_paused_until)}, dan setiap balasan Kakak
+            memundurkannya 24 jam lagi.
+          </p>
+        )}
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[0.8rem]">
           {Object.entries(c.handover_detail ?? {}).map(([k, v]) => (
             <li key={k} className="flex justify-between gap-3">
@@ -507,6 +583,7 @@ function InfoPanel({
 
 export default function Chat() {
   const conversations = useConversations();
+  const escalations = useDb(selectEscalations);
   const search = useSearch();
   const toast = useToast();
 
@@ -535,11 +612,34 @@ export default function Chat() {
     }
   }, [active?.id, active?.messages.length]);
 
+  /* --- Antrean "Perlu CS" bersandar pada eskalasi TERBUKA --------
+
+     Sebelum ini tabnya menyaring `action === "HANDOVER_TO_CS"`.
+     Itu tidak pernah bisa jadi antrean, karena `action` adalah
+     catatan keputusan terakhir AI dan tidak pernah berubah setelah
+     CS menanganinya — daftarnya hanya bertambah panjang, tidak
+     pernah berkurang, sampai berhenti dibaca orang.
+
+     `escalations.status` justru bergerak: dibuka saat handover,
+     ditutup oleh balasan pertama dari manusia (lihat appendMessage
+     di lib/db/store.ts). Itulah yang membuatnya antrean. */
+  const menungguSejak = useMemo(() => {
+    const peta = new Map<string, string>();
+    for (const e of escalations) {
+      if (e.status !== "open" || !e.conversation_id) continue;
+      // Kalau satu percakapan punya beberapa eskalasi terbuka,
+      // yang dihitung adalah yang PALING LAMA menunggu.
+      const ada = peta.get(e.conversation_id);
+      if (!ada || e.created_at < ada) peta.set(e.conversation_id, e.created_at);
+    }
+    return peta;
+  }, [escalations]);
+
   const rows = useMemo(() => {
     const q = panelQuery.trim().toLowerCase();
-    return conversations.filter((c) => {
+    const tersaring = conversations.filter((c) => {
       if (filter === "unread" && !c.unread) return false;
-      if (filter === "cs" && c.action !== "HANDOVER_TO_CS") return false;
+      if (filter === "cs" && !menungguSejak.has(c.id)) return false;
 
       if (q) {
         const nama = (c.customer_name ?? "").toLowerCase();
@@ -555,11 +655,23 @@ export default function Chat() {
       }
       return true;
     });
-  }, [conversations, filter, panelQuery, search]);
+
+    /* Urutan antrean berlawanan dengan urutan inbox, dan itu
+       disengaja. Daftar biasa menaruh yang terbaru di atas; antrean
+       menaruh yang PALING LAMA MENUNGGU di atas, karena aturan
+       balasan di bawah 15 menit hanya bisa dijaga kalau yang paling
+       terancam melanggar terlihat lebih dulu. */
+    if (filter !== "cs") return tersaring;
+    return [...tersaring].sort(
+      (a, b) =>
+        Date.parse(menungguSejak.get(a.id) ?? "") -
+        Date.parse(menungguSejak.get(b.id) ?? ""),
+    );
+  }, [conversations, filter, panelQuery, search, menungguSejak]);
 
   const counts = {
     unread: conversations.filter((c) => c.unread).length,
-    cs: conversations.filter((c) => c.action === "HANDOVER_TO_CS").length,
+    cs: conversations.filter((c) => menungguSejak.has(c.id)).length,
   };
 
   const pick = (id: string) => {
@@ -672,6 +784,7 @@ export default function Chat() {
           query={panelQuery}
           setQuery={setPanelQuery}
           counts={counts}
+          menungguSejak={menungguSejak}
           onPick={pick}
         />
       </section>
@@ -899,6 +1012,7 @@ export default function Chat() {
               query={panelQuery}
               setQuery={setPanelQuery}
               counts={counts}
+              menungguSejak={menungguSejak}
               onPick={pick}
               onClose={() => setOverlay(null)}
             />
