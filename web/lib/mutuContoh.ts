@@ -64,6 +64,9 @@ const SINGKATAN_KUAT = [
   "trs", "kk", "knp", "dgn", "utk", "kl", "klo", "bgt", "jd", "dlm",
   "hrg", "tp", "sdh", "blh", "bs", "dr", "dpt", "sm", "tq",
   "gak", "ga", "ngga", "nggak", "engga", "sampe", "makasih", "mksh",
+  // Bervokal tetapi tetap terpenggal, jadi tidak tertangkap aturan
+  // "tanpa vokal" di tokenDisingkat().
+  "ap", "pke", "bgmn", "gt", "gtu",
 ];
 
 /**
@@ -89,6 +92,55 @@ export type CatatanMutu = {
 };
 
 const kata = (t: string) => t.trim().split(/\s+/).filter(Boolean);
+
+/**
+ * Apakah contoh ini memuat singkatan yang membuang huruf?
+ *
+ * Beda dari bergayaChat(): yang itu menjawab "apakah ini terdengar
+ * seperti pelanggan", yang ini menjawab "seberapa terpenggal
+ * tulisannya". Sebuah contoh bisa bergaya chat tanpa singkatan
+ * ("poc itu buat apa ya kak") — dan justru itulah gunanya dibedakan,
+ * karena kumpulan contoh sebaiknya memuat kedua-duanya.
+ */
+export function bersingkatanBerat(teks: string): boolean {
+  return teks
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .some(tokenDisingkat);
+}
+
+/**
+ * Nama produk yang kebetulan tidak bervokal.
+ *
+ * Tanpa pengecualian ini, "npk nya brp" akan dinilai bersingkatan
+ * berat gara-gara "npk" — padahal itu nama produk, bukan singkatan
+ * yang diketik pelanggan karena buru-buru.
+ */
+const AKRONIM_PRODUK = ["npk", "tds", "ph", "pbm", "agk", "abmix", "nph"];
+
+/**
+ * Satu kata dianggap singkatan berat bila memenuhi salah satu:
+ *
+ *   a. ada di SINGKATAN_KUAT, atau
+ *   b. dua huruf atau lebih dan TIDAK punya satu pun vokal
+ *
+ * Aturan (b) ditambahkan 9 September 2026 setelah `npm run uji-mutu`
+ * menunjukkan daftar tangan selalu bocor: "poc tuh bwt ap" lolos
+ * tanpa terdeteksi karena "bwt" belum terdaftar.
+ *
+ * Itu pola yang sama dengan celah `also` pada MINTA_DESKRIPSI —
+ * daftar putih hanya menangkap yang tertulis di dalamnya, dan yang
+ * belum terpikir lolos diam-diam. Membuang vokal adalah CARA orang
+ * menyingkat, bukan daftar kata tertentu, jadi aturannya yang harus
+ * menangkap, bukan daftarnya.
+ */
+function tokenDisingkat(k: string): boolean {
+  if (SINGKATAN_KUAT.includes(k)) return true;
+  if (AKRONIM_PRODUK.includes(k)) return false;
+  return k.length >= 2 && /^[a-z]+$/.test(k) && !/[aeiou]/.test(k);
+}
 
 /**
  * Apakah contoh ini terdengar seperti pelanggan sungguhan?
@@ -309,6 +361,34 @@ export function periksaKumpulan(daftar: string[]): MutuTemplate {
         pesan:
           "Semua contoh dibuka dengan kata yang sama. Variasikan " +
           'pembukanya — "cara pakai...", "...gmn kak", "takarannya brp".',
+      });
+    }
+
+    /* Ragam TINGKAT SINGKATAN — bukan sekadar ragam panjang.
+     *
+     * Voyage mencocokkan bentuk kalimat, bukan huruf. Tiga contoh
+     * yang semuanya rapi menutup satu wilayah sempit; tiga yang
+     * semuanya disingkat berat menutup wilayah sempit yang lain.
+     * Yang menutup luas adalah tiga titik yang BERJAUHAN.
+     *
+     * Terbukti dari pemakaian sungguhan 9 September 2026:
+     * "pke poc biar ap?" tertangkap 0,811 lewat contoh "pakai poc
+     * biar apa" — sedangkan contoh bawaan yang rapi ("cara pakai POC
+     * gimana ya kak?") jauh tertinggal untuk kalimat yang sama.
+     */
+    const berat = bersih.filter(bersingkatanBerat).length;
+    if (jumlah >= CONTOH_MINIMUM && (berat === 0 || berat === jumlah)) {
+      catatan.push({
+        berat: "saran",
+        pesan:
+          berat === 0
+            ? "Belum ada contoh dengan singkatan berat. Tambahkan satu yang " +
+              'ditulis sesingkat mungkin — mis. "poc tuh bwt ap". Pelanggan ' +
+              "yang mengetik sambil buru-buru menulis seperti itu, dan contoh " +
+              "yang semuanya lengkap tidak menjangkaunya."
+            : "Semua contoh disingkat berat. Tambahkan satu yang agak lengkap — " +
+              "pelanggan juga ada yang mengetik utuh, dan tiga contoh yang " +
+              "mirip satu sama lain hampir sama saja dengan satu contoh.",
       });
     }
   }

@@ -20,7 +20,7 @@
    di laporan audit.
    =========================================================== */
 
-const { bergayaChat, periksaContoh, periksaKumpulan, CONTOH_MINIMUM } =
+const { bergayaChat, bersingkatanBerat, periksaContoh, periksaKumpulan, CONTOH_MINIMUM } =
   await import("../lib/mutuContoh.ts");
 
 let lulus = 0;
@@ -111,6 +111,56 @@ periksa(
   "kumpulan yang semuanya rapi diperingatkan",
   !semuaRapi.adaGayaChat &&
     semuaRapi.catatan.some((c) => c.berat === "peringatan"),
+);
+
+/* ---------------------------------------------------------------
+   6. Ragam tingkat singkatan
+   ---------------------------------------------------------------
+   Voyage mencocokkan bentuk kalimat, bukan huruf. Tiga contoh yang
+   semuanya rapi menutup satu wilayah sempit; tiga yang semuanya
+   disingkat berat menutup wilayah sempit yang lain. Yang menutup luas
+   adalah tiga titik yang BERJAUHAN. --------------------------- */
+console.log("\n6. Ragam tingkat singkatan");
+
+periksa(
+  '"poc tuh bwt ap" dinilai bersingkatan berat',
+  bersingkatanBerat("poc tuh bwt ap"),
+);
+periksa(
+  '"poc itu buat apa ya kak" TIDAK bersingkatan berat',
+  !bersingkatanBerat("poc itu buat apa ya kak"),
+  "gaya chat tanpa singkatan salah dinilai",
+);
+
+const semuaLengkap = periksaKumpulan([
+  "poc itu produk apa ya",
+  "poc gunanya buat apa ya kak",
+  "poc ini fungsinya apa",
+]);
+periksa(
+  "semua lengkap -> disarankan tambah singkatan berat",
+  semuaLengkap.catatan.some((c) => /singkatan berat/.test(c.pesan)),
+);
+
+const semuaSingkat = periksaKumpulan([
+  "poc tuh bwt ap",
+  "poc gmn sih",
+  "poc bs bwt ap",
+]);
+periksa(
+  "semua disingkat -> disarankan tambah yang lengkap",
+  semuaSingkat.catatan.some((c) => /agak lengkap/.test(c.pesan)),
+);
+
+const campur = periksaKumpulan([
+  "poc itu produk apa ya",
+  "poc gunanya buat apa sih kak",
+  "poc tuh bwt ap",
+]);
+periksa(
+  "campuran tiga tingkat -> tidak disarankan apa-apa soal singkatan",
+  !campur.catatan.some((c) => /singkatan berat|agak lengkap/.test(c.pesan)),
+  JSON.stringify(campur.catatan.map((c) => c.pesan)),
 );
 
 console.log(`\n${"-".repeat(52)}`);
