@@ -44,6 +44,7 @@ pemilik proyek menjawab.
 | `node knowledge-base/periksa-katalog.mjs` | Tidak ada kode kembar, index.json sinkron, semua balasan <= 600 karakter |
 | `node knowledge-base/uji-sumber-luar.mjs` | 23 kasus lapisan sumber tabel: tabel menang atas berkas, tabel kosong kembali ke berkas, pola rusak dibuang satuan |
 | `node knowledge-base/audit-voyage.mjs` | Audit kesiapan data Gerbang 2: jumlah contoh, gaya bahasa, kode ganda, kemiripan antar-template |
+| `node knowledge-base/peraga-kemiripan.mjs` | Dari mana angka skor kemiripan datang — rumus kosinus dihitung ulang atas vektor yang sudah ada |
 | `npm run uji-mutu` | 30 kasus pemeriksa mutu contoh pertanyaan: kalimat rapi ditandai, kalimat pelanggan tidak |
 | `npm run periksa-sumber` | Apakah tabel `templates` & `pustaka_router()` siap dipakai router (membaca Supabase, tidak menulis) |
 | `npm run periksa-aturan` | Aturan pemicu di tabel masih sepadan dengan berkas .md — menangkap `also`/`unless` yang hilang |

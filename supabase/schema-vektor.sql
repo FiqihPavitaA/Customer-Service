@@ -125,8 +125,20 @@ as $fn$
     t.body,
     e.teks,
     -- <=> adalah jarak kosinus (0 = identik). Dibalik jadi kemiripan
-    -- 0..1 supaya angkanya searah dengan ambang di /api/chat: makin
-    -- besar makin yakin.
+    -- supaya angkanya searah dengan ambang di /api/chat: makin besar
+    -- makin yakin. Kalau jaraknya dipakai langsung, ambang "lebih
+    -- besar lebih baik" akan terbalik artinya.
+    --
+    -- Rentangnya -1..1, BUKAN 0..1 seperti yang tertulis di sini
+    -- sebelum 9 September 2026. Kemiripan kosinus memang bisa
+    -- negatif. Pada teks hal itu praktis tidak pernah terjadi — dua
+    -- kalimat berbahasa Indonesia hampir tak mungkin berarah
+    -- berlawanan — tetapi batas bawahnya bukan nol, dan ambang yang
+    -- disusun dengan mengira "0 = paling tidak mirip" akan salah
+    -- menilai kasus yang jarang itu.
+    --
+    -- Aritmetikanya bisa dilihat penuh, tanpa memanggil Voyage:
+    --   node knowledge-base/peraga-kemiripan.mjs
     1 - (e.embedding <=> q) as skor
   from public.template_examples e
   join public.templates t on t.id = e.template_id
