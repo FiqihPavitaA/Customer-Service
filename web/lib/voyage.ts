@@ -87,14 +87,29 @@ export class VoyageTerkunciError extends Error {
  * Ubah teks menjadi vektor.
  *
  * @param teks     daftar kalimat. Dipecah otomatis per 128.
- * @param jenis    "document" untuk contoh pertanyaan yang disimpan,
- *                 "query" untuk pesan pelanggan yang masuk.
+ * @param jenis    Pada proyek ini "query" untuk KEDUA sisi — pesan
+ *                 pelanggan maupun contoh yang disimpan.
  *
- *                 BUKAN detail sepele: Voyage memakai penanda ini
- *                 untuk menempatkan pertanyaan dan dokumen pada
- *                 ruang yang saling cocok. Memakai jenis yang sama
- *                 untuk keduanya menurunkan ketepatan tanpa satu pun
- *                 pesan galat.
+ *                 BUKAN detail sepele, tetapi bukan pula hal yang
+ *                 bisa diputuskan dari aturan umum. Catatan di sini
+ *                 sebelumnya menyatakan bahwa memakai jenis yang sama
+ *                 untuk keduanya "menurunkan ketepatan", dan itu
+ *                 terlalu percaya diri — pernyataan itu benar untuk
+ *                 pencarian ASIMETRIS (pertanyaan pendek ke paragraf
+ *                 panjang berisi jawaban), sedangkan yang disimpan di
+ *                 proyek ini adalah CONTOH PERTANYAAN. Bentuknya sama
+ *                 dengan pesan yang masuk; itu tugas simetris.
+ *
+ *                 Diukur pada 9 September 2026, bukan ditebak:
+ *                 query<->query mengungguli query<->document, 17
+ *                 berbanding 12 kalimat yang bisa dijawab tanpa satu
+ *                 pun kesalahan. Rinciannya beserta batas
+ *                 ketelitiannya di docs/hasil-uji-input-type.md.
+ *
+ *                 Yang tetap benar: kedua penanda dikalibrasi pada
+ *                 SKALA BERBEDA, jadi vektor yang dibuat dengan
+ *                 penanda berbeda tidak boleh dibandingkan. Skalanya
+ *                 dicatat di kolom `embedding_input_type`.
  * @throws VoyageTerkunciError bila saklar pengaman aktif.
  */
 /**

@@ -42,6 +42,18 @@ import { getSupabaseServer } from "@/lib/supabase/server";
  *
  * Pelajarannya: ambang HARUS diturunkan dari pengukuran yang
  * bentuknya sama persis dengan yang berjalan di produksi.
+ *
+ * ---
+ * DIPERIKSA ULANG 9 SEPTEMBER 2026, setelah contoh tersimpan pindah
+ * dari "document" ke "query". Skalanya berubah lagi:
+ *
+ *   query vs query (sekarang)       0,50 – 0,90
+ *
+ * 0,50 kebetulan tetap pas — skor juara benar terendah 0,504. Tetapi
+ * "kebetulan pas" bukan alasan yang cukup, jadi perlu dicatat: pada
+ * skala ini ambang skor hampir tidak berperan. Jawaban yang SALAH
+ * justru berskor 0,833, lebih tinggi daripada sebagian besar jawaban
+ * benar. Yang benar-benar memutuskan adalah AMBANG_MARGIN di bawah.
  */
 export const AMBANG_YAKIN = Number(process.env.AMBANG_YAKIN || 0.5);
 
@@ -74,7 +86,27 @@ export const AMBANG_YAKIN = Number(process.env.AMBANG_YAKIN || 0.5);
  * hal yang benar-benar ditanyakan — apakah template ini menonjol
  * dibanding tetangganya.
  */
-export const AMBANG_MARGIN = Number(process.env.AMBANG_MARGIN || 0.1);
+/*
+ * DITURUNKAN DARI 0,10 KE 0,06 PADA 9 SEPTEMBER 2026, mengikuti
+ * pemindahan contoh tersimpan dari input_type "document" ke "query".
+ *
+ * Angka 0,10 di atas diturunkan dari skala LAMA (query-vs-document).
+ * Pada skala baru sebarannya berbeda, dan diukur ulang dengan 19
+ * kalimat yang sama (`npm run uji-input-type`, Rp 0,13):
+ *
+ *   margin jawaban SALAH terbesar   0,051
+ *   margin jawaban BENAR median     0,318
+ *
+ * 0,06 dipilih tepat di atas 0,051 — setinggi mungkin yang masih
+ * menahan seluruh jawaban salah. Hasilnya 17 dari 19 kalimat bisa
+ * dijawab otomatis tanpa satu pun kesalahan, naik dari 12.
+ *
+ * PERHATIKAN: ambang SKOR hampir tidak berperan lagi di skala ini.
+ * Jawaban yang salah justru berskor TINGGI (0,833) — lebih tinggi
+ * daripada banyak jawaban benar. Yang menahannya semata margin.
+ * Itu memperkuat alasan margin dipakai sejak awal, bukan skor.
+ */
+export const AMBANG_MARGIN = Number(process.env.AMBANG_MARGIN || 0.06);
 
 /**
  * Di bawah ini dianggap tidak ada template yang cocok sama sekali.

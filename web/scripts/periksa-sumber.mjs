@@ -111,6 +111,61 @@ if (galatFn) {
 }
 
 /* -----------------------------------------------------------
+   1b. Kesehatan vektor Gerbang 2
+   -----------------------------------------------------------
+   Yang dijaga di sini bukan "ada vektornya atau tidak", melainkan
+   apakah semuanya masih SATU SKALA. Vektor dari model berbeda, atau
+   dari input_type berbeda, tidak bisa dibandingkan satu sama lain —
+   dan campurannya tidak pernah muncul sebagai galat, hanya sebagai
+   skor yang aneh. ----------------------------------------------- */
+const { data: vek, error: galatVek } = await sb.rpc("periksa_vektor");
+
+console.log("");
+if (galatVek) {
+  const belum = /does not exist|schema cache/i.test(galatVek.message);
+  console.log(`1b. periksa_vektor()     : ${belum ? "BELUM ADA" : "GAGAL"}`);
+  console.log(`   ${galatVek.message}`);
+  if (belum) {
+    console.log("   -> Jalankan supabase/tambah-input-type.sql di SQL Editor.");
+    console.log(
+      "      Tanpa itu, vektor yang bercampur dua skala tidak bisa\n" +
+        "      dideteksi sama sekali.",
+    );
+  }
+} else {
+  const v = (vek ?? [])[0] ?? {};
+  console.log(`1b. Kesehatan vektor     :`);
+  console.log(`   contoh total          : ${v.total ?? 0}`);
+  console.log(`   sudah bervektor       : ${v.bervektor ?? 0}`);
+  console.log(`   belum bervektor       : ${v.belum_bervektor ?? 0}`);
+  console.log(`   model dipakai         : ${v.daftar_model ?? "-"}`);
+  console.log(`   skala (input_type)    : ${v.daftar_skala ?? "-"}`);
+
+  if ((v.jumlah_model ?? 0) > 1) {
+    siap = false;
+    console.log(
+      "\n   ⛔ LEBIH DARI SATU MODEL. Vektornya tidak bisa dibandingkan.\n" +
+        "      Bangun ulang SELURUHNYA — sebagian justru itulah masalahnya.",
+    );
+  }
+  if ((v.jumlah_skala ?? 0) > 1) {
+    siap = false;
+    console.log(
+      "\n   ⛔ LEBIH DARI SATU SKALA input_type. Vektor 'document' dan\n" +
+        "      'query' dikalibrasi pada rentang yang berbeda, jadi skornya\n" +
+        "      tidak sebanding. Ini TIDAK akan muncul sebagai galat.\n" +
+        "      Kosongkan embedding lalu bangun ulang seluruhnya.",
+    );
+  }
+  if ((v.belum_bervektor ?? 0) > 0) {
+    console.log(
+      `\n   ⚠️  ${v.belum_bervektor} contoh belum punya vektor — belum berpengaruh\n` +
+        "      sama sekali. Bangun lewat tombol di halaman Kelola Template.",
+    );
+  }
+}
+
+/* -----------------------------------------------------------
    2. Tabel templates dari sisi anon — HARUS ditolak
    ----------------------------------------------------------- */
 const { data: tabel, error: galatTabel } = await sb

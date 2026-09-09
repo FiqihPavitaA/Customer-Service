@@ -66,6 +66,9 @@ export const maxDuration = 120;
  */
 const BATAS_SEKALI = 256;
 
+/** Skala penyematan contoh tersimpan. Lihat catatan panjang di bawah. */
+const JENIS_SIMPAN = "query";
+
 type BarisKosong = {
   id: string;
   teks: string;
@@ -186,14 +189,34 @@ export async function POST(req: Request) {
   /* ---------- Panggil Voyage ---------- */
   let hasil;
   try {
-    // "document", bukan "query". Yang disimpan di sini adalah bahan
-    // yang DICARI; pesan pelanggan yang MENCARI disematkan sebagai
-    // "query" di lib/pengenal.ts. Voyage mengkalibrasi kedua peran itu
-    // pada skala berbeda — menukarnya menurunkan ketepatan tanpa satu
-    // pun pesan galat.
+    /* "query" DI KEDUA SISI — diubah dari "document" pada 9 September
+       2026 setelah diukur, bukan ditebak.
+
+       Penanda document/query dirancang untuk pencarian ASIMETRIS:
+       pertanyaan pendek dicocokkan ke paragraf panjang berisi
+       jawaban. Yang kita simpan bukan paragraf jawaban melainkan
+       CONTOH PERTANYAAN — bentuknya sama dengan pesan yang masuk.
+       Itu tugas simetris, jadi kedua sisi memakai penanda yang sama.
+
+       Diukur `npm run uji-input-type`, 19 kalimat, Rp 0,13:
+
+                                    query<->dok   query<->query
+         juara benar                17/19         18/19
+         margin BENAR median        0,173         0,318
+         margin SALAH terbesar      0,061         0,051
+         dijawab tanpa satu pun salah  12         17
+
+       Yang membuktikan ini bukan sekadar pergeseran skala: margin
+       jawaban BENAR naik hampir dua kali lipat sementara margin
+       jawaban SALAH justru turun. Kalau semua angka hanya naik
+       bersama, keduanya akan bergerak searah.
+
+       Rinciannya di docs/hasil-uji-input-type.md, termasuk batas
+       ketelitiannya: 19 kalimat itu karangan, bukan chat pelanggan.
+       Wajib diukur ulang pada Tahap E. */
     hasil = await embed(
       antre.map((b) => b.teks),
-      "document",
+      JENIS_SIMPAN,
       // Tidak ada pelanggan yang menunggu di sini, jadi kena batas
       // laju cukup ditunggu — jauh lebih baik daripada memaksa Admin
       // menekan tombolnya berkali-kali dan tidak pernah tahu berapa
@@ -234,6 +257,10 @@ export async function POST(req: Request) {
         // pgvector menerima bentuk teks '[0.1,0.2,...]'.
         embedding: JSON.stringify(hasil.vektor[i]),
         embedding_model: VOYAGE_MODEL,
+        // Skala vektor ikut dicatat. Tanpa ini, vektor "document" lama
+        // dan "query" baru tidak bisa dibedakan sama sekali, dan
+        // campurannya tidak pernah muncul sebagai galat.
+        embedding_input_type: JENIS_SIMPAN,
         embedding_dibuat: waktu,
       })
       .eq("id", antre[i].id);

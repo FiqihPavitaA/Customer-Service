@@ -72,6 +72,16 @@ function contohDariUji() {
 
 const contoh = contohDariUji();
 
+/* Skala penyematan. "query" DI KEDUA SISI sejak 9 Sep 2026: yang
+   disimpan di sini contoh PERTANYAAN, bentuknya sama dengan pesan
+   pelanggan yang masuk — itu tugas simetris, bukan pencarian
+   pertanyaan-ke-paragraf. Diukur, bukan ditebak:
+   docs/hasil-uji-input-type.md
+
+   Nilainya ikut ditulis ke kolom embedding_input_type supaya vektor
+   yang bercampur dua skala bisa dideteksi. */
+const JENIS = "query";
+
 /* Satu pesan untuk dua kode berbeda akan menarik pencarian ke dua
    arah sekaligus. Lebih baik ketahuan sekarang. */
 const perTeks = new Map();
@@ -125,9 +135,7 @@ if (!voyageSiap()) {
 console.log("\nMemanggil Voyage...");
 const hasil = await embed(
   contoh.map((c) => c.teks),
-  // "document": contoh ini DISIMPAN untuk dicari nanti. Pesan
-  // pelanggan yang masuk nanti disematkan sebagai "query".
-  "document",
+  JENIS,
 );
 
 console.log("  dimensi vektor:", hasil.dimensi);
@@ -172,8 +180,8 @@ P(
   "begin;",
   "",
   "insert into public.template_examples",
-  "  (template_id, teks, sumber, embedding, embedding_model, embedding_dibuat)",
-  "select t.id, v.teks, 'bootstrap', v.embedding, v.model, now()",
+  "  (template_id, teks, sumber, embedding, embedding_model, embedding_input_type, embedding_dibuat)",
+  "select t.id, v.teks, 'bootstrap', v.embedding, v.model, '" + JENIS + "', now()",
   "from (values",
 );
 
@@ -191,6 +199,7 @@ P(
   "on conflict (template_id, teks) do update set",
   "  embedding        = excluded.embedding,",
   "  embedding_model  = excluded.embedding_model,",
+  "  embedding_input_type = excluded.embedding_input_type,",
   "  embedding_dibuat = excluded.embedding_dibuat;",
   "",
   "commit;",
