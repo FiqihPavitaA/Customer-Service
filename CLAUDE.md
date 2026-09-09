@@ -53,6 +53,7 @@ pemilik proyek menjawab.
 | `POST /api/pengenal/uji` | **BERBAYAR ~Rp 0,003** — uji Gerbang 2 tanpa memanggil Claude |
 | `npm run tes0` | Kebingungan antar-contoh dari vektor yang sudah ada |
 | `npm run tes-ambang` | **BERBAYAR ~Rp 0,04** — ukur ambang Gerbang 2 dengan 19 kalimat |
+| `npm run uji-input-type` | **BERBAYAR ~Rp 0,13** — bandingkan query<->document vs query<->query. Tanpa `--jalankan` hanya memperkirakan |
 | `GET /api/templates` | Daftar 152 template + aturan pemicunya |
 | `GET /api/health` | Konfigurasi & ukuran KB (tidak memanggil Claude) |
 | `npx tsc --noEmit` · `npx eslint .` · `npx next build` | Kode benar |

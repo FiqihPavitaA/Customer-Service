@@ -18,6 +18,7 @@
     "periksa-katalog": "node ../knowledge-base/periksa-katalog.mjs",
     "contoh": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/bangun-contoh.mjs",
     "tes0": "node --env-file-if-exists=.env.local scripts/tes0.mjs",
+    "uji-input-type": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/uji-input-type.mjs",
     "tes-ambang": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/tes-ambang.mjs"
   },
   "dependencies": {
