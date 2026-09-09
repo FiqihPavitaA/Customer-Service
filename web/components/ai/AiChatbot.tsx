@@ -527,29 +527,60 @@ export default function AiChatbot() {
               {/* --- Hasil --- */}
               {result && !error && (
                 <div className="mt-4 rounded-xl border border-line bg-green-soft p-4">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="text-[0.86rem] text-text-2">Tindakan:</span>
-                    <span
-                      className={`rounded-md px-1.5 py-0.5 text-[0.6rem] font-extrabold ${actionTagClass(
-                        result.action,
-                      )}`}
-                    >
-                      {result.action}
-                    </span>
-                    {result.source === "template" ? (
-                      <span className="rounded-md bg-green-mint px-1.5 py-0.5 text-[0.6rem] font-extrabold text-green-dark">
-                        ⚡ TEMPLATE [{result.templateCode}] · Rp 0
-                      </span>
-                    ) : result.source === "tanpa-claude" ? (
-                      <span className="rounded-md bg-[#fdf3d8] px-1.5 py-0.5 text-[0.6rem] font-extrabold text-[#8a5a00]">
-                        ⏭️ DILEMPAR KE CLAUDE · dibatalkan
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted">
-                        🤖 Claude · {result.model}
-                      </span>
-                    )}
-                  </div>
+                  {/* Gerbang 2 menemukan jawabannya, tetapi mode bayangan
+                      menahannya. Keadaan ini perlu dinamai sendiri.
+
+                      Sebelumnya layar hanya menampilkan HANDOVER_TO_CS dan
+                      "DILEMPAR KE CLAUDE · dibatalkan" — dua lencana yang
+                      keduanya benar secara teknis dan bersama-sama
+                      menyesatkan: tidak ada yang dialihkan ke CS, dan yang
+                      paling penting justru tidak disebut sama sekali, yaitu
+                      bahwa jawabannya SUDAH ketemu. Pemilik proyek membaca
+                      layar ini dua kali dan menyimpulkan Gerbang 2 gagal. */}
+                  {(() => {
+                    const ditahanBayangan =
+                      result.source === "tanpa-claude" &&
+                      result.pengenal?.jenis === "yakin" &&
+                      !result.pengenal.dipakai;
+
+                    return (
+                      <div className="mb-2 flex flex-wrap items-center gap-2">
+                        <span className="text-[0.86rem] text-text-2">Tindakan:</span>
+
+                        {/* Untuk "tanpa-claude" tidak ada tindakan yang
+                            benar-benar diputuskan — permintaannya dihentikan
+                            sebelum ada yang memutuskan apa pun. Menampilkan
+                            HANDOVER_TO_CS di situ mengarang keputusan. */}
+                        {result.source !== "tanpa-claude" && (
+                          <span
+                            className={`rounded-md px-1.5 py-0.5 text-[0.6rem] font-extrabold ${actionTagClass(
+                              result.action,
+                            )}`}
+                          >
+                            {result.action}
+                          </span>
+                        )}
+
+                        {result.source === "template" ? (
+                          <span className="rounded-md bg-green-mint px-1.5 py-0.5 text-[0.6rem] font-extrabold text-green-dark">
+                            ⚡ TEMPLATE [{result.templateCode}] · Rp 0
+                          </span>
+                        ) : ditahanBayangan ? (
+                          <span className="rounded-md bg-green-mint px-1.5 py-0.5 text-[0.6rem] font-extrabold text-green-dark">
+                            🧭 GERBANG 2 COCOK · ditahan mode bayangan
+                          </span>
+                        ) : result.source === "tanpa-claude" ? (
+                          <span className="rounded-md bg-[#fdf3d8] px-1.5 py-0.5 text-[0.6rem] font-extrabold text-[#8a5a00]">
+                            ⏭️ DILEMPAR KE CLAUDE · dibatalkan
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted">
+                            🤖 Claude · {result.model}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Tanpa cabang ini kotaknya tampil kosong dengan label
                       "Claude · null", seolah balasannya gagal. Padahal
@@ -558,13 +589,33 @@ export default function AiChatbot() {
                   {result.pengenal && <PanelPengenal p={result.pengenal} />}
 
                   {result.source === "tanpa-claude" ? (
-                    <p className="m-0 text-[0.9rem] text-text-2">
-                      Tidak ada balasan karena Claude tidak dipanggil. Pesan ini
-                      lolos dari Gerbang 0, 1, dan 2, jadi pada keadaan normal
-                      akan diteruskan ke Sonnet bersama{" "}
-                      <b>{result.berkas?.length ?? 0} berkas FAQ</b> kategori{" "}
-                      <b>{result.kategori}</b>.
-                    </p>
+                    result.pengenal?.jenis === "yakin" &&
+                    !result.pengenal.dipakai ? (
+                      /* Kalimat lama berbunyi "lolos dari Gerbang 0, 1, dan 2"
+                         apa pun keadaannya — dan itu SALAH persis pada kasus
+                         ini: Gerbang 2 tidak dilewati, ia menangkap pesannya
+                         lalu ditahan mode bayangan. Keliru menyebut gerbang
+                         mana yang bekerja membuat orang memperbaiki bagian
+                         yang tidak rusak. */
+                      <p className="m-0 text-[0.9rem] text-text-2">
+                        <b>Gerbang 2 sudah menemukan jawabannya</b> —{" "}
+                        <b>[{result.pengenal.kandidat?.[0]?.code}]</b>. Yang
+                        menahannya bukan skor, melainkan{" "}
+                        <b>mode bayangan</b>: gerbang ini sengaja menghitung
+                        tanpa pernah membalas, sampai ada yang mempercayainya.
+                        Isi <code>PENGENAL_MODE=aktif</code> di{" "}
+                        <code>web/.env.local</code> lalu jalankan ulang server
+                        untuk melihatnya benar-benar menjawab.
+                      </p>
+                    ) : (
+                      <p className="m-0 text-[0.9rem] text-text-2">
+                        Tidak ada balasan karena Claude tidak dipanggil. Pesan
+                        ini tidak tertangkap Gerbang 0, 1, maupun 2, jadi pada
+                        keadaan normal akan diteruskan ke Sonnet bersama{" "}
+                        <b>{result.berkas?.length ?? 0} berkas FAQ</b> kategori{" "}
+                        <b>{result.kategori}</b>.
+                      </p>
+                    )
                   ) : (
                     <div className="whitespace-pre-wrap">{result.reply}</div>
                   )}
