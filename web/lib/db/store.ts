@@ -289,10 +289,19 @@ export function markRead(id: string) {
     .then(({ error, data }) => periksaTulis("status dibaca", error, data));
 }
 
-/** Tambah balasan CS ke sebuah percakapan. */
+/**
+ * Tambah balasan CS ke sebuah percakapan.
+ *
+ * role 'cs', BUKAN 'assistant'. Yang mengetik di sini selalu manusia
+ * — tombol ✨ hanya mengisi kotak draf, dan CS masih harus menekan
+ * kirim. Selama keduanya ditulis 'assistant', tidak ada cara
+ * membedakan percakapan yang sudah disentuh orang dari yang belum,
+ * dan itulah satu-satunya penanda yang dipakai untuk menutup
+ * eskalasi. Lihat ChatMessage di lib/db/types.ts.
+ */
 export function appendMessage(id: string, content: string) {
   const now = new Date().toISOString();
-  const msg: ChatMessage = { role: "assistant", content, timestamp: now };
+  const msg: ChatMessage = { role: "cs", content, timestamp: now };
 
   const target = state.conversations.find((c) => c.id === id);
   if (!target) return;

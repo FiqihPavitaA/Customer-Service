@@ -36,7 +36,7 @@
    =========================================================== */
 
 import { useCallback, useSyncExternalStore } from "react";
-import { getSupabase } from "@/lib/supabase/client";
+import { headerBerSesi } from "@/lib/supabase/header";
 import type {
   RingkasanTemplate,
   TemplateItem,
@@ -97,27 +97,8 @@ export function useTemplates() {
    Header
    =========================================================== */
 
-/**
- * Header permintaan, lengkap dengan token bila ada sesi.
- *
- * Sengaja TIDAK melempar saat sesi tidak ada: membaca daftar
- * template harus tetap bisa dilakukan (jatuh ke berkas .md), dan
- * yang menolak penulisan sebaiknya database dengan pesannya sendiri
- * — bukan tebakan di sisi peramban tentang siapa yang berhak.
- */
-async function header(): Promise<HeadersInit> {
-  const dasar: Record<string, string> = { "Content-Type": "application/json" };
-  const sb = getSupabase();
-  if (!sb) return dasar;
-  try {
-    const { data } = await sb.auth.getSession();
-    const token = data.session?.access_token;
-    if (token) dasar.Authorization = `Bearer ${token}`;
-  } catch {
-    // Sesi tidak terbaca — biarkan tanpa token; server akan menjawab 401.
-  }
-  return dasar;
-}
+/** Header permintaan, lengkap dengan token bila ada sesi. */
+const header = headerBerSesi;
 
 /** Ambil pesan galat dari jawaban server, apa pun bentuknya. */
 async function pesanGalat(r: Response): Promise<string> {

@@ -24,8 +24,25 @@ export type Platform = "shopee" | "tiktok" | "lazada";
 
 /** Satu pesan di dalam kolom `conversations.messages` (jsonb). */
 export type ChatMessage = {
-  /** 'user' = pelanggan, 'assistant' = balasan toko/AI. */
-  role: "user" | "assistant";
+  /**
+   * 'user' = pelanggan, 'assistant' = balasan AI, 'cs' = balasan
+   * manusia.
+   *
+   * KENAPA 'cs' PERLU DIPISAH DARI 'assistant'
+   *
+   * Sampai 9 Sep 2026 balasan CS ditulis sebagai 'assistant', persis
+   * sama dengan balasan AI. Akibatnya tidak ada satu pun cara
+   * mengetahui apakah sebuah percakapan sudah disentuh manusia —
+   * dan aturan "eskalasi ditutup saat CS membalas" mustahil
+   * dijalankan, karena tidak ada yang tahu siapa yang barusan
+   * membalas.
+   *
+   * Kolomnya jsonb tanpa CHECK, jadi nilai ketiga ini tidak butuh
+   * migrasi. Baris lama tetap terbaca: balasan CS sebelum tanggal
+   * itu akan selamanya tercatat sebagai 'assistant', dan memang
+   * tidak ada cara memperbaikinya surut.
+   */
+  role: "user" | "assistant" | "cs";
   content: string;
   timestamp: string;
 };
@@ -56,6 +73,17 @@ export type ConversationRow = {
   ai_suggestion: string | null;
   handover_detail: Record<string, string> | null;
   last_message_at: string;
+  /**
+   * Selama > now(), AI tidak boleh menjawab percakapan ini karena
+   * sedang ditangani CS manusia. Diisi saat handover (+24 jam),
+   * dimajukan setiap balasan CS. Null = tidak pernah dialihkan.
+   *
+   * Sengaja stempel waktu, bukan boolean: jeda berakhir sendiri
+   * karena waktu berjalan, jadi tidak perlu penjadwal yang
+   * mematikannya dan tidak ada keadaan yang bisa tersangkut menyala.
+   * Lihat supabase/handover-jeda-ai.sql.
+   */
+  ai_paused_until: string | null;
 };
 
 /**

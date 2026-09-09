@@ -43,6 +43,7 @@ import type { ActionCode, Conversation } from "@/lib/db/types";
 import { catalogStatusText, searchProducts, useCatalog } from "@/lib/catalog";
 import { inisial, jam, stempel, tanggalPanjang } from "@/lib/format";
 import { useSearch, type SearchScope } from "@/lib/search";
+import { headerBerSesi } from "@/lib/supabase/header";
 
 /* ---------------- Peta klasifikasi (ACTIONS di dashboard.js) --------------- */
 
@@ -593,21 +594,42 @@ export default function Chat() {
     try {
       const resp = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history: [] }),
+        // Token sesi wajib ikut: percakapan ini sungguhan, dan
+        // /api/chat perlu bisa menandainya bila jawabannya ternyata
+        // harus dialihkan ke manusia. Tanpa token, penulisannya
+        // berjalan sebagai anon dan ditolak RLS diam-diam.
+        headers: await headerBerSesi(),
+        // Inilah yang membedakan panggilan ini dari halaman AI
+        // Chatbot: ada percakapan nyata di baliknya, jadi handover
+        // yang diputuskan boleh dicatat ke antrean CS.
+        body: JSON.stringify({ message, history: [], conversationId: active.id }),
       });
       if (!resp.ok) throw new Error(String(resp.status));
       const data = (await resp.json()) as {
         action: ActionCode;
         reply: string;
         source?: string;
+        sisaJeda?: string;
+        handover?: { eskalasiBaru: boolean } | null;
       };
+
+      // Percakapan sedang dijeda: balasannya sengaja kosong. Menimpa
+      // draf dengan string kosong di sini berarti kalimat yang
+      // sedang diketik CS hilang begitu saja — hukuman yang aneh
+      // untuk menekan tombol saran.
+      if (data.source === "dijeda") {
+        toast(`Sedang ditangani CS — AI berhenti, aktif lagi ${data.sisaJeda}`);
+        return;
+      }
+
       setAiSuggestion(active.id, data.reply, data.action);
       setDraft(data.reply);
       toast(
-        data.source === "template"
-          ? "Balasan dari template (tanpa biaya AI) ✨"
-          : "Saran dari Claude siap ✨",
+        data.handover?.eskalasiBaru
+          ? "Masuk antrean Perlu CS — AI dijeda 24 jam 🔔"
+          : data.source === "template"
+            ? "Balasan dari template (tanpa biaya AI) ✨"
+            : "Saran dari Claude siap ✨",
       );
     } catch {
       // Sama seperti versi lama: tanpa API key, pakai saran contoh.
@@ -704,23 +726,37 @@ export default function Chat() {
             </span>
           </div>
 
-          {active.messages.map((m, i) => (
-            <div
-              key={i}
-              className={`mb-3 flex flex-col ${m.role === "assistant" ? "items-end" : "items-start"}`}
-            >
+          {active.messages.map((m, i) => {
+            // 'cs' dan 'assistant' sama-sama keluar dari sisi toko,
+            // jadi sama-sama di kanan. Yang membedakan bukan posisi,
+            // melainkan siapa yang mengetiknya — dan itu ditandai di
+            // bawah gelembung, bukan lewat warna, supaya percakapan
+            // tidak berubah jadi lampu lalu lintas.
+            const dariToko = m.role !== "user";
+            return (
               <div
-                className={`max-w-[min(560px,78%)] rounded-2xl px-3.5 py-2.5 text-[0.88rem] leading-relaxed whitespace-pre-line ${
-                  m.role === "assistant"
-                    ? "bg-green text-white"
-                    : "border border-line bg-white text-text"
-                }`}
+                key={i}
+                className={`mb-3 flex flex-col ${dariToko ? "items-end" : "items-start"}`}
               >
-                {m.content}
+                <div
+                  className={`max-w-[min(560px,78%)] rounded-2xl px-3.5 py-2.5 text-[0.88rem] leading-relaxed whitespace-pre-line ${
+                    dariToko
+                      ? "bg-green text-white"
+                      : "border border-line bg-white text-text"
+                  }`}
+                >
+                  {m.content}
+                </div>
+                <span className="mt-1 text-[0.7rem] text-muted">
+                  {/* Hanya balasan mesin yang diberi tanda. Balasan
+                      manusia adalah keadaan normal; menandai keduanya
+                      membuat tandanya berhenti berarti. */}
+                  {m.role === "assistant" && <b>🤖 AI · </b>}
+                  {stempel(m.timestamp)}
+                </span>
               </div>
-              <span className="mt-1 text-[0.7rem] text-muted">{stempel(m.timestamp)}</span>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* AI Assist */}

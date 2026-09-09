@@ -10,6 +10,7 @@
     "sync-kb": "node scripts/sync-kb.mjs",
     "uji-sumber": "node ../knowledge-base/uji-sumber-luar.mjs",
     "uji-mutu": "node --experimental-strip-types scripts/uji-mutu-contoh.mjs",
+    "uji-handover": "node --experimental-strip-types scripts/uji-handover.mjs",
     "periksa-sumber": "node --env-file-if-exists=.env.local scripts/periksa-sumber.mjs",
     "periksa-aturan": "node --env-file-if-exists=.env.local scripts/periksa-aturan.mjs",
     "seed-sql": "node --experimental-strip-types scripts/buat-seed-sql.mjs",

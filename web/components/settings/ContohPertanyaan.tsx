@@ -36,7 +36,7 @@ import {
   periksaKumpulan,
   type CatatanMutu,
 } from "@/lib/mutuContoh";
-import { getSupabase } from "@/lib/supabase/client";
+import { headerBerSesi } from "@/lib/supabase/header";
 
 export type ContohItem = {
   id: string;
@@ -46,19 +46,7 @@ export type ContohItem = {
   model: string | null;
 };
 
-async function header(): Promise<HeadersInit> {
-  const dasar: Record<string, string> = { "Content-Type": "application/json" };
-  const sb = getSupabase();
-  if (!sb) return dasar;
-  try {
-    const { data } = await sb.auth.getSession();
-    const token = data.session?.access_token;
-    if (token) dasar.Authorization = `Bearer ${token}`;
-  } catch {
-    // Tanpa token, server menjawab 401 dengan pesannya sendiri.
-  }
-  return dasar;
-}
+const header = headerBerSesi;
 
 async function pesanGalat(r: Response): Promise<string> {
   try {

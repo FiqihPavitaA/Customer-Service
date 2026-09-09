@@ -19,6 +19,14 @@ import {
   statusSumberTemplate,
 } from "@/lib/db/templatesServer";
 import {
+  bacaJeda,
+  catatHandover,
+  type BahanHandover,
+  type HasilHandover,
+} from "@/lib/db/handoverServer";
+import { sedangDijeda, teksSisaJeda } from "@/lib/handover";
+import { getSupabaseSebagai, tokenDariHeader } from "@/lib/supabase/server";
+import {
   bacaBerkasFaq,
   logRouting,
   routeToCategory,
@@ -50,6 +58,7 @@ export async function POST(req: Request) {
     history?: unknown;
     useTemplates?: unknown;
     useClaude?: unknown;
+    conversationId?: unknown;
   };
   try {
     body = await req.json();
@@ -57,9 +66,63 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Body harus JSON yang valid." }, { status: 400 });
   }
 
-  const { message, history, useTemplates, useClaude } = body ?? {};
+  const { message, history, useTemplates, useClaude, conversationId } = body ?? {};
   if (!message || typeof message !== "string") {
     return NextResponse.json({ error: 'Field "message" wajib diisi.' }, { status: 400 });
+  }
+
+  // ---------- Sambungan ke percakapan sungguhan ----------
+  // conversationId bersifat OPSIONAL, dan itu yang memisahkan meja
+  // uji dari kenyataan. Halaman AI Chatbot mengirim kalimat karangan
+  // untuk mengukur biaya dan ambang; kalau ia ikut membuat eskalasi,
+  // antrean CS akan penuh oleh pelanggan yang tidak pernah ada.
+  // Tanpa id, route ini berperilaku persis seperti sebelumnya:
+  // memutuskan, menjawab, tidak menulis apa pun.
+  const convId = typeof conversationId === "string" && conversationId ? conversationId : null;
+  const sb = convId ? getSupabaseSebagai(tokenDariHeader(req)) : null;
+
+  /**
+   * Catat handover bila permintaan ini memang menempel pada
+   * percakapan sungguhan. Mengembalikan null pada semua keadaan
+   * lain — tanpa id, tanpa sesi, atau gagal menulis — dan itu tidak
+   * pernah menghentikan balasan ke pelanggan.
+   */
+  const catat = async (
+    bahan: Omit<BahanHandover, "conversationId">,
+  ): Promise<HasilHandover | null> => {
+    if (!sb || !convId) return null;
+    return catatHandover(sb, { ...bahan, conversationId: convId });
+  };
+
+  // ---------- Gerbang -1: percakapan sedang ditangani manusia ----------
+  // Sengaja diperiksa PALING AWAL, sebelum Gerbang 0 dan sebelum
+  // pustaka template dibaca. Dua alasan:
+  //
+  //   Biaya    pemeriksaannya satu SELECT ke satu baris. Menaruhnya
+  //            setelah Gerbang 2 berarti sebagian permintaan yang
+  //            seharusnya diam tetap membayar Voyage.
+  //
+  //   Cakupan  Gerbang 0 hanya menangkap kalimat yang mengandung
+  //            kata pemicu. Pesan lanjutan di tengah kasus refund —
+  //            "12345", "oke kak makasih" — tidak mengandung satu
+  //            pun, jadi Gerbang 0 akan meloloskannya ke Claude
+  //            tepat di saat CS sedang menangani orangnya. Jeda
+  //            inilah yang menutup celah itu, bukan Gerbang 0.
+  if (sb && convId) {
+    const jedaSampai = await bacaJeda(sb, convId);
+    if (sedangDijeda(jedaSampai)) {
+      return NextResponse.json({
+        // Bukan AUTO_REPLY: tidak ada balasan untuk pelanggan di
+        // sini, dan itu memang tujuannya.
+        action: "HANDOVER_TO_CS",
+        reply: "",
+        model: null,
+        usage: null,
+        source: "dijeda",
+        jedaSampai,
+        sisaJeda: teksSisaJeda(jedaSampai),
+      });
+    }
   }
 
   // ---------- Sumber template ----------
@@ -86,6 +149,13 @@ export async function POST(req: Request) {
   // bidang di permintaan.
   if (keputusan.jenis === "handover") {
     logRouting(keputusan);
+    const handover = await catat({
+      sumber: "satpam",
+      kode: keputusan.kode,
+      kategori: keputusan.kategori,
+      pesan: message,
+      balasan: keputusan.teks,
+    });
     return NextResponse.json({
       action: keputusan.action, // HANDOVER_TO_CS
       reply: keputusan.teks,
@@ -98,17 +168,36 @@ export async function POST(req: Request) {
       satpam: keputusan.satpam,
       sumberTemplate,
       panjang: ukurBalasan(keputusan.teks),
+      // null bila permintaan ini tidak menempel pada percakapan
+      // sungguhan — bukan tanda kegagalan.
+      handover,
     });
   }
 
   if (useTemplates !== false && keputusan.jenis === "template") {
     logRouting(keputusan);
+    // Sebagian besar template menjawab sendiri dan selesai. Yang
+    // ber-action HANDOVER_TO_CS — [DITERUSKAN CS], [REKENING],
+    // [CS KOMPLAIN] — hanya menenangkan pelanggan sambil menunggu
+    // orang; tanpa baris antrean, "mohon ditunggu sebentar" itu
+    // janji yang tidak pernah sampai ke siapa pun.
+    const handover =
+      keputusan.action === "HANDOVER_TO_CS"
+        ? await catat({
+            sumber: "template",
+            kode: keputusan.kode,
+            kategori: keputusan.kategori,
+            pesan: message,
+            balasan: keputusan.teks,
+          })
+        : null;
     return NextResponse.json({
       action: keputusan.action,
       reply: keputusan.teks,
       model: null,
       usage: null,
       source: "template",
+      handover,
       templateCode: keputusan.kode,
       templateWhy: keputusan.alasan,
       kategori: keputusan.kategori,
@@ -237,6 +326,11 @@ export async function POST(req: Request) {
   // berlaku untuk semua pemanggil. Keduanya sengaja tidak digabung.
   if (useClaude === false) {
     const jejakTanpaClaude = logRouting(keputusan);
+    // SENGAJA tidak memanggil catat(). Nilai HANDOVER_TO_CS di
+    // bawah bukan keputusan tentang pelanggan — tidak ada yang
+    // pernah menilai pesannya; permintaannya cuma dihentikan karena
+    // saklar demo dimatikan. Mencatatnya berarti setiap percobaan
+    // di panel biaya menaruh satu eskalasi palsu di antrean CS.
     return NextResponse.json({
       // Bukan AUTO_REPLY: tidak ada balasan untuk pelanggan di sini.
       action: "HANDOVER_TO_CS",
@@ -332,9 +426,25 @@ export async function POST(req: Request) {
 
     const { action, reply } = parseAction(raw);
 
+    // Claude memutuskan handover untuk hal yang tidak tertangkap
+    // kata kunci mana pun — pelanggan yang marah, informasi yang
+    // saling bertentangan, permintaan bicara dengan manusia. Justru
+    // kasus-kasus inilah yang paling perlu masuk antrean, karena
+    // tidak ada aturan tertulis yang akan menangkapnya lain kali.
+    const handover =
+      action === "HANDOVER_TO_CS"
+        ? await catat({
+            sumber: "ai",
+            kategori: keputusan.kategori,
+            pesan: message,
+            balasan: reply,
+          })
+        : null;
+
     return NextResponse.json({
       action, // AUTO_REPLY | ASK_INFORMATION | HANDOVER_TO_CS | CHECK_ORDER_SYSTEM
       reply, // teks balasan untuk pelanggan
+      handover,
       model: MODEL,
       usage: response.usage, // jumlah token (untuk estimasi biaya)
       // Voyage tetap ditagih walau permintaannya berakhir di Sonnet.
