@@ -17,3 +17,6 @@ web/node_modules/
 Thumbs.db
 *.log
 npm-debug.log*
+
+# Preferensi editor pribadi (tema, warna jendela) — tiap orang beda
+.vscode/
