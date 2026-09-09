@@ -80,7 +80,8 @@ type ChatResponse = {
     kandidat?: { code: string; contoh: string; skor: number }[];
     alasan?: string;
     ambang: { yakin: number; ragu: number; margin: number };
-    margin?: number;
+    margin?: number | null;
+    pesaing?: string | null;
     mode: string;
     dipakai: boolean;
   } | null;
@@ -147,7 +148,17 @@ function PanelPengenal({ p }: { p: NonNullable<ChatResponse["pengenal"]> }) {
           <p className="mt-2 mb-0 text-[0.78rem] text-muted">
             Syarat: skor ≥ {p.ambang.yakin} DAN margin ≥ {p.ambang.margin}
             {typeof p.margin === "number" && (
-              <> — margin sekarang {p.margin.toFixed(3)}</>
+              <>
+                {" "}— margin sekarang {p.margin.toFixed(3)}
+                {p.pesaing && <> terhadap [{p.pesaing}]</>}
+              </>
+            )}
+            {/* margin null = tidak ada template LAIN di sepuluh tetangga
+                terdekat. Ditulis apa adanya, bukan sebagai angka besar:
+                sebelum 9 Sep 2026 keadaan ini ditampilkan sebagai
+                "margin 0.811" — meyakinkan, dan tidak berarti apa-apa. */}
+            {p.margin === null && (
+              <> — tidak ada template lain di 10 tetangga terdekat</>
             )}{" "}
             · mode {p.mode}
             {!p.dipakai && p.jenis === "yakin" && (

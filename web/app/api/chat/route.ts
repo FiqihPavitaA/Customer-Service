@@ -150,7 +150,10 @@ export async function POST(req: Request) {
     kandidat?: { code: string; contoh: string; skor: number }[];
     alasan?: string;
     ambang: { yakin: number; ragu: number; margin: number };
-    margin?: number;
+    /** null = tidak ada template lain di sepuluh tetangga terdekat. */
+    margin?: number | null;
+    /** Kode template pembanding, atau null bila tidak ada. */
+    pesaing?: string | null;
     mode: string;
     dipakai: boolean;
   } | null = null;
@@ -171,6 +174,7 @@ export async function POST(req: Request) {
       alasan: kenal.jenis === "lewat" ? kenal.alasan : undefined,
       ambang: { yakin: AMBANG_YAKIN, ragu: AMBANG_RAGU, margin: AMBANG_MARGIN },
       margin: kenal.jenis === "lewat" ? undefined : kenal.margin,
+      pesaing: kenal.jenis === "lewat" ? undefined : kenal.pesaing,
       mode: MODE_PENGENAL,
       // Diisi ulang di bawah bila jawabannya benar-benar dikirim.
       dipakai: false,

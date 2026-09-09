@@ -85,8 +85,8 @@ export const AMBANG_YAKIN = Number(process.env.AMBANG_YAKIN || 0.5);
  * ikut naik-turun mengikuti bentuk kalimat, sedangkan margin mengukur
  * hal yang benar-benar ditanyakan — apakah template ini menonjol
  * dibanding tetangganya.
- */
-/*
+ *
+ * ---
  * DITURUNKAN DARI 0,10 KE 0,06 PADA 9 SEPTEMBER 2026, mengikuti
  * pemindahan contoh tersimpan dari input_type "document" ke "query".
  *
@@ -149,6 +149,31 @@ export const MODE_PENGENAL = (process.env.PENGENAL_MODE || "bayangan").toLowerCa
 /** Berapa kandidat teratas yang diambil untuk Gerbang 3. */
 const JUMLAH_KANDIDAT = 3;
 
+/**
+ * Berapa tetangga terdekat yang diambil untuk MENGHITUNG MARGIN.
+ *
+ * Sengaja lebih besar daripada JUMLAH_KANDIDAT, dan itu memperbaiki
+ * cacat yang baru terlihat pada 9 September 2026 dari pemakaian
+ * sungguhan.
+ *
+ * Pesan "pke poc biar ap?" mengembalikan tiga kandidat yang KETIGANYA
+ * [PRODUK POC]. Karena tidak ada template lain di dalam jendela,
+ * `penantang` bernilai undefined dan marginnya dihitung sebagai
+ * `skor - 0` = 0,811 — angka yang terlihat meyakinkan padahal
+ * sebenarnya berarti "tidak ada pembanding".
+ *
+ * Itu berbahaya justru karena arahnya optimistis: bisa saja peringkat
+ * keempat adalah template lain dengan skor 0,809, dan margin yang
+ * sebenarnya cuma 0,002. Syarat margin lalu lolos tepat pada kasus
+ * yang paling tidak layak diloloskan.
+ *
+ * Sepuluh dipilih karena satu template yang punya tiga contoh tidak
+ * mungkin mengisi sepuluh tempat teratas. Barisnya tetap murah:
+ * pembandingannya sudah menyapu seluruh tabel, yang bertambah hanya
+ * jumlah baris yang dikirim balik.
+ */
+const JUMLAH_PEMBANDING = 10;
+
 export type Kandidat = {
   code: string;
   body: string;
@@ -158,8 +183,8 @@ export type Kandidat = {
 };
 
 export type HasilPengenal =
-  | { jenis: "yakin"; kandidat: Kandidat[]; margin: number; token: number }
-  | { jenis: "ragu"; kandidat: Kandidat[]; margin: number; token: number }
+  | { jenis: "yakin"; kandidat: Kandidat[]; margin: number | null; pesaing: string | null; token: number }
+  | { jenis: "ragu"; kandidat: Kandidat[]; margin: number | null; pesaing: string | null; token: number }
   | { jenis: "lewat"; alasan: string; token: number };
 
 /**
@@ -197,7 +222,7 @@ export async function kenaliMaksud(pesan: string): Promise<HasilPengenal> {
 
     const { data, error } = await sb.rpc("cari_template", {
       q: JSON.stringify(hasil.vektor[0]),
-      batas: JUMLAH_KANDIDAT,
+      batas: JUMLAH_PEMBANDING,
     });
 
     if (error) return lewat(`cari_template gagal: ${error.message}`, token);
@@ -216,16 +241,36 @@ export async function kenaliMaksud(pesan: string): Promise<HasilPengenal> {
        palsu-besar dan syarat margin justru paling longgar tepat saat
        skornya paling lemah — kebalikan dari yang dimaksud. */
     const penantang = semua.find((k) => k.code !== semua[0].code);
-    const margin = semua[0].skor - (penantang?.skor ?? 0);
 
-    const kandidat = semua.filter((k) => k.skor >= AMBANG_RAGU);
+    /* Tidak ada template lain di sepuluh teratas.
+     *
+     * Marginnya TIDAK BISA dihitung — bukan "sangat besar". Bedanya
+     * penting: `skor - 0` menghasilkan angka besar yang terbaca
+     * seperti bukti kuat, padahal artinya cuma "tidak ada pembanding
+     * di dalam jendela".
+     *
+     * Diperlakukan sebagai lolos, karena satu template yang menguasai
+     * sepuluh tetangga terdekat memang bukti yang kuat — tetapi
+     * dilaporkan apa adanya lewat `pesaing: null` supaya panel tidak
+     * memamerkan angka yang tidak berarti.
+     */
+    const margin = penantang ? semua[0].skor - penantang.skor : null;
 
-    const yakin = kandidat[0].skor >= AMBANG_YAKIN && margin >= AMBANG_MARGIN;
+    const kandidat = semua
+      .filter((k) => k.skor >= AMBANG_RAGU)
+      .slice(0, JUMLAH_KANDIDAT);
+
+    const yakin =
+      kandidat[0].skor >= AMBANG_YAKIN &&
+      (margin === null || margin >= AMBANG_MARGIN);
 
     return {
       jenis: yakin ? "yakin" : "ragu",
       kandidat,
       margin,
+      // Kode template pembanding, atau null bila tidak ada template
+      // lain di sepuluh tetangga terdekat.
+      pesaing: penantang?.code ?? null,
       token,
     };
   } catch (err) {
