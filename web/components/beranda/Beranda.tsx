@@ -26,7 +26,8 @@ import {
   HOME_SUMMARY,
   HOME_TREND,
 } from "@/lib/db/analytics";
-import { selectEscalations, useConversations, useDb } from "@/lib/db";
+import { DB_MODE, selectEscalations, useConversations, useDb } from "@/lib/db";
+import { hitungAntrean, MENIT_GENTING, teksMenunggu } from "@/lib/handover";
 import { angka } from "@/lib/format";
 
 const PERIODS = [
@@ -137,24 +138,43 @@ function Akun() {
 function RealTime() {
   const conversations = useConversations();
   const escalations = useDb(selectEscalations);
+  const nyata = DB_MODE !== "memory";
 
-  const unread = conversations.filter((c) => c.unread).length;
-  const open = escalations.filter((e) => e.status === "open").length;
+  const antrean = hitungAntrean(conversations, escalations);
 
+  /* JANGAN PERNAH MENJUMLAHKAN DEMO DENGAN NYATA.
+     Sampai 9 Sep 2026 baris ini berbunyi
+     `HOME_REALTIME.perluHandover + open` — tetapan 7 ditambah
+     hitungan sungguhan. Dengan 2 eskalasi terbuka layarnya menulis
+     9: bukan angka demo, bukan angka nyata, dan cukup masuk akal
+     untuk dipercaya. Sekarang salah satu, tidak pernah keduanya. */
   const items = [
     {
       label: "Membutuhkan balasan",
-      value: angka(HOME_REALTIME.perluBalasan + unread),
+      value: angka(nyata ? antrean.belumDibaca : HOME_REALTIME.perluBalasan),
       tone: "text-[#dc2626]",
       live: true,
     },
+    // Menunggu Diproses butuh data pesanan marketplace, yang belum
+    // ada. Tetap contoh, dan tidak ditandai `live`.
     { label: "Menunggu Diproses", value: angka(HOME_REALTIME.menungguProses), tone: "" },
     {
       label: "Perlu Handover ke CS",
-      value: angka(HOME_REALTIME.perluHandover + open),
+      value: angka(nyata ? antrean.terbuka : HOME_REALTIME.perluHandover),
       tone: "text-[#d97706]",
       live: true,
+      // Angka saja tidak memberi tahu apakah keadaannya genting.
+      // Dua eskalasi yang baru masuk semenit lalu sama sekali
+      // berbeda dari dua yang sudah menunggu empat puluh menit.
+      catatan:
+        nyata && antrean.terbuka > 0
+          ? `tertua menunggu ${teksMenunggu(antrean.tertuaMenit)}`
+          : undefined,
+      genting: nyata && antrean.tertuaMenit >= MENIT_GENTING,
+      tautan: nyata && antrean.terbuka > 0 ? "/chat" : undefined,
     },
+    // Waktu respons perlu selisih antar pesan per percakapan —
+    // bisa dihitung, tetapi belum, jadi jangan diakui nyata.
     { label: "Waktu respons rata-rata", value: HOME_REALTIME.responRata, tone: "", small: true },
   ];
 
@@ -170,20 +190,44 @@ function RealTime() {
           <div key={it.label} className="border-l-[3px] border-green-mint pl-2">
             <div className="mb-2 text-[0.84rem] text-text-2">
               {it.label} <span className="text-muted">ⓘ</span>
-              {it.live && (
+              {/* Lencana "live" hanya untuk angka yang benar-benar
+                  dihitung dari tabel. Di mode demo tidak ada satu
+                  pun yang layak menyandangnya — memasangnya di sana
+                  persis kebalikan dari gunanya. */}
+              {it.live && nyata && (
                 <span
                   className="ml-1 text-[0.66rem] font-bold text-green-dark"
-                  title="Sebagian angka ini sudah dihitung dari data store, bukan angka tetap"
+                  title="Dihitung langsung dari tabel Supabase, bukan angka tetap"
                 >
                   live
                 </span>
               )}
             </div>
-            <div
-              className={`font-extrabold ${it.small ? "text-[1.25rem]" : "text-[1.9rem]"} ${it.tone}`}
-            >
-              {it.value}
-            </div>
+            {(() => {
+              const nilai = (
+                <div
+                  className={`font-extrabold ${it.small ? "text-[1.25rem]" : "text-[1.9rem]"} ${it.tone}`}
+                >
+                  {it.value}
+                </div>
+              );
+              return it.tautan ? (
+                <Link href={it.tautan} className="no-underline">
+                  {nilai}
+                </Link>
+              ) : (
+                nilai
+              );
+            })()}
+            {it.catatan && (
+              <div
+                className={`mt-0.5 text-[0.72rem] font-semibold ${
+                  it.genting ? "text-[#b91c1c]" : "text-muted"
+                }`}
+              >
+                {it.catatan}
+              </div>
+            )}
           </div>
         ))}
       </div>

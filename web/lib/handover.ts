@@ -154,6 +154,59 @@ export const MENIT_GENTING = 10;
  * tidak memberi tahu apa pun kepada orang yang sedang memilih mana
  * yang harus dikerjakan lebih dulu.
  */
+/* -----------------------------------------------------------
+   Ringkasan antrean untuk Beranda
+
+   Ditaruh di sini, bukan di modul dasbor tersendiri, karena satu
+   syarat: berkas ini dijalankan langsung oleh Node lewat
+   `npm run uji-handover`, dan Node tidak membaca alias "@/" di
+   tsconfig maupun impor tanpa ekstensi berkas. Yang selamat hanya
+   `import type`, yang memang dihapus penuh oleh penanggal tipe.
+
+   Jadi fungsi ini tinggal bersama menitMenunggu() yang dipakainya,
+   dan tetap bisa diuji Rp 0.
+   ----------------------------------------------------------- */
+
+import type { EscalationRow } from "./db/types";
+
+export type RingkasanAntrean = {
+  /** Eskalasi berstatus 'open'. */
+  terbuka: number;
+  /**
+   * Lama menunggu eskalasi TERTUA, dalam menit.
+   *
+   * Sengaja yang tertua, bukan rata-rata. Rata-rata dari 5 menit
+   * dan 42 menit adalah 23 — angka yang menenangkan, padahal ada
+   * kasus yang sudah melanggar batas 15 menit hampir tiga kali
+   * lipat dan tidak terlihat sama sekali.
+   */
+  tertuaMenit: number;
+  /** Percakapan yang belum dibaca siapa pun. */
+  belumDibaca: number;
+};
+
+export function hitungAntrean(
+  conversations: readonly { unread: boolean }[],
+  escalations: readonly EscalationRow[],
+  sekarang: Date = new Date(),
+): RingkasanAntrean {
+  let terbuka = 0;
+  let tertuaMenit = 0;
+
+  for (const e of escalations) {
+    if (e.status !== "open") continue;
+    terbuka++;
+    const menit = menitMenunggu(e.created_at, sekarang);
+    if (menit > tertuaMenit) tertuaMenit = menit;
+  }
+
+  return {
+    terbuka,
+    tertuaMenit,
+    belumDibaca: conversations.filter((c) => c.unread).length,
+  };
+}
+
 export function teksMenunggu(menit: number): string {
   if (menit < 1) return "baru saja";
   if (menit < 60) return `${menit} menit`;

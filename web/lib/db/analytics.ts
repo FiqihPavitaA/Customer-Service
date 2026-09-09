@@ -201,3 +201,98 @@ export const HOME_TREND = [
   { d: "06-23", a: 635, b: 481, p: 75 },
   { d: "06-24", a: 470, b: 360, p: 76 },
 ];
+
+/* ===========================================================
+   Hitungan NYATA dari tabel conversations
+   ===========================================================
+   Semua di atas garis ini adalah angka contoh. Semua di bawahnya
+   menghitung dari data sungguhan.
+
+   ATURAN YANG TIDAK BOLEH DILANGGAR: JANGAN PERNAH DIJUMLAHKAN.
+
+   Sampai 9 Sep 2026 Beranda menampilkan
+   `HOME_REALTIME.perluHandover + open` — tetapan 7 ditambah
+   hitungan sungguhan. Dengan 2 eskalasi terbuka layarnya menulis
+   9: bukan angka contoh, bukan angka nyata, dan cukup masuk akal
+   untuk dipercaya. Tidak ada galat dan tidak ada tanda. Pakai
+   salah satu sesuai DB_MODE, tidak pernah keduanya.
+
+   Fungsi di bawah murni — menerima array, mengembalikan angka.
+   Diuji `npm run uji-ringkasan` seharga Rp 0. Karena itu berkas
+   ini tidak boleh menambah impor selain `import type`: Node
+   menjalankannya langsung, dan hanya impor tipe yang dihapus
+   penanggal tipe.
+   =========================================================== */
+
+/** Nol untuk keempat klasifikasi — supaya donat tidak pernah kekurangan irisan. */
+function kosong(): Record<ActionCode, number> {
+  const hasil = {} as Record<ActionCode, number>;
+  for (const a of ACTION_ORDER) hasil[a] = 0;
+  return hasil;
+}
+
+/**
+ * Awal sebuah rentang waktu.
+ *
+ * "today" berarti sejak tengah malam waktu setempat, BUKAN 24 jam
+ * ke belakang. Bedanya terasa tiap pagi: pukul 09.00, "24 jam ke
+ * belakang" masih menghitung chat kemarin sore, dan angkanya tidak
+ * akan pernah cocok dengan laporan harian yang dibaca tim.
+ */
+export function awalRentang(rentang: RangeKey, sekarang: Date = new Date()): Date {
+  if (rentang === "today") {
+    const t = new Date(sekarang);
+    t.setHours(0, 0, 0, 0);
+    return t;
+  }
+  const hari = rentang === "7d" ? 7 : 30;
+  return new Date(sekarang.getTime() - hari * 24 * 60 * 60 * 1000);
+}
+
+export type BarisTindakan = {
+  action: ActionCode | null;
+  last_message_at: string;
+};
+
+/**
+ * Berapa percakapan per klasifikasi dalam sebuah rentang.
+ *
+ * Percakapan tanpa `action` tidak dihitung ke mana pun — belum ada
+ * keputusan yang dibuat atasnya, dan memaksakannya masuk salah
+ * satu dari empat kotak berarti mengarang keputusan itu.
+ */
+export function hitungTindakan(
+  rows: readonly BarisTindakan[],
+  sejak: Date,
+): Record<ActionCode, number> {
+  const hasil = kosong();
+  const batas = sejak.getTime();
+
+  for (const r of rows) {
+    if (!r.action) continue;
+    const waktu = Date.parse(r.last_message_at);
+    if (Number.isNaN(waktu) || waktu < batas) continue;
+    if (r.action in hasil) hasil[r.action]++;
+  }
+  return hasil;
+}
+
+/** Jumlah seluruh irisan — dipakai sebagai "total sesi". */
+export function totalTindakan(sebaran: Record<ActionCode, number>): number {
+  return ACTION_ORDER.reduce((n, a) => n + sebaran[a], 0);
+}
+
+/**
+ * Persentase handover, sebagai teks siap tampil.
+ *
+ * Mengembalikan "—" saat belum ada satu pun percakapan, bukan
+ * "0,0%". Nol persen berarti "sudah diukur dan hasilnya nol";
+ * tanda pisah berarti "belum ada yang bisa diukur". Untuk dasbor
+ * yang baru menyala, bedanya itu justru seluruh isinya.
+ */
+export function persenHandover(sebaran: Record<ActionCode, number>): string {
+  const total = totalTindakan(sebaran);
+  if (total === 0) return "—";
+  const persen = (sebaran.HANDOVER_TO_CS / total) * 100;
+  return persen.toFixed(1).replace(".", ",") + "%";
+}

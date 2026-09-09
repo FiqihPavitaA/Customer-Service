@@ -11,7 +11,7 @@
    statistik.js).
    =========================================================== */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardHead } from "@/components/ui/Card";
 import {
   DateTabs,
@@ -28,12 +28,18 @@ import { useToast } from "@/components/Toast";
 import {
   ACTION_COLORS,
   ACTION_ORDER,
+  awalRentang,
   HANDOVER_REASONS,
+  hitungTindakan,
   MARKETPLACE_STATS,
+  persenHandover,
   RANGE_DATA,
   TOP_PRODUCTS,
+  totalTindakan,
   type RangeKey,
 } from "@/lib/db/analytics";
+import { DB_MODE, useConversations } from "@/lib/db";
+import type { ActionCode } from "@/lib/db/types";
 import { angka, persen } from "@/lib/format";
 
 const RANGES: { value: RangeKey; label: string }[] = [
@@ -44,25 +50,61 @@ const RANGES: { value: RangeKey; label: string }[] = [
 
 /* ---------------- KPI ---------------- */
 
-type Kpi = { ico: string; num: string; label: string; trend: string; up: boolean };
+type Kpi = {
+  ico: string;
+  num: string;
+  label: string;
+  trend: string;
+  up: boolean;
+  /** true = dihitung dari tabel; tren pembanding sengaja dikosongkan. */
+  nyata?: boolean;
+};
 
-function kpiCards(range: RangeKey): Kpi[] {
+/**
+ * KENAPA KARTU NYATA TIDAK PUNYA TREN
+ *
+ * Panah "▲ +12% vs periode lalu" itu tetapan di RANGE_DATA[*].trend.
+ * Menempelkannya pada angka yang baru dihitung sungguhan berarti
+ * mengarang perbandingan yang tidak pernah dilakukan — dan justru
+ * itulah bagian yang paling dipercaya orang saat membaca dasbor.
+ * Membandingkan dengan periode sebelumnya butuh menyimpan hitungan
+ * lama; sampai itu ada, kartunya menyebut sumbernya saja.
+ */
+function kpiCards(
+  range: RangeKey,
+  sebaran: Record<ActionCode, number>,
+  nyata: boolean,
+): Kpi[] {
   const d = RANGE_DATA[range];
   const t = d.trend;
+  const total = totalTindakan(sebaran);
+
   return [
-    { ico: "💬", num: d.kpi.sesi, label: "Total Sesi Percakapan", trend: `▲ ${t[0]} vs periode lalu`, up: true },
+    nyata
+      ? { ico: "💬", num: angka(total), label: "Total Sesi Percakapan", trend: "dari tabel conversations", up: true, nyata: true }
+      : { ico: "💬", num: d.kpi.sesi, label: "Total Sesi Percakapan", trend: `▲ ${t[0]} vs periode lalu`, up: true },
     { ico: "⚡", num: d.kpi.auto, label: "Tingkat Auto-Reply", trend: `▲ ${t[1]}`, up: true },
     { ico: "⏱️", num: d.kpi.resp, label: "Rata-rata Waktu Respons", trend: `▼ ${t[2]} (lebih cepat)`, up: false },
-    { ico: "🙋", num: d.kpi.ho, label: "Tingkat Handover ke CS", trend: `▼ ${t[3]} (lebih sedikit)`, up: false },
+    nyata
+      ? { ico: "🙋", num: persenHandover(sebaran), label: "Tingkat Handover ke CS", trend: "dari tabel conversations", up: true, nyata: true }
+      : { ico: "🙋", num: d.kpi.ho, label: "Tingkat Handover ke CS", trend: `▼ ${t[3]} (lebih sedikit)`, up: false },
     { ico: "🛒", num: d.kpi.konv, label: "Konversi Chat → Order", trend: `▲ ${t[4]}`, up: true },
     { ico: "💰", num: d.kpi.rev, label: "Estimasi Pendapatan dari Chat", trend: `▲ ${t[5]}`, up: true },
   ];
 }
 
-function KpiGrid({ range }: { range: RangeKey }) {
+function KpiGrid({
+  range,
+  sebaran,
+  nyata,
+}: {
+  range: RangeKey;
+  sebaran: Record<ActionCode, number>;
+  nyata: boolean;
+}) {
   return (
     <div className="grid grid-cols-6 gap-3.5 max-wide:grid-cols-3 max-tablet:grid-cols-2 max-mini:grid-cols-2">
-      {kpiCards(range).map((k) => (
+      {kpiCards(range, sebaran, nyata).map((k) => (
         <div
           key={k.label}
           className="rounded-2xl border border-line bg-white p-4.5 shadow-[0_8px_24px_rgb(15_23_42/0.04)]"
@@ -73,8 +115,11 @@ function KpiGrid({ range }: { range: RangeKey }) {
           <div className="text-[1.7rem] leading-tight font-extrabold">{k.num}</div>
           <div className="mt-1 text-[0.78rem] leading-snug text-muted">{k.label}</div>
           <div
-            className={`mt-2 text-[0.74rem] font-bold ${k.up ? "text-green-dark" : "text-[#dc2626]"}`}
+            className={`mt-2 text-[0.74rem] font-bold ${
+              k.nyata ? "text-muted" : k.up ? "text-green-dark" : "text-[#dc2626]"
+            }`}
           >
+            {k.nyata && <span aria-hidden>· </span>}
             {k.trend}
           </div>
         </div>
@@ -85,9 +130,27 @@ function KpiGrid({ range }: { range: RangeKey }) {
 
 /* ---------------- Donat klasifikasi ---------------- */
 
-function Donut({ range }: { range: RangeKey }) {
-  const a = RANGE_DATA[range].actions;
+function Donut({ sebaran }: { sebaran: Record<ActionCode, number> }) {
+  const a = sebaran;
   const total = ACTION_ORDER.reduce((sum, k) => sum + a[k], 0);
+
+  /* Tabel yang masih kosong bukan keadaan mustahil — justru itu
+     keadaan awal begitu Supabase menyala. Tanpa penjagaan ini,
+     start dan end tiap irisan jadi NaN, dan conic-gradient dengan
+     NaN tidak menggambar apa-apa: lingkarannya hilang tanpa satu
+     pun pesan yang menjelaskan kenapa. */
+  if (total === 0) {
+    return (
+      <div className="grid place-items-center py-10 text-center">
+        <div className="text-3xl opacity-40" aria-hidden>
+          🍩
+        </div>
+        <p className="mt-2 mb-0 text-[0.84rem] text-muted">
+          Belum ada percakapan berklasifikasi pada rentang ini.
+        </p>
+      </div>
+    );
+  }
 
   // conic-gradient dibangun sama seperti renderDonut() di statistik.js.
   // Batas tiap irisan dihitung dari jumlah kumulatif sampai indeks itu
@@ -247,6 +310,22 @@ function HBars({
 export default function Statistik() {
   const [range, setRange] = useState<RangeKey>("7d");
   const toast = useToast();
+  const conversations = useConversations();
+  const nyata = DB_MODE !== "memory";
+
+  /* Dua dari enam kartu KPI dan seluruh donat sekarang dihitung
+     dari tabel `conversations`. Empat kartu sisanya — auto-reply,
+     waktu respons, konversi, pendapatan — tetap contoh: dua yang
+     pertama butuh selisih waktu antar pesan yang belum dihitung,
+     dua terakhir butuh data pesanan marketplace yang belum ada
+     sambungannya sama sekali. */
+  const sebaran = useMemo(
+    () =>
+      nyata
+        ? hitungTindakan(conversations, awalRentang(range))
+        : RANGE_DATA[range].actions,
+    [nyata, conversations, range],
+  );
 
   return (
     <div className="flex flex-col gap-4.5 bg-page p-5 px-6 pb-10 max-mobile:p-3.5 max-mobile:pb-8">
@@ -263,15 +342,19 @@ export default function Statistik() {
 
       <DemoNotice
         sumber="contoh"
-        detail="Seluruh angka di halaman ini masih dari lib/db/analytics.ts, belum dihitung dari tabel conversations."
+        detail={
+          nyata
+            ? "Total sesi, tingkat handover, dan donat klasifikasi dihitung dari tabel conversations. Empat KPI lain, grafik batang, corong, produk, dan marketplace masih angka contoh dari lib/db/analytics.ts."
+            : "Seluruh angka di halaman ini dari lib/db/analytics.ts, belum dihitung dari tabel conversations."
+        }
       />
 
-      <KpiGrid range={range} />
+      <KpiGrid range={range} sebaran={sebaran} nyata={nyata} />
 
       <div className="grid grid-cols-2 gap-4.5 max-tablet:grid-cols-1">
         <Card>
           <CardHead title="Distribusi Klasifikasi Aksi" note="sesuai claude.md" />
-          <Donut range={range} />
+          <Donut sebaran={sebaran} />
         </Card>
 
         <Card>
