@@ -207,6 +207,7 @@ async function buatEskalasi(
    ----------------------------------------------------------- */
 
 const NAMA_SUMBER: Record<string, string> = {
+  lampiran: "Gerbang -0.5 (pesan berisi foto/berkas)",
   satpam: "Gerbang 0 (kata kunci pengaman)",
   template: "template baku",
   ai: "Claude",

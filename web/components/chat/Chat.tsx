@@ -1136,6 +1136,35 @@ export default function Chat() {
                   }`}
                 >
                   {m.content}
+
+                  {/* Lampiran. Ditampilkan sebagai tautan, BUKAN
+                      <img>: URL-nya berasal dari marketplace dan
+                      kedaluwarsa, dan gambar yang gagal dimuat
+                      terlihat persis seperti pesan yang tidak punya
+                      lampiran sama sekali. Tautan yang mati setidaknya
+                      memberi tahu bahwa ada sesuatu di sana.
+
+                      Membukanya di tab baru dengan noreferrer: alamat
+                      console kami tidak perlu ikut terkirim ke server
+                      marketplace. */}
+                  {m.lampiran?.map((l, j) => (
+                    <a
+                      key={j}
+                      href={l.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className={`mt-1.5 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[0.76rem] font-semibold no-underline ${
+                        dariToko
+                          ? "bg-white/20 text-white"
+                          : "bg-green-mint text-green-dark"
+                      }`}
+                    >
+                      <span aria-hidden>
+                        {l.jenis === "gambar" ? "🖼️" : l.jenis === "video" ? "🎬" : "📎"}
+                      </span>
+                      {l.nama ?? (l.jenis === "gambar" ? "Foto" : "Lampiran")} — buka
+                    </a>
+                  ))}
                 </div>
                 <span className="mt-1 text-[0.7rem] text-muted">
                   {/* Hanya balasan mesin yang diberi tanda. Balasan

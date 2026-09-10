@@ -590,7 +590,11 @@ let sudahMengeluhHandover = false;
  * berarti ada yang harus dibetulkan; yang tidak boleh adalah
  * pelanggan ikut menanggung akibatnya sementara itu.
  */
-function teksHandover() {
+/* Diekspor sejak 10 Sep 2026: Gerbang -0.5 (lampiran) di
+   /api/chat perlu balasan handover yang SAMA dengan Gerbang 0.
+   Menyalin kalimatnya ke sana berarti dua kalimat yang harus
+   dijaga tetap sepadan, dan yang satu pasti tertinggal. */
+export function teksHandover() {
   const dariSumber = pustakaAktif().get(KODE_HANDOVER);
   if (dariSumber && dariSumber.trim()) return dariSumber;
 

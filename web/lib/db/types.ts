@@ -45,6 +45,45 @@ export type ChatMessage = {
   role: "user" | "assistant" | "cs";
   content: string;
   timestamp: string;
+  /**
+   * Foto atau berkas yang ikut dikirim pelanggan.
+   *
+   * KENAPA KEHADIRANNYA SAJA SUDAH CUKUP UNTUK MENGALIHKAN KE CS
+   *
+   * AI tidak pernah melihat isinya. `/api/chat` hanya mengirim teks
+   * ke Claude; gambar tidak ikut sama sekali. Jadi menjawab pesan
+   * berlampiran berarti menjawab sesuatu yang tidak pernah dilihat —
+   * dan AI akan terdengar yakin tentang tanaman yang tidak pernah
+   * ada di hadapannya.
+   *
+   * Karena itu lampiran diperlakukan sebagai pemicu handover di
+   * Gerbang -0.5, sebelum gerbang mana pun yang bisa menjawab.
+   * Bukan karena foto berbahaya, tetapi karena AI-nya buta
+   * terhadapnya.
+   *
+   * Kolom `messages` bertipe jsonb tanpa CHECK, jadi bidang ini
+   * tidak menuntut migrasi. Pesan lama yang tidak punya bidang ini
+   * terbaca sebagai undefined — dan itu benar, memang tidak ada
+   * lampirannya.
+   */
+  lampiran?: Lampiran[];
+};
+
+/** Satu berkas yang menempel pada sebuah pesan. */
+export type Lampiran = {
+  /**
+   * Alamat berkasnya.
+   *
+   * Untuk sekarang selalu URL dari marketplace, yang KEDALUWARSA.
+   * Menyalinnya ke Supabase Storage adalah keputusan tersendiri dan
+   * belum diambil — lihat catatan di /api/chat. Yang penting
+   * disadari: URL yang mati membuat bukti klaim ikut hilang justru
+   * saat dibutuhkan.
+   */
+  url: string;
+  jenis: "gambar" | "video" | "berkas";
+  /** Nama asli bila ada, untuk ditampilkan pada berkas non-gambar. */
+  nama?: string;
 };
 
 /* ---------------- public.profiles ---------------- */

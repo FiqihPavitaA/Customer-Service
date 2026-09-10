@@ -30,6 +30,7 @@ import {
   bacaBerkasFaq,
   logRouting,
   routeToCategory,
+  teksHandover,
 } from "@/content/knowledge-base/router.js";
 
 /* ===========================================================
@@ -59,6 +60,7 @@ export async function POST(req: Request) {
     useTemplates?: unknown;
     useClaude?: unknown;
     conversationId?: unknown;
+    lampiran?: unknown;
   };
   try {
     body = await req.json();
@@ -66,10 +68,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Body harus JSON yang valid." }, { status: 400 });
   }
 
-  const { message, history, useTemplates, useClaude, conversationId } = body ?? {};
-  if (!message || typeof message !== "string") {
-    return NextResponse.json({ error: 'Field "message" wajib diisi.' }, { status: 400 });
+  const { message, history, useTemplates, useClaude, conversationId, lampiran } = body ?? {};
+
+  /* Lampiran diperiksa SEBELUM syarat "message wajib diisi".
+     Pelanggan yang mengirim foto tanpa satu kata pun adalah kejadian
+     biasa — dan sampai 10 Sep 2026 permintaan itu dijawab HTTP 400.
+     Bukan handover, bukan balasan: galat. */
+  const berkas = Array.isArray(lampiran)
+    ? lampiran.filter(
+        (l): l is { url: string; jenis: string } =>
+          Boolean(l) && typeof (l as { url?: unknown }).url === "string",
+      )
+    : [];
+
+  if (!berkas.length && (!message || typeof message !== "string")) {
+    return NextResponse.json(
+      { error: 'Field "message" wajib diisi, kecuali ada lampiran.' },
+      { status: 400 },
+    );
   }
+  const teksMasuk = typeof message === "string" ? message : "";
 
   // ---------- Sambungan ke percakapan sungguhan ----------
   // conversationId bersifat OPSIONAL, dan itu yang memisahkan meja
@@ -125,6 +143,46 @@ export async function POST(req: Request) {
     }
   }
 
+  /* ---------- Gerbang -0.5: ada lampiran ----------
+
+     KEHADIRAN LAMPIRAN SUDAH CUKUP. Isinya tidak diperiksa, dan
+     memang tidak bisa: gambar tidak pernah ikut dikirim ke Claude
+     dari route ini. Menjawab pesan berlampiran berarti menjawab
+     sesuatu yang tidak pernah dilihat — AI akan terdengar yakin
+     tentang tanaman yang tidak ada di hadapannya.
+
+     BERLAKU JUGA SAAT TEKSNYA SEBENARNYA BISA DIJAWAB.
+     "dosis NPK berapa ya? [foto struk]" memang cocok template, dan
+     tetap dialihkan. Foto yang diabaikan lebih buruk daripada CS
+     yang membaca satu chat mudah: pelanggan mengirimnya karena
+     merasa ada yang perlu dilihat, dan balasan yang mengabaikannya
+     memberi tahu dia bahwa tidak ada yang melihat.
+
+     Ditaruh sebelum Gerbang 0 dan sebelum pustaka template dibaca,
+     jadi tidak pernah menyentuh Voyage maupun Claude. */
+  if (berkas.length) {
+    const teksBalasan = teksHandover();
+    const handover = await catat({
+      sumber: "lampiran",
+      kategori: null,
+      pesan: teksMasuk || `[${berkas.length} lampiran tanpa teks]`,
+      balasan: teksBalasan,
+    });
+    return NextResponse.json({
+      action: "HANDOVER_TO_CS",
+      reply: teksBalasan,
+      model: null,
+      usage: null,
+      source: "lampiran",
+      lampiran: berkas.length,
+      alasan:
+        "Pesan berisi lampiran. AI tidak bisa melihat gambar, jadi " +
+        "seluruh pesan berlampiran dialihkan ke CS.",
+      handover,
+      panjang: ukurBalasan(teksBalasan),
+    });
+  }
+
   // ---------- Sumber template ----------
   // Pastikan router memakai isi tabel `templates` bila tabelnya
   // sudah terisi; bila tidak, ia tetap membaca berkas .md seperti
@@ -139,7 +197,7 @@ export async function POST(req: Request) {
   // Dilewati bila pemanggil mengirim useTemplates:false — dipakai
   // panel demo untuk membandingkan biaya dengan dan tanpa lapisan ini.
   // Satu panggilan router memutuskan ketiga lapisan sekaligus.
-  const keputusan = routeToCategory(message);
+  const keputusan = routeToCategory(teksMasuk);
 
   // ---------- Gerbang 0: satpam ----------
   // Diperiksa lebih dulu dan TANPA syarat useTemplates. Saklar itu
@@ -153,7 +211,7 @@ export async function POST(req: Request) {
       sumber: "satpam",
       kode: keputusan.kode,
       kategori: keputusan.kategori,
-      pesan: message,
+      pesan: teksMasuk,
       balasan: keputusan.teks,
     });
     return NextResponse.json({
@@ -187,7 +245,7 @@ export async function POST(req: Request) {
             sumber: "template",
             kode: keputusan.kode,
             kategori: keputusan.kategori,
-            pesan: message,
+            pesan: teksMasuk,
             balasan: keputusan.teks,
           })
         : null;
@@ -248,7 +306,7 @@ export async function POST(req: Request) {
   } | null = null;
 
   if (useTemplates !== false) {
-    const kenal = await kenaliMaksud(message);
+    const kenal = await kenaliMaksud(teksMasuk);
     pengenalToken = kenal.token;
     pengenal = {
       jenis: kenal.jenis,
@@ -390,7 +448,11 @@ export async function POST(req: Request) {
     )
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content as string }));
 
-  const messages: Anthropic.MessageParam[] = [...past, { role: "user", content: message }];
+  /* teksMasuk, bukan `message`. Keduanya sama isinya di titik ini —
+     permintaan tanpa teks sudah berhenti di Gerbang -0.5 jauh di
+     atas — tetapi hanya teksMasuk yang bertipe string. `message`
+     tetap `unknown` sejak lampiran membuatnya boleh kosong. */
+  const messages: Anthropic.MessageParam[] = [...past, { role: "user", content: teksMasuk }];
 
   // Rakit system prompt sesuai hasil routing. Dua blok, keduanya
   // di-cache terpisah: blok pertama sama untuk semua kategori
@@ -436,7 +498,7 @@ export async function POST(req: Request) {
         ? await catat({
             sumber: "ai",
             kategori: keputusan.kategori,
-            pesan: message,
+            pesan: teksMasuk,
             balasan: reply,
           })
         : null;

@@ -6,7 +6,7 @@ import { getSupabaseSebagai, tokenDariHeader } from "@/lib/supabase/server";
 import { perkiraanBiaya } from "@/lib/voyage";
 import { cariToko, DAFTAR_TOKO, susunShopName } from "@/lib/toko";
 import "@/lib/templates";
-import { routeToCategory } from "@/content/knowledge-base/router.js";
+import { routeToCategory, teksHandover } from "@/content/knowledge-base/router.js";
 
 /* ===========================================================
    /api/simulasi
@@ -96,16 +96,25 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { teks?: unknown; nama?: unknown; toko?: unknown };
+  let body: { teks?: unknown; nama?: unknown; toko?: unknown; foto?: unknown };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Body harus JSON yang valid." }, { status: 400 });
   }
 
+  /* Peragaan "pelanggan mengirim foto".
+     URL-nya karangan dan memang tidak akan memuat gambar apa pun —
+     yang diperagakan bukan fotonya, melainkan KEPUTUSANNYA. Foto
+     sungguhan baru ada setelah webhook marketplace dibangun. */
+  const adaFoto = body.foto === true;
+
   const teks = typeof body.teks === "string" ? body.teks.trim() : "";
-  if (!teks) {
-    return NextResponse.json({ error: 'Field "teks" wajib diisi.' }, { status: 400 });
+  if (!teks && !adaFoto) {
+    return NextResponse.json(
+      { error: 'Field "teks" wajib diisi, kecuali mengirim foto.' },
+      { status: 400 },
+    );
   }
 
   const nama = typeof body.nama === "string" && body.nama.trim() ? body.nama.trim() : "pelanggan.baru";
@@ -125,8 +134,15 @@ export async function POST(req: Request) {
      teks, action, maupun kode — karena belum ada yang menjawab.
      Ditarik sekali di sini supaya penyempitan tipenya terjadi satu
      kali, bukan diulang di tiap pemakaian. */
+  /* GERBANG -0.5 mendahului semuanya: lampiran mengalihkan ke CS
+     tanpa memeriksa isinya, dan tanpa memedulikan apakah teksnya
+     sebenarnya cocok template. `adaFoto` karena itu ikut mematikan
+     kedua gerbang di bawah — bukan menimpanya belakangan, supaya
+     Gerbang 2 tidak sempat memanggil Voyage untuk pesan yang sudah
+     pasti dialihkan. */
   const adaJawabanTemplate =
-    keputusan.jenis === "handover" || keputusan.jenis === "template";
+    !adaFoto &&
+    (keputusan.jenis === "handover" || keputusan.jenis === "template");
   const teksTemplate = adaJawabanTemplate ? keputusan.teks : null;
   const actionTemplate = adaJawabanTemplate ? keputusan.action : null;
   const kodeTemplate = adaJawabanTemplate ? keputusan.kode : null;
@@ -158,7 +174,7 @@ export async function POST(req: Request) {
   let balasanPengenal: string | null = null;
   let kodePengenal: string | null = null;
 
-  const perluGerbang2 = !adaJawabanTemplate;
+  const perluGerbang2 = !adaFoto && !adaJawabanTemplate;
   if (perluGerbang2) {
     const kenal = await kenaliMaksud(teks);
     if (kenal.jenis === "lewat") {
@@ -195,11 +211,32 @@ export async function POST(req: Request) {
      tidak terjadi hanya panggilan berbayarnya. */
   const diluarJangkauan = perluGerbang2 && !balasanPengenal;
 
+  /* Lampiran memakai kalimat handover yang SAMA dengan Gerbang 0,
+     lewat fungsi yang sama — bukan salinannya. */
+  const balasanLampiran = adaFoto ? teksHandover() : null;
+
   const sekarang = new Date().toISOString();
   const id = crypto.randomUUID();
 
-  const messages = [{ role: "user", content: teks, timestamp: sekarang }];
-  const balasan = teksTemplate || balasanPengenal;
+  const messages: Record<string, unknown>[] = [
+    {
+      role: "user",
+      content: teks || "(mengirim foto tanpa keterangan)",
+      timestamp: sekarang,
+      ...(adaFoto
+        ? {
+            lampiran: [
+              {
+                url: "https://contoh.marketplace/foto-simulasi.jpg",
+                jenis: "gambar",
+                nama: "foto-pelanggan.jpg",
+              },
+            ],
+          }
+        : {}),
+    },
+  ];
+  const balasan = balasanLampiran || teksTemplate || balasanPengenal;
   if (balasan) {
     messages.push({ role: "assistant", content: balasan, timestamp: sekarang });
   }
@@ -212,7 +249,7 @@ export async function POST(req: Request) {
       customer_id: AWALAN_SIMULASI + id.slice(0, 8),
       customer_name: nama,
       shop_name: susunShopName(toko.nama, toko.platform),
-      action: actionTemplate ?? (balasanPengenal ? "AUTO_REPLY" : null),
+      action: adaFoto ? "HANDOVER_TO_CS" : (actionTemplate ?? (balasanPengenal ? "AUTO_REPLY" : null)),
       template_code: kodeTemplate ?? kodePengenal,
       unread: true,
       messages,
@@ -253,14 +290,18 @@ export async function POST(req: Request) {
      catatHandover() berubah, peragaan ikut berubah — dan itulah
      yang membuat peragaan ini tetap jujur seiring waktu. */
   const handover =
-    actionTemplate === "HANDOVER_TO_CS"
+    adaFoto || actionTemplate === "HANDOVER_TO_CS"
       ? await catatHandover(sb, {
           conversationId: id,
-          sumber: keputusan.jenis === "handover" ? "satpam" : "template",
-          kode: kodeTemplate,
-          kategori: keputusan.kategori,
-          pesan: teks,
-          balasan: teksTemplate,
+          sumber: adaFoto
+            ? "lampiran"
+            : keputusan.jenis === "handover"
+              ? "satpam"
+              : "template",
+          kode: adaFoto ? null : kodeTemplate,
+          kategori: adaFoto ? null : keputusan.kategori,
+          pesan: teks || "(mengirim foto tanpa keterangan)",
+          balasan: balasan,
         })
       : null;
 
@@ -272,15 +313,15 @@ export async function POST(req: Request) {
     // Gerbang mana yang menjawab — inilah yang paling ingin dilihat
     // penonton, dan satu-satunya yang menjelaskan kenapa sebagian
     // pertanyaan gratis dan sebagian tidak.
-    gerbang: keputusan.jenis === "handover"
-      ? "0 · Satpam"
+    gerbang: adaFoto || keputusan.jenis === "handover"
+      ? (adaFoto ? "-0.5 · Lampiran" : "0 · Satpam")
       : keputusan.jenis === "template"
         ? "1 · Penghafal"
         : balasanPengenal
           ? "2 · Pengenal (Voyage)"
           : "tidak ada",
     jenis: keputusan.jenis,
-    action: actionTemplate ?? (balasanPengenal ? "AUTO_REPLY" : null),
+    action: adaFoto ? "HANDOVER_TO_CS" : (actionTemplate ?? (balasanPengenal ? "AUTO_REPLY" : null)),
     kode: kodeTemplate ?? kodePengenal,
     balasan: balasan ?? "",
     diluarJangkauan,

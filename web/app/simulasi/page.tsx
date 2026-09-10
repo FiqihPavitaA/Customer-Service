@@ -77,19 +77,22 @@ export default function SimulasiPelanggan() {
     bawah.current?.scrollIntoView({ behavior: "smooth" });
   }, [riwayat]);
 
-  const kirim = async (isi: string) => {
+  const kirim = async (isi: string, foto = false) => {
     const pesan = isi.trim();
-    if (!pesan || sibuk) return;
+    if ((!pesan && !foto) || sibuk) return;
 
     setSibuk(true);
     setTeks("");
-    setRiwayat((r) => [...r, { dari: "pelanggan", teks: pesan }]);
+    setRiwayat((r) => [
+      ...r,
+      { dari: "pelanggan", teks: pesan || "(mengirim foto)", meta: foto ? "📷 berfoto" : undefined },
+    ]);
 
     try {
       const res = await fetch("/api/simulasi", {
         method: "POST",
         headers: await headerBerSesi(),
-        body: JSON.stringify({ teks: pesan, nama, toko }),
+        body: JSON.stringify({ teks: pesan, nama, toko, foto }),
       });
       const d = (await res.json()) as Jawaban;
 
@@ -279,6 +282,20 @@ export default function SimulasiPelanggan() {
           aria-label="Pesan"
           className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2.5 text-[0.86rem] text-white outline-none placeholder:text-white/40"
         />
+        {/* Kirim foto. Fotonya karangan — yang diperagakan bukan
+            gambarnya, melainkan KEPUTUSANNYA: apa pun isinya, dan
+            apa pun teks yang menyertainya, pesan berlampiran selalu
+            dialihkan ke CS karena AI tidak bisa melihat gambar. */}
+        <button
+          type="button"
+          onClick={() => void kirim(teks, true)}
+          disabled={sibuk}
+          title="Kirim sebagai pesan berfoto"
+          aria-label="Kirim foto"
+          className="shrink-0 cursor-pointer rounded-xl border border-white/25 bg-white/10 px-3 py-2.5 text-[1rem] disabled:opacity-40"
+        >
+          📷
+        </button>
         <button
           type="button"
           onClick={() => void kirim(teks)}

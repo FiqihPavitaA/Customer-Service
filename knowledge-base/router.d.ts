@@ -141,6 +141,16 @@ export type Keputusan = KeputusanTemplate | KeputusanAi | KeputusanHandover;
  * Gerbang 0 — apakah pesan ini wajib langsung ke CS manusia?
  * @returns null bila aman dilanjutkan ke gerbang berikutnya.
  */
+/**
+ * Kalimat handover baku, dengan tiga lapis cadangan.
+ *
+ * Diekspor sejak 10 Sep 2026 untuk Gerbang -0.5 di /api/chat:
+ * pesan berlampiran dialihkan ke CS dan harus memakai kalimat yang
+ * SAMA dengan Gerbang 0. Menyalin kalimatnya berarti dua teks yang
+ * harus dijaga tetap sepadan, dan yang satu pasti tertinggal.
+ */
+export function teksHandover(): string;
+
 export function periksaSatpam(pesanPelanggan: string): HasilSatpam | null;
 
 export function getKategoriSatpam(): { kategori: string; why: string }[];
