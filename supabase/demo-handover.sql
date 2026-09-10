@@ -54,7 +54,7 @@ values
 
   -- D2 — baru masuk. Badge HIJAU. Dipakai memperagakan "CS membalas".
   ('d0000000-0000-4000-8000-000000000002',
-   'tiktok', 'demo_agus', 'agus.pratama', 'infarm · TikTok Shop',
+   'tiktok', 'demo_agus', 'agus.pratama', 'Infarm Jakarta · TikTok Shop',
    '260909DEMO2', null, 'HANDOVER_TO_CS', true,
    jsonb_build_array(
      jsonb_build_object(
@@ -77,7 +77,7 @@ values
   -- D3 — BELUM dialihkan. Inilah yang ditekan ✨ saat demo, supaya
   -- penonton melihat barisnya LAHIR, bukan sudah ada sejak awal.
   ('d0000000-0000-4000-8000-000000000003',
-   'shopee', 'demo_rina', 'rina.kusuma', 'infarm · Shopee',
+   'shopee', 'demo_rina', 'rina.kusuma', 'Infarm Yogyakarta · Shopee',
    '260909DEMO3', null, null, true,
    jsonb_build_array(
      jsonb_build_object(
@@ -92,7 +92,7 @@ values
   -- membalasnya tidak mematikan AI. Ini bagian yang paling sering
   -- disalahpahami, jadi sebaiknya ikut diperagakan.
   ('d0000000-0000-4000-8000-000000000004',
-   'shopee', 'demo_dewi', 'dewi.anggraini', 'infarm · Shopee',
+   'lazada', 'demo_dewi', 'dewi.anggraini', 'Infarm Surabaya · Lazada',
    null, null, 'AUTO_REPLY', false,
    jsonb_build_array(
      jsonb_build_object(
@@ -157,6 +157,20 @@ order by c.customer_name;
 --   dewi.anggraini  AUTO_REPLY      (null) (null) tidak
 --   rina.kusuma     (null)          (null) (null) tidak
 --   sari.wulandari  HANDOVER_TO_CS  open   ~27   ya
+--
+-- Keempatnya sengaja ditaruh di TOKO YANG BERBEDA:
+--
+--   sari.wulandari   infarm              Shopee
+--   agus.pratama     Infarm Jakarta      TikTok Shop
+--   rina.kusuma      Infarm Yogyakarta   Shopee
+--   dewi.anggraini   Infarm Surabaya     Lazada
+--
+-- Kalau semuanya di satu toko, mengklik toko di panel kiri console
+-- tidak mengubah apa pun yang terlihat — dan penyaringan yang
+-- bekerja jadi tidak bisa dibedakan dari penyaringan yang rusak.
+-- Nama tokonya harus persis sama dengan DAFTAR_TOKO di
+-- web/lib/toko.ts; nama di luar daftar itu tidak akan pernah muncul
+-- di panel mana pun.
 
 -- -----------------------------------------------------------
 -- 4. PEMBERSIHAN — jalankan SETELAH demo selesai

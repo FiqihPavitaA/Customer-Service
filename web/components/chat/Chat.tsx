@@ -46,6 +46,16 @@ import type { ActionCode, Conversation } from "@/lib/db/types";
 import { catalogStatusText, searchProducts, useCatalog } from "@/lib/catalog";
 import { inisial, jam, stempel, tanggalPanjang } from "@/lib/format";
 import { useSearch, type SearchScope } from "@/lib/search";
+import {
+  cocokToko,
+  DAFTAR_TOKO,
+  HURUF_LOGO,
+  KELAS_LOGO,
+  namaTokoDari,
+  SEMUA_TOKO,
+  type Platform,
+  type Toko,
+} from "@/lib/toko";
 import { headerBerSesi } from "@/lib/supabase/header";
 import {
   MENIT_GENTING,
@@ -66,19 +76,11 @@ const ACTION_META: Record<ActionCode, { tag: string; conf: string }> = {
 
 /* ---------------- Daftar toko ---------------- */
 
-type Shop = { name: string; logo: string; char: string; status: "online" | "away" | "offline" };
-
-const SHOPS_AWAL: Shop[] = [
-  { name: "infarmofficialshop", logo: "bg-shp", char: "S", status: "online" },
-  { name: "infarm", logo: "bg-shp", char: "S", status: "online" },
-  { name: "Infarm Official", logo: "bg-tt", char: "T", status: "online" },
-  { name: "Infarm Yogyakarta", logo: "bg-shp", char: "S", status: "online" },
-  { name: "Infarm Tangerang", logo: "bg-shp", char: "S", status: "away" },
-  { name: "Infarm Jakarta", logo: "bg-tt", char: "T", status: "online" },
-  { name: "Infarm Semarang", logo: "bg-shp", char: "S", status: "away" },
-  { name: "Infarm Bali", logo: "bg-tt", char: "T", status: "online" },
-  { name: "Infarm Surabaya", logo: "bg-lz", char: "L", status: "offline" },
-];
+/* Daftarnya pindah ke lib/toko.ts supaya halaman /simulasi memakai
+   toko yang SAMA. Sebelumnya /simulasi punya daftar karangan sendiri
+   berisi "Toko A / B / C", dan peragaan jadi menunjukkan toko yang
+   tidak ada di console ini. */
+type Shop = Toko;
 
 const STATUS_DOT: Record<Shop["status"], string> = {
   online: "bg-green",
@@ -115,16 +117,20 @@ function snippet(c: Conversation) {
 function ShopsPanel({
   shops,
   active,
+  jumlah,
   onPick,
   onIntegrate,
   onClose,
 }: {
   shops: Shop[];
   active: string;
+  /** Berapa percakapan per nama toko — kunci huruf kecil semua. */
+  jumlah: Map<string, number>;
   onPick: (name: string) => void;
   onIntegrate: () => void;
   onClose?: () => void;
 }) {
+  const total = [...jumlah.values()].reduce((a, b) => a + b, 0);
   return (
     <div className="flex h-full flex-col bg-white">
       {onClose && (
@@ -143,31 +149,70 @@ function ShopsPanel({
         Marketplace Terhubung
       </div>
       <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
-        {shops.map((s) => (
-          <li key={s.name}>
-            <button
-              type="button"
-              onClick={() => onPick(s.name)}
-              className={`flex w-full cursor-pointer items-center gap-2.5 border-none px-3.5 py-2.5 text-left transition ${
-                s.name === active ? "bg-green-mint" : "bg-transparent hover:bg-green-soft"
-              }`}
+        {/* "Semua toko" harus ada, dan harus jadi pilihan awal.
+            Tanpanya, layar pertama yang dilihat CS adalah daftar
+            toko teratas — yang kebetulan belum punya satu percakapan
+            pun — dan console terlihat seperti kosong padahal penuh. */}
+        <li>
+          <button
+            type="button"
+            onClick={() => onPick(SEMUA_TOKO)}
+            className={`flex w-full cursor-pointer items-center gap-2.5 border-none border-b border-b-line-soft px-3.5 py-2.5 text-left transition ${
+              active === SEMUA_TOKO ? "bg-green-mint" : "bg-transparent hover:bg-green-soft"
+            }`}
+          >
+            <span
+              className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-green text-[0.7rem] font-extrabold text-white"
+              aria-hidden
             >
-              <span
-                className={`grid h-6 w-6 shrink-0 place-items-center rounded-md text-[0.7rem] font-extrabold text-white ${s.logo}`}
-                aria-hidden
+              ∀
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[0.86rem] font-bold">Semua toko</span>
+            <span className="shrink-0 rounded-lg bg-green-mint px-1.5 py-px text-[0.68rem] font-bold text-green-dark">
+              {total}
+            </span>
+          </button>
+        </li>
+
+        {shops.map((s) => {
+          const n = jumlah.get(s.nama.toLowerCase()) ?? 0;
+          return (
+            <li key={s.nama}>
+              <button
+                type="button"
+                onClick={() => onPick(s.nama)}
+                className={`flex w-full cursor-pointer items-center gap-2.5 border-none px-3.5 py-2.5 text-left transition ${
+                  s.nama === active ? "bg-green-mint" : "bg-transparent hover:bg-green-soft"
+                }`}
               >
-                {s.char}
-              </span>
-              <span className="min-w-0 flex-1 truncate text-[0.86rem] font-semibold">
-                {s.name}
-              </span>
-              <span
-                className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[s.status]}`}
-                title={s.status}
-              />
-            </button>
-          </li>
-        ))}
+                <span
+                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-md text-[0.7rem] font-extrabold text-white ${KELAS_LOGO[s.platform]}`}
+                  aria-hidden
+                >
+                  {HURUF_LOGO[s.platform]}
+                </span>
+                <span
+                  className={`min-w-0 flex-1 truncate text-[0.86rem] ${n > 0 ? "font-semibold" : "font-normal text-muted"}`}
+                >
+                  {s.nama}
+                </span>
+                {/* Angka nol sengaja TIDAK ditampilkan sebagai "0".
+                    Yang berguna dilihat adalah toko mana yang ramai;
+                    deretan nol hanya membuat yang berisi jadi sulit
+                    ditemukan. Nama toko kosong dibuat pudar. */}
+                {n > 0 && (
+                  <span className="shrink-0 rounded-lg bg-green-mint px-1.5 py-px text-[0.68rem] font-bold text-green-dark">
+                    {n}
+                  </span>
+                )}
+                <span
+                  className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[s.status]}`}
+                  title={s.status}
+                />
+              </button>
+            </li>
+          );
+        })}
       </ul>
       <button
         type="button"
@@ -594,8 +639,8 @@ export default function Chat() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [panelQuery, setPanelQuery] = useState("");
   const [draft, setDraft] = useState("");
-  const [shops, setShops] = useState<Shop[]>(SHOPS_AWAL);
-  const [activeShop, setActiveShop] = useState(SHOPS_AWAL[0].name);
+  const [shops, setShops] = useState<Shop[]>(DAFTAR_TOKO);
+  const [activeShop, setActiveShop] = useState<string>(SEMUA_TOKO);
   const [modal, setModal] = useState(false);
   const [overlay, setOverlay] = useState<null | "shops" | "conv" | "info">(null);
   const [meminta, setMeminta] = useState(false);
@@ -641,6 +686,13 @@ export default function Chat() {
   const rows = useMemo(() => {
     const q = panelQuery.trim().toLowerCase();
     const tersaring = conversations.filter((c) => {
+      /* Penyaringan toko — sampai 10 Sep 2026 baris ini TIDAK ADA.
+         `activeShop` disimpan, warnanya berubah saat diklik, tetapi
+         daftar percakapannya tidak pernah ikut berubah. Toko yang
+         berbeda menampilkan pelanggan yang persis sama, dan tidak
+         ada galat apa pun yang menunjukkan bahwa itu keliru. */
+      if (!cocokToko(c.shop_name, activeShop)) return false;
+
       if (filter === "unread" && !c.unread) return false;
       if (filter === "cs" && !menungguSejak.has(c.id)) return false;
 
@@ -670,11 +722,34 @@ export default function Chat() {
         Date.parse(menungguSejak.get(a.id) ?? "") -
         Date.parse(menungguSejak.get(b.id) ?? ""),
     );
-  }, [conversations, filter, panelQuery, search, menungguSejak]);
+  }, [conversations, filter, panelQuery, search, menungguSejak, activeShop]);
+
+  /* Hitungan per toko — dipakai lencana di panel kiri.
+     Sengaja dihitung atas SELURUH percakapan, bukan atas `rows`:
+     gunanya justru memberi tahu ada apa di toko yang sedang TIDAK
+     dipilih. Kalau ikut tersaring, semuanya akan selalu nol kecuali
+     satu, dan lencananya tidak memberi informasi apa pun. */
+  const jumlahPerToko = useMemo(() => {
+    const peta = new Map<string, number>();
+    for (const c of conversations) {
+      const kunci = namaTokoDari(c.shop_name).toLowerCase();
+      if (!kunci) continue;
+      peta.set(kunci, (peta.get(kunci) ?? 0) + 1);
+    }
+    return peta;
+  }, [conversations]);
+
+  /* Angka tab dihitung dalam lingkup toko yang sedang dipilih.
+     Kalau tidak, tab "Perlu CS" bisa menulis 3 sementara daftarnya
+     kosong — karena ketiganya milik toko lain. */
+  const dalamToko = useMemo(
+    () => conversations.filter((c) => cocokToko(c.shop_name, activeShop)),
+    [conversations, activeShop],
+  );
 
   const counts = {
-    unread: conversations.filter((c) => c.unread).length,
-    cs: conversations.filter((c) => menungguSejak.has(c.id)).length,
+    unread: dalamToko.filter((c) => c.unread).length,
+    cs: dalamToko.filter((c) => menungguSejak.has(c.id)).length,
   };
 
   const pick = (id: string) => {
@@ -783,6 +858,7 @@ export default function Chat() {
         <ShopsPanel
           shops={shops}
           active={activeShop}
+          jumlah={jumlahPerToko}
           onPick={setActiveShop}
           onIntegrate={() => setModal(true)}
         />
@@ -1006,6 +1082,7 @@ export default function Chat() {
             <ShopsPanel
               shops={shops}
               active={activeShop}
+              jumlah={jumlahPerToko}
               onPick={(n) => {
                 setActiveShop(n);
                 setOverlay(null);
@@ -1041,13 +1118,9 @@ export default function Chat() {
         <IntegrateModal
           onClose={() => setModal(false)}
           onAdd={({ name, platform }: { name: string; platform: PlatformName }) => {
-            const logo =
-              platform === "Shopee"
-                ? { logo: "bg-shp", char: "S" }
-                : platform === "TikTok Shop"
-                  ? { logo: "bg-tt", char: "T" }
-                  : { logo: "bg-lz", char: "L" };
-            setShops((prev) => [...prev, { name, status: "online", ...logo }]);
+            const p: Platform =
+              platform === "Shopee" ? "shopee" : platform === "TikTok Shop" ? "tiktok" : "lazada";
+            setShops((prev) => [...prev, { nama: name, platform: p, status: "online" }]);
           }}
         />
       )}

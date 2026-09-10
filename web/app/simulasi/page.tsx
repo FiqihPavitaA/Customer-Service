@@ -28,12 +28,12 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { headerBerSesi } from "@/lib/supabase/header";
-
-const TOKO = [
-  { id: "shopee", label: "Toko A · Shopee", warna: "#ee4d2d" },
-  { id: "tiktok", label: "Toko B · TikTok Shop", warna: "#000000" },
-  { id: "lazada", label: "Toko C · Lazada", warna: "#0f146d" },
-] as const;
+import {
+  cariToko,
+  DAFTAR_TOKO,
+  LABEL_PLATFORM,
+  WARNA_PLATFORM,
+} from "@/lib/toko";
 
 const USUL = [
   "kak barangnya rusak pas sampe, mau refund",
@@ -62,7 +62,11 @@ type Jawaban = {
 };
 
 export default function SimulasiPelanggan() {
-  const [toko, setToko] = useState<(typeof TOKO)[number]["id"]>("shopee");
+  /* Disimpan sebagai NAMA toko, bukan platform. Sebelumnya halaman
+     ini hanya memilih platform, sehingga ketiga "toko" karangannya
+     menulis shop_name yang sama untuk tiap marketplace — dan di
+     console semuanya menumpuk di satu toko. */
+  const [toko, setToko] = useState(DAFTAR_TOKO[1].nama);
   const [nama, setNama] = useState("budi.pembeli");
   const [teks, setTeks] = useState("");
   const [sibuk, setSibuk] = useState(false);
@@ -85,7 +89,7 @@ export default function SimulasiPelanggan() {
       const res = await fetch("/api/simulasi", {
         method: "POST",
         headers: await headerBerSesi(),
-        body: JSON.stringify({ teks: pesan, nama, platform: toko }),
+        body: JSON.stringify({ teks: pesan, nama, toko }),
       });
       const d = (await res.json()) as Jawaban;
 
@@ -146,20 +150,22 @@ export default function SimulasiPelanggan() {
     }
   };
 
-  const aktif = TOKO.find((t) => t.id === toko)!;
+  const aktif = cariToko(toko) ?? DAFTAR_TOKO[0];
 
   return (
     <div className="flex min-h-dvh flex-col bg-[#0f172a] text-white">
       <header
         className="flex flex-wrap items-center gap-3 px-4 py-3"
-        style={{ background: aktif.warna }}
+        style={{ background: WARNA_PLATFORM[aktif.platform] }}
       >
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/20 text-[1rem]">
           🌱
         </span>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[0.9rem] font-bold">{aktif.label}</div>
-          <div className="text-[0.7rem] opacity-80">biasanya membalas dalam beberapa menit</div>
+          <div className="truncate text-[0.9rem] font-bold">{aktif.nama}</div>
+          <div className="text-[0.7rem] opacity-80">
+            {LABEL_PLATFORM[aktif.platform]} · biasanya membalas dalam beberapa menit
+          </div>
         </div>
         <Link
           href="/chat"
@@ -169,20 +175,25 @@ export default function SimulasiPelanggan() {
         </Link>
       </header>
 
+      {/* Toko yang SAMA dengan panel kiri console. Penonton harus
+          bisa menunjuk nama yang sama di dua layar; nama karangan
+          seperti "Toko A" langsung memunculkan pertanyaan "yang mana
+          itu di console?" yang tidak ada jawabannya. */}
       <div className="flex flex-wrap gap-2 border-b border-white/10 px-4 py-2.5">
-        {TOKO.map((t) => (
+        {DAFTAR_TOKO.map((t) => (
           <button
-            key={t.id}
+            key={t.nama}
             type="button"
-            onClick={() => setToko(t.id)}
-            aria-pressed={toko === t.id}
+            onClick={() => setToko(t.nama)}
+            aria-pressed={toko === t.nama}
+            title={LABEL_PLATFORM[t.platform]}
             className={`cursor-pointer rounded-lg border px-2.5 py-1 text-[0.72rem] font-bold transition ${
-              toko === t.id
+              toko === t.nama
                 ? "border-white bg-white text-[#0f172a]"
                 : "border-white/25 bg-transparent text-white/70"
             }`}
           >
-            {t.label}
+            {t.nama}
           </button>
         ))}
         <input

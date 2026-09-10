@@ -4,6 +4,7 @@ import { siapkanSumberTemplate } from "@/lib/db/templatesServer";
 import { kenaliMaksud, MODE_PENGENAL } from "@/lib/pengenal";
 import { getSupabaseSebagai, tokenDariHeader } from "@/lib/supabase/server";
 import { perkiraanBiaya } from "@/lib/voyage";
+import { cariToko, DAFTAR_TOKO, susunShopName } from "@/lib/toko";
 import "@/lib/templates";
 import { routeToCategory } from "@/content/knowledge-base/router.js";
 
@@ -61,14 +62,12 @@ import { routeToCategory } from "@/content/knowledge-base/router.js";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const PLATFORM = ["shopee", "tiktok", "lazada"] as const;
-type Platform = (typeof PLATFORM)[number];
-
-const NAMA_TOKO: Record<Platform, string> = {
-  shopee: "infarm · Shopee",
-  tiktok: "infarm · TikTok Shop",
-  lazada: "infarm · Lazada",
-};
+/* Toko diterima sebagai NAMA, bukan platform.
+   Versi pertama endpoint ini hanya menerima platform dan menulis
+   shop_name "infarm · Shopee" untuk semuanya — akibatnya seluruh
+   chat simulasi menumpuk di satu toko, betapa pun berbedanya toko
+   yang dipilih di layar pembeli. */
+const TOKO_BAWAAN = DAFTAR_TOKO[1];
 
 export async function POST(req: Request) {
   if (process.env.NODE_ENV === "production") {
@@ -83,7 +82,7 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { teks?: unknown; nama?: unknown; platform?: unknown };
+  let body: { teks?: unknown; nama?: unknown; toko?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -96,9 +95,13 @@ export async function POST(req: Request) {
   }
 
   const nama = typeof body.nama === "string" && body.nama.trim() ? body.nama.trim() : "pelanggan.baru";
-  const platform: Platform = PLATFORM.includes(body.platform as Platform)
-    ? (body.platform as Platform)
-    : "shopee";
+
+  /* Nama toko HARUS ada di daftar. Menerima nama bebas berarti chat
+     simulasi bisa mendarat di toko yang tidak pernah muncul di panel
+     kiri console — hilang tanpa jejak, dan tidak ada layar yang bisa
+     menunjukkan ke mana perginya. */
+  const toko =
+    (typeof body.toko === "string" ? cariToko(body.toko.trim()) : undefined) ?? TOKO_BAWAAN;
 
   // Router memutuskan persis seperti pada /api/chat.
   await siapkanSumberTemplate();
@@ -191,10 +194,10 @@ export async function POST(req: Request) {
     .from("conversations")
     .insert({
       id,
-      platform,
+      platform: toko.platform,
       customer_id: `sim_${id.slice(0, 8)}`,
       customer_name: nama,
-      shop_name: NAMA_TOKO[platform],
+      shop_name: susunShopName(toko.nama, toko.platform),
       action: actionTemplate ?? (balasanPengenal ? "AUTO_REPLY" : null),
       template_code: kodeTemplate ?? kodePengenal,
       unread: true,
@@ -251,6 +254,7 @@ export async function POST(req: Request) {
     ok: true,
     conversationId: id,
     nama,
+    toko: toko.nama,
     // Gerbang mana yang menjawab — inilah yang paling ingin dilihat
     // penonton, dan satu-satunya yang menjelaskan kenapa sebagian
     // pertanyaan gratis dan sebagian tidak.
