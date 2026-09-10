@@ -25,6 +25,7 @@
 import { useState } from "react";
 import { useToast } from "@/components/Toast";
 import { headerBerSesi } from "@/lib/supabase/header";
+import { SIMULASI_HIDUP } from "@/lib/simulasi";
 
 /** Sudah diverifikasi berhenti di Gerbang 0 — biaya Rp 0. */
 const CONTOH = [
@@ -58,7 +59,7 @@ export default function SimulasiPesan({ jumlahSimulasi }: { jumlahSimulasi: numb
   const [konfirmasi, setKonfirmasi] = useState(false);
   const toast = useToast();
 
-  if (process.env.NODE_ENV === "production") return null;
+  if (!SIMULASI_HIDUP) return null;
 
   const bersihkan = async () => {
     if (sibuk) return;

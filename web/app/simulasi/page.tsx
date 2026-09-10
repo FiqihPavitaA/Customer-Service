@@ -28,6 +28,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { headerBerSesi } from "@/lib/supabase/header";
+import { PESAN_SIMULASI_MATI, SIMULASI_HIDUP } from "@/lib/simulasi";
 import {
   cariToko,
   DAFTAR_TOKO,
@@ -175,6 +176,32 @@ export default function SimulasiPelanggan() {
   };
 
   const aktif = cariToko(toko) ?? DAFTAR_TOKO[0];
+
+  /* Halaman ini sebelumnya TIDAK ikut dijaga. Akibatnya di Vercel ia
+     tetap termuat lengkap dengan kotak ketik dan tombol Kirim —
+     lalu setiap kiriman dibalas 404 oleh API yang tertutup. Layar
+     yang mengundang ditekan tetapi selalu gagal lebih buruk daripada
+     layar yang mengatakan sejak awal bahwa ia sedang mati. */
+  if (!SIMULASI_HIDUP) {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-[#0f172a] p-6 text-white">
+        <div className="max-w-md rounded-2xl border border-dashed border-white/25 p-6 text-center">
+          <div className="text-2xl" aria-hidden>
+            🔌
+          </div>
+          <p className="mt-2 text-[0.86rem] leading-relaxed text-white/80">
+            {PESAN_SIMULASI_MATI}
+          </p>
+          <Link
+            href="/chat"
+            className="mt-4 inline-block rounded-lg bg-white/15 px-3 py-2 text-[0.78rem] font-bold text-white no-underline"
+          >
+            ← Kembali ke console
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-dvh flex-col bg-[#0f172a] text-white">

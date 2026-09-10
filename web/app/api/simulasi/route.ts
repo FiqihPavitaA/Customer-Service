@@ -5,6 +5,7 @@ import { kenaliMaksud, MODE_PENGENAL } from "@/lib/pengenal";
 import { getSupabaseSebagai, tokenDariHeader } from "@/lib/supabase/server";
 import { perkiraanBiaya } from "@/lib/voyage";
 import { cariToko, DAFTAR_TOKO, susunShopName } from "@/lib/toko";
+import { PESAN_SIMULASI_MATI, SIMULASI_HIDUP } from "@/lib/simulasi";
 import "@/lib/templates";
 import { routeToCategory, teksHandover } from "@/content/knowledge-base/router.js";
 
@@ -56,10 +57,16 @@ import { routeToCategory, teksHandover } from "@/content/knowledge-base/router.j
    benar-benar nol rupiah — Gerbang 2 akan dilewati dan hasilnya
    sama dengan "tidak ketemu".
 
-   HANYA HIDUP DI LUAR PRODUKSI
+   HANYA HIDUP DI DEPLOYMENT YANG MENYALAKANNYA
 
-   Dijaga NODE_ENV, bukan env var tersendiri: env var yang harus
-   diisi manual cepat atau lambat akan terisi di tempat yang salah.
+   Dijaga NEXT_PUBLIC_SIMULASI sejak 10 Sep 2026, menggantikan
+   NODE_ENV. Alasan lama — "env var yang harus diisi manual cepat
+   atau lambat akan terisi di tempat yang salah" — masih benar,
+   tetapi menganggap "produksi" sama dengan "tempat yang tidak boleh
+   diperagakan" ternyata keliru: Vercel menyetel NODE_ENV=production
+   pada SETIAP deployment, termasuk proyek uji coba yang belum punya
+   satu pun pengguna. Perkakas peragaan jadi mati justru di URL yang
+   ingin dibuka tim CS. Lihat lib/simulasi.ts.
    =========================================================== */
 
 export const runtime = "nodejs";
@@ -84,8 +91,8 @@ const AWALAN_SIMULASI = "sim_";
 const TOKO_BAWAAN = DAFTAR_TOKO[1];
 
 export async function POST(req: Request) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Tidak tersedia." }, { status: 404 });
+  if (!SIMULASI_HIDUP) {
+    return NextResponse.json({ error: PESAN_SIMULASI_MATI }, { status: 404 });
   }
 
   const sb = getSupabaseSebagai(tokenDariHeader(req));
@@ -404,8 +411,8 @@ export async function POST(req: Request) {
    =========================================================== */
 
 export async function DELETE(req: Request) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json({ error: "Tidak tersedia." }, { status: 404 });
+  if (!SIMULASI_HIDUP) {
+    return NextResponse.json({ error: PESAN_SIMULASI_MATI }, { status: 404 });
   }
 
   const sb = getSupabaseSebagai(tokenDariHeader(req));
