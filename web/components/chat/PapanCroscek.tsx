@@ -45,6 +45,7 @@ import {
   bukaPapan,
   geserPapan,
   kosongkanCroscek,
+  selesaikanCroscek,
   tandaiCroscek,
   useCroscek,
 } from "@/lib/croscek";
@@ -54,16 +55,19 @@ const LEBAR = 320;
 const SISA_TERLIHAT = 80;
 
 export default function PapanCroscek({
-  nomor,
   calon,
   onPilih,
 }: {
-  /** Nomor yang ditempel, apa adanya dan berurutan. */
-  nomor: string[];
   calon: CalonCroscek[];
   onPilih: (conversationId: string) => void;
 }) {
-  const { buka, posisi, sudah } = useCroscek();
+  /* Daftar nomor datang dari penyimpanan papan, BUKAN dari
+     lib/search.ts. Lihat komentar `nomor` di lib/croscek.ts —
+     menumpang pada penyaring pencarian membuat daftarnya lenyap
+     setiap halaman dimuat ulang, sementara tanda centangnya
+     bertahan; progres beberapa jam masih tersimpan tetapi tidak
+     bisa dilihat lagi. */
+  const { buka, posisi, nomor, sudah } = useCroscek();
   const [seret, setSeret] = useState<{ dx: number; dy: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -151,11 +155,15 @@ export default function PapanCroscek({
             {hitung.hilang > 0 && ` · ${hitung.hilang} tidak ketemu`}
           </div>
         </div>
+        {/* Menutup papan TIDAK membuang daftarnya — tombolnya ada
+            di kepala daftar percakapan untuk membukanya lagi.
+            Kalau ✕ ikut menghapus, satu klik meleset menghilangkan
+            pekerjaan setengah jam tanpa cara mengembalikannya. */}
         <button
           type="button"
           onClick={() => bukaPapan(false)}
-          title="Tutup papan"
-          aria-label="Tutup papan croscek"
+          title="Sembunyikan papan (daftar tetap tersimpan)"
+          aria-label="Sembunyikan papan croscek"
           className="shrink-0 cursor-pointer rounded-lg border-none bg-transparent px-1 text-[0.9rem] text-muted"
         >
           ✕
@@ -224,12 +232,28 @@ export default function PapanCroscek({
           type="button"
           onClick={kosongkanCroscek}
           disabled={hitung.sudah === 0}
+          title="Kosongkan centang, daftar nomornya tetap"
           className="cursor-pointer rounded-lg border border-line bg-white px-2.5 py-1 text-[0.72rem] font-semibold text-muted transition hover:border-[#b91c1c] hover:text-[#b91c1c] disabled:opacity-40"
         >
-          Hapus semua tanda
+          Reset tanda
         </button>
-        {selesai && (
-          <span className="text-[0.72rem] font-bold text-green-dark">Semua selesai 🎉</span>
+        {selesai ? (
+          <button
+            type="button"
+            onClick={selesaikanCroscek}
+            className="cursor-pointer rounded-lg border-none bg-green px-2.5 py-1 text-[0.72rem] font-bold text-white transition hover:bg-green-hover"
+          >
+            Selesai 🎉
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={selesaikanCroscek}
+            title="Buang daftar ini seluruhnya"
+            className="cursor-pointer rounded-lg border border-line bg-white px-2.5 py-1 text-[0.72rem] font-semibold text-muted transition hover:border-[#b91c1c] hover:text-[#b91c1c]"
+          >
+            Buang daftar
+          </button>
         )}
       </div>
     </div>

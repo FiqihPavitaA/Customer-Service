@@ -48,6 +48,7 @@ import { catalogStatusText, searchProducts, useCatalog } from "@/lib/catalog";
 import { inisial, jam, stempel, tanggalPanjang } from "@/lib/format";
 import { useSearch, type SearchScope } from "@/lib/search";
 import { cocokKata } from "@/lib/cocok";
+import { bukaPapan, useCroscek } from "@/lib/croscek";
 import {
   cocokToko,
   DAFTAR_TOKO,
@@ -329,6 +330,12 @@ function ConversationsPanel({
   onPick: (id: string) => void;
   onClose?: () => void;
 }) {
+  /* Dibaca langsung dari store, bukan diteruskan lewat prop.
+     Papan croscek tidak ada hubungannya dengan percakapan mana pun,
+     jadi menyalurkannya turun lewat halaman hanya menambah dua
+     lapis prop tanpa menambah kejelasan apa pun. */
+  const croscek = useCroscek();
+
   return (
     <div className="flex h-full flex-col border-r border-line bg-white">
       {onClose && (
@@ -395,6 +402,22 @@ function ConversationsPanel({
       </div>
 
       <SimulasiPesan jumlahSimulasi={jumlahSimulasi} />
+
+      {/* Jalan kembali ke papan yang disembunyikan. Tanpa tombol
+          ini, menutup papan berarti kehilangan daftarnya untuk
+          selamanya — datanya masih ada di localStorage, tapi tidak
+          ada satu pun cara memanggilnya lagi. */}
+      {croscek.nomor.length > 0 && !croscek.buka && (
+        <div className="border-b border-line-soft px-2 py-2">
+          <button
+            type="button"
+            onClick={() => bukaPapan(true)}
+            className="w-full cursor-pointer rounded-xl border border-[#f59e0b]/50 bg-[#fffbeb] px-3 py-2 text-[0.78rem] font-bold text-[#92400e] transition hover:bg-[#fef3c7]"
+          >
+            📋 Buka papan croscek ({croscek.sudah.length}/{croscek.nomor.length})
+          </button>
+        </div>
+      )}
 
       <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
         {rows.length === 0 && (
@@ -1285,7 +1308,6 @@ export default function Chat() {
           dalam salah satu panel berarti ia ikut tergeser setiap
           kali panel itu berubah. */}
       <PapanCroscek
-        nomor={search.terms}
         calon={calonCroscek}
         onPilih={(id) => {
           pick(id);

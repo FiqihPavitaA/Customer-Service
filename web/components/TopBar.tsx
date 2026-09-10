@@ -16,7 +16,8 @@ import {
   useSearch,
   type SearchScope,
 } from "@/lib/search";
-import { bukaPapan } from "@/lib/croscek";
+import { mulaiCroscek } from "@/lib/croscek";
+import { kunciCroscek } from "@/lib/cocok";
 
 /* ===========================================================
    TopBar — pengganti <header class="topbar"> di HTML lama.
@@ -93,8 +94,11 @@ function MassModal({
     /* Papan croscek dibuka otomatis. Alasannya: yang dibutuhkan
        setelah menempel 30 nomor bukan daftar percakapan tersaring,
        melainkan daftar tugas — dan nomor yang TIDAK ketemu hanya
-       terlihat di papan itu, tidak pernah di daftar tersaring. */
-    bukaPapan(true);
+       terlihat di papan itu, tidak pernah di daftar tersaring.
+
+       Daftarnya disimpan di papan, bukan hanya di search.terms,
+       supaya bertahan setelah halaman dimuat ulang. */
+    mulaiCroscek(terms, terms.map(kunciCroscek));
     toast(`${terms.length} nomor dicari — papan croscek dibuka 📋`);
     onClose();
   };

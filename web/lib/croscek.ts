@@ -34,11 +34,28 @@ export type PosisiPapan = { x: number; y: number };
 type Keadaan = {
   buka: boolean;
   posisi: PosisiPapan;
+  /**
+   * Nomor yang sedang dikerjakan, apa adanya seperti ditempel.
+   *
+   * PAPAN MEMILIKI DAFTARNYA SENDIRI, TIDAK MENUMPANG search.terms.
+   *
+   * Awalnya papan membaca daftar dari lib/search.ts. Akibatnya
+   * setelah halaman dimuat ulang, tanda centang tetap tersimpan
+   * tetapi daftarnya lenyap — papan menganggap dirinya terbuka lalu
+   * menyembunyikan diri karena tidak punya baris. Progres beberapa
+   * jam masih ada di localStorage, tanpa satu pun cara melihatnya.
+   *
+   * Keduanya memang beda umur: search.terms adalah penyaring
+   * sesaat, daftar ini adalah tugas yang berlangsung berjam-jam.
+   * Menyatukannya berarti yang berumur panjang ikut mati bersama
+   * yang berumur pendek.
+   */
+  nomor: string[];
   /** Kunci ternormalkan dari nomor yang sudah dicek. */
   sudah: string[];
 };
 
-const AWAL: Keadaan = { buka: false, posisi: { x: 24, y: 96 }, sudah: [] };
+const AWAL: Keadaan = { buka: false, posisi: { x: 24, y: 96 }, nomor: [], sudah: [] };
 
 function muat(): Keadaan {
   if (typeof window === "undefined") return AWAL;
@@ -52,6 +69,7 @@ function muat(): Keadaan {
         d.posisi && typeof d.posisi.x === "number" && typeof d.posisi.y === "number"
           ? d.posisi
           : AWAL.posisi,
+      nomor: Array.isArray(d.nomor) ? d.nomor.filter((s) => typeof s === "string") : [],
       sudah: Array.isArray(d.sudah) ? d.sudah.filter((s) => typeof s === "string") : [],
     };
   } catch {
@@ -99,6 +117,38 @@ export function useCroscek(): Keadaan {
 
 export function bukaPapan(buka: boolean) {
   ubah({ ...state, buka });
+}
+
+/**
+ * Mulai tugas croscek baru dengan daftar nomor yang baru ditempel.
+ *
+ * TANDA LAMA DIPANGKAS, TIDAK DIBIARKAN MENUMPUK.
+ *
+ * Yang dipertahankan hanya tanda untuk nomor yang MASIH ada di
+ * daftar baru. Dua alasan: localStorage tidak tumbuh selamanya,
+ * dan nomor yang kebetulan muncul lagi berbulan-bulan kemudian
+ * tidak tiba-tiba tampil "sudah dicek" karena pernah dicek pada
+ * tugas yang sama sekali berbeda.
+ *
+ * @param nomor daftar apa adanya; urutannya dipertahankan karena
+ *        CS membandingkannya baris demi baris dengan pesan gudang.
+ * @param kunci kunci ternormalkan dari daftar itu, dihitung
+ *        pemanggil (lib/cocok.ts) supaya berkas ini tetap tanpa
+ *        impor dan bisa dijalankan Node.
+ */
+export function mulaiCroscek(nomor: string[], kunci: string[]) {
+  const masih = new Set(kunci);
+  ubah({
+    ...state,
+    nomor,
+    sudah: state.sudah.filter((s) => masih.has(s)),
+    buka: true,
+  });
+}
+
+/** Tutup papan DAN buang daftarnya — tugasnya dianggap selesai. */
+export function selesaikanCroscek() {
+  ubah({ ...state, nomor: [], sudah: [], buka: false });
 }
 
 export function geserPapan(posisi: PosisiPapan) {
