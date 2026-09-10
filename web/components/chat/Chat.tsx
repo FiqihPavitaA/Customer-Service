@@ -719,6 +719,17 @@ export default function Chat() {
         // yang diputuskan boleh dicatat ke antrean CS.
         body: JSON.stringify({ message, history: [], conversationId: active.id }),
       });
+      /* 423 = penjaga saldo, bukan kerusakan.
+         Dipisah dari galat lain karena keduanya terlihat sama di
+         layar tetapi artinya berlawanan: yang satu "ada yang rusak",
+         yang satu "sistem menolak membelanjakan uang Anda, sesuai
+         perintah". Saat memperagakan ke orang lain, membiarkan
+         keduanya berbunyi "AI belum aktif" membuat pengaman yang
+         bekerja dengan benar terlihat seperti kegagalan. */
+      if (resp.status === 423) {
+        toast("🔒 Penguncian saldo aktif — Claude sengaja tidak dipanggil");
+        return;
+      }
       if (!resp.ok) throw new Error(String(resp.status));
       const data = (await resp.json()) as {
         action: ActionCode;
