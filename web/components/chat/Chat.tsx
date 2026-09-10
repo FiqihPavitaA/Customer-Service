@@ -28,7 +28,7 @@
    menutup jalur XSS dari isi chat pelanggan.
    =========================================================== */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/Toast";
 import { actionTagClass } from "@/components/ai/actionTag";
 import { DemoNotice } from "@/components/ui/Bits";
@@ -46,7 +46,7 @@ import {
 import type { ActionCode, Conversation } from "@/lib/db/types";
 import { catalogStatusText, searchProducts, useCatalog } from "@/lib/catalog";
 import { inisial, jam, stempel, tanggalPanjang } from "@/lib/format";
-import { useSearch, type SearchScope } from "@/lib/search";
+import { clearSearch, useSearch, type SearchScope } from "@/lib/search";
 import { cocokKata } from "@/lib/cocok";
 import { bukaPapan, useCroscek } from "@/lib/croscek";
 import {
@@ -313,6 +313,10 @@ function ConversationsPanel({
   counts,
   menungguSejak,
   jumlahSimulasi,
+  tersembunyi,
+  sebab,
+  adaPenyaring,
+  onReset,
   onPick,
   onClose,
 }: {
@@ -327,6 +331,13 @@ function ConversationsPanel({
   menungguSejak: Map<string, string>;
   /** Berapa percakapan buatan simulasi yang bisa dibersihkan. */
   jumlahSimulasi: number;
+  /** Cocok dengan tab ini, tetapi disembunyikan toko/pencarian. */
+  tersembunyi: number;
+  /** Penyaring mana yang menyembunyikannya — "pilihan toko" dsb. */
+  sebab: string;
+  /** Ada penyaring yang sedang menyala sama sekali? */
+  adaPenyaring: boolean;
+  onReset: () => void;
   onPick: (id: string) => void;
   onClose?: () => void;
 }) {
@@ -419,16 +430,40 @@ function ConversationsPanel({
         </div>
       )}
 
+      {/* Percakapan yang cocok tab ini tetapi tidak terlihat karena
+          toko atau pencarian. Ditaruh di atas daftar, bukan di
+          tempat kosong di bawahnya: saat daftarnya panjang, catatan
+          di bawah tidak pernah terbaca siapa pun. */}
+      {tersembunyi > 0 && (
+        <div className="flex items-center gap-2 border-b border-[#f59e0b]/40 bg-[#fffbeb] px-3 py-2 text-[0.74rem] text-[#92400e]">
+          <span className="min-w-0 flex-1">
+            <b>{tersembunyi}</b> percakapan lain di tab ini disembunyikan {sebab}.
+          </span>
+          <button
+            type="button"
+            onClick={onReset}
+            className="shrink-0 cursor-pointer rounded-lg border border-[#f59e0b]/60 bg-white px-2 py-1 font-bold text-[#92400e]"
+          >
+            Tampilkan semua
+          </button>
+        </div>
+      )}
+
       <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
         {rows.length === 0 && (
           <li className="px-4 py-8 text-center text-[0.84rem] text-muted">
-            {/* Antrean kosong itu kabar baik, bukan hasil pencarian
-                yang nihil. Kalimatnya harus berbeda supaya CS tahu
-                bedanya "tidak ada yang menunggu" dari "filternya
-                terlalu sempit". */}
-            {filter === "cs"
-              ? "Tidak ada yang menunggu CS 🎉"
-              : "Tidak ada percakapan yang cocok."}
+            {/* Tiga kalimat, bukan dua. "Tidak ada yang menunggu CS 🎉"
+                hanya boleh muncul kalau memang tidak ada — kalau yang
+                menunggu sebenarnya ada tetapi tersembunyi penyaring,
+                ucapan selamat itu menyuruh CS pulang dari antrean yang
+                masih terisi. */}
+            {tersembunyi > 0
+              ? "Semuanya sedang disembunyikan penyaring di atas."
+              : adaPenyaring
+                ? "Tidak ada percakapan yang cocok dengan penyaring ini."
+                : filter === "cs"
+                  ? "Tidak ada yang menunggu CS 🎉"
+                  : "Tidak ada percakapan yang cocok."}
           </li>
         )}
         {rows.map((c) => (
@@ -837,20 +872,30 @@ export default function Chat() {
     return peta;
   }, [escalations]);
 
-  const rows = useMemo(() => {
+  /* --- Penyaring di luar tab: toko, kotak cari panel, cari topbar --
+
+     Dipisahkan dari tab dan dihitung SEKALI, lalu dipakai daftar DAN
+     angka di lencana tab. Sebelum 10 Sep 2026 keduanya dihitung
+     sendiri-sendiri: lencana hanya memperhitungkan toko, sedangkan
+     daftar juga memperhitungkan pencarian. Akibatnya tab "Perlu CS"
+     bisa menulis 3 sementara daftarnya berbunyi "Tidak ada yang
+     menunggu CS 🎉" — dua kalimat di layar yang sama yang saling
+     membantah, tanpa satu pun galat.
+
+     Dilaporkan pemilik proyek setelah mengirim foto dari /simulasi:
+     angkanya naik, percakapannya tidak pernah muncul. Sekarang
+     mustahil berselisih, karena sumbernya satu. */
+  const dasar = useMemo(() => {
     // Tidak dikecilkan di sini: cocokKata() yang mengurus huruf
     // besar-kecil DAN tanda baca sekaligus.
     const q = panelQuery.trim();
-    const tersaring = conversations.filter((c) => {
+    return conversations.filter((c) => {
       /* Penyaringan toko — sampai 10 Sep 2026 baris ini TIDAK ADA.
          `activeShop` disimpan, warnanya berubah saat diklik, tetapi
          daftar percakapannya tidak pernah ikut berubah. Toko yang
          berbeda menampilkan pelanggan yang persis sama, dan tidak
          ada galat apa pun yang menunjukkan bahwa itu keliru. */
       if (!cocokToko(c.shop_name, activeShop)) return false;
-
-      if (filter === "unread" && !c.unread) return false;
-      if (filter === "cs" && !menungguSejak.has(c.id)) return false;
 
       /* Kotak "Cari percakapan…" di panel ini mencari SEMUA bidang,
          bukan hanya nama dan cuplikan pesan terakhir seperti
@@ -868,6 +913,20 @@ export default function Chat() {
       }
       return true;
     });
+  }, [conversations, panelQuery, search, activeShop]);
+
+  /** Apakah sebuah percakapan masuk tab yang sedang dibuka. */
+  const cocokTab = useCallback(
+    (c: Conversation) => {
+      if (filter === "unread") return c.unread;
+      if (filter === "cs") return menungguSejak.has(c.id);
+      return true;
+    },
+    [filter, menungguSejak],
+  );
+
+  const rows = useMemo(() => {
+    const tersaring = dasar.filter(cocokTab);
 
     /* Urutan antrean berlawanan dengan urutan inbox, dan itu
        disengaja. Daftar biasa menaruh yang terbaru di atas; antrean
@@ -880,7 +939,7 @@ export default function Chat() {
         Date.parse(menungguSejak.get(a.id) ?? "") -
         Date.parse(menungguSejak.get(b.id) ?? ""),
     );
-  }, [conversations, filter, panelQuery, search, menungguSejak, activeShop]);
+  }, [dasar, cocokTab, filter, menungguSejak]);
 
   /* Hitungan per toko — dipakai lencana di panel kiri.
      Sengaja dihitung atas SELURUH percakapan, bukan atas `rows`:
@@ -897,17 +956,56 @@ export default function Chat() {
     return peta;
   }, [conversations]);
 
-  /* Angka tab dihitung dalam lingkup toko yang sedang dipilih.
-     Kalau tidak, tab "Perlu CS" bisa menulis 3 sementara daftarnya
-     kosong — karena ketiganya milik toko lain. */
-  const dalamToko = useMemo(
-    () => conversations.filter((c) => cocokToko(c.shop_name, activeShop)),
-    [conversations, activeShop],
+  /* Angka tab dihitung atas `dasar` — persis himpunan yang dipakai
+     daftar. Lencana yang berbunyi 3 karena itu selalu berarti tiga
+     baris yang benar-benar bisa dilihat dan diklik. */
+  const counts = {
+    unread: dasar.filter((c) => c.unread).length,
+    cs: dasar.filter((c) => menungguSejak.has(c.id)).length,
+  };
+
+  /* --- Yang disembunyikan penyaring, dan harus tetap dikatakan ----
+
+     Menyamakan lencana dengan daftar memperbaiki kebohongannya,
+     tetapi memunculkan bahaya kedua yang lebih halus: percakapan
+     yang menunggu CS di toko lain sekarang menghitung NOL, dan
+     layar berbunyi "Tidak ada yang menunggu CS 🎉" pada saat ada
+     orang yang benar-benar menunggu. Diam yang menenangkan justru
+     lebih berbahaya daripada angka yang salah.
+
+     Jadi yang tersembunyi tetap dihitung — hanya diletakkan
+     terpisah, dengan satu tombol untuk melihatnya. */
+  const tersembunyi = useMemo(
+    () => conversations.filter(cocokTab).length - rows.length,
+    [conversations, cocokTab, rows.length],
   );
 
-  const counts = {
-    unread: dalamToko.filter((c) => c.unread).length,
-    cs: dalamToko.filter((c) => menungguSejak.has(c.id)).length,
+  const adaPenyaring =
+    activeShop !== SEMUA_TOKO ||
+    panelQuery.trim().length > 0 ||
+    search.terms.length > 0 ||
+    search.single.trim().length > 0;
+
+  /* Menyebut penyaring MANA yang menyembunyikannya. "Disembunyikan
+     oleh filter" tidak menolong siapa pun: yang perlu diketahui CS
+     adalah apakah ia harus mengganti toko atau mengosongkan kotak
+     pencarian. */
+  const adaCarian =
+    search.terms.length > 0 ||
+    search.single.trim().length > 0 ||
+    panelQuery.trim().length > 0;
+  const sebabTersembunyi =
+    activeShop !== SEMUA_TOKO && adaCarian
+      ? `pilihan toko "${activeShop}" dan pencarian`
+      : activeShop !== SEMUA_TOKO
+        ? `pilihan toko "${activeShop}"`
+        : "pencarian yang sedang aktif";
+
+  /** Kembalikan daftar ke keadaan "tidak menyaring apa pun". */
+  const bersihkanPenyaring = () => {
+    setActiveShop(SEMUA_TOKO);
+    setPanelQuery("");
+    clearSearch();
   };
 
   /* Dihitung atas SELURUH percakapan, bukan atas toko yang sedang
@@ -1062,6 +1160,10 @@ export default function Chat() {
           counts={counts}
           menungguSejak={menungguSejak}
           jumlahSimulasi={jumlahSimulasi}
+          tersembunyi={tersembunyi}
+          sebab={sebabTersembunyi}
+          adaPenyaring={adaPenyaring}
+          onReset={bersihkanPenyaring}
           onPick={pick}
         />
       </section>
@@ -1321,6 +1423,10 @@ export default function Chat() {
               counts={counts}
               menungguSejak={menungguSejak}
               jumlahSimulasi={jumlahSimulasi}
+              tersembunyi={tersembunyi}
+              sebab={sebabTersembunyi}
+              adaPenyaring={adaPenyaring}
+              onReset={bersihkanPenyaring}
               onPick={pick}
               onClose={() => setOverlay(null)}
             />

@@ -289,8 +289,9 @@ export async function POST(req: Request) {
   /* Jalur yang SAMA dengan /api/chat, bukan salinannya. Kalau
      catatHandover() berubah, peragaan ikut berubah — dan itulah
      yang membuat peragaan ini tetap jujur seiring waktu. */
+  const perluHandover = adaFoto || actionTemplate === "HANDOVER_TO_CS";
   const handover =
-    adaFoto || actionTemplate === "HANDOVER_TO_CS"
+    perluHandover
       ? await catatHandover(sb, {
           conversationId: id,
           sumber: adaFoto
@@ -305,11 +306,43 @@ export async function POST(req: Request) {
         })
       : null;
 
+  /* ---------- Kegagalan mencatat handover harus terdengar --------
+
+     catatHandover() sengaja tidak pernah melempar: gagal mencatat
+     lebih ringan daripada gagal membalas. Konsekuensinya, kalau
+     pencatatan itu gagal, satu-satunya jejaknya ada di terminal
+     server — dan orang yang sedang memperagakan justru sedang
+     menatap peramban.
+
+     Yang terlihat kemudian persis seperti yang dilaporkan pemilik
+     proyek pada 10 Sep 2026: percakapannya tetap dibuat dan
+     lencana "belum dibaca" tetap naik, tetapi antrean "Perlu CS"
+     tidak pernah menampilkannya. Tidak ada satu pun kalimat di
+     layar yang menyebut ada yang gagal.
+
+     eskalasiBaru === false juga dihitung gagal DI SINI, walau di
+     /api/chat artinya "sudah ada eskalasi terbuka". Percakapan ini
+     baru dibuat sedetik yang lalu, jadi mustahil punya eskalasi
+     lama — nilai false hanya bisa berarti insert-nya ditolak. */
+  const peringatan = !perluHandover
+    ? null
+    : !handover
+      ? "Percakapan dibuat, tetapi penandaan handover GAGAL — antrean " +
+        "'Perlu CS' tidak akan menampilkannya. Alasannya tercetak di " +
+        "terminal server (cari baris berawalan [handover])."
+      : !handover.eskalasiBaru
+        ? "Percakapan ditandai handover, tetapi barisnya GAGAL masuk " +
+          "tabel escalations — tab 'Perlu CS' bekerja atas tabel itu, " +
+          "jadi percakapan ini tidak akan muncul di sana. Alasannya " +
+          "tercetak di terminal server (cari baris berawalan [handover])."
+        : null;
+
   return NextResponse.json({
     ok: true,
     conversationId: id,
     nama,
     toko: toko.nama,
+    peringatan,
     // Gerbang mana yang menjawab — inilah yang paling ingin dilihat
     // penonton, dan satu-satunya yang menjelaskan kenapa sebagian
     // pertanyaan gratis dan sebagian tidak.

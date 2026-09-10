@@ -58,6 +58,9 @@ type Jawaban = {
   biaya?: string;
   modeProduksi?: string;
   handover?: { eskalasiBaru: boolean } | null;
+  /** Terisi bila handover diputuskan tetapi gagal tercatat. */
+  peringatan?: string | null;
+  toko?: string;
   pengenal?: { jenis: string; skor?: number; alasan?: string } | null;
 };
 
@@ -141,10 +144,28 @@ export default function SimulasiPelanggan() {
       }
 
       if (d.handover?.eskalasiBaru) {
+        /* Nama tokonya ikut disebut. Console menyaring daftar per
+           toko, jadi "masuk antrean" saja belum cukup menuntun
+           orang ke barisnya — kalau panel kiri sedang memilih toko
+           lain, barisnya memang ada tetapi tidak terlihat, dan itu
+           terbaca persis seperti kegagalan. */
         setRiwayat((r) => [
           ...r,
-          { dari: "sistem", teks: "Masuk antrean Perlu CS di console. AI dijeda 24 jam." },
+          {
+            dari: "sistem",
+            teks:
+              `Masuk antrean Perlu CS di console — toko ${d.toko ?? toko}. ` +
+              "AI dijeda 24 jam.",
+            meta: "Kalau tidak terlihat, pastikan panel toko di console memilih toko itu atau «Semua toko».",
+          },
         ]);
+      }
+
+      /* Handover yang diputuskan tetapi gagal dicatat. Tanpa baris
+         ini kegagalannya hanya ada di terminal server, sementara
+         layar tetap tampak berhasil. */
+      if (d.peringatan) {
+        setRiwayat((r) => [...r, { dari: "sistem", teks: "⚠️ " + d.peringatan! }]);
       }
     } catch (e) {
       setRiwayat((r) => [...r, { dari: "sistem", teks: (e as Error).message }]);
