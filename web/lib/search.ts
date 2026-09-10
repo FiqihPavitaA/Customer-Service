@@ -27,8 +27,16 @@ export const SCOPE_LABEL: Record<SearchScope, string> = {
   produk: "Nama Produk",
 };
 
-/** Lingkup yang mendukung pencarian massal (tempel banyak nomor). */
-export const MASS_SCOPES: SearchScope[] = ["pesanan", "resi"];
+/**
+ * Lingkup yang mendukung pencarian massal (tempel banyak nomor).
+ *
+ * "semua" ikut, dan itu perbaikan atas regresi yang dibuat saat
+ * lingkup bawaan diubah menjadi "semua": klik 2× di kotak pencarian
+ * mendadak tidak melakukan apa-apa, karena fiturnya hanya menyala
+ * pada dua lingkup lama. Justru pada lingkup bawaan itulah tim
+ * gudang menempelkan daftar nomor pesanannya.
+ */
+export const MASS_SCOPES: SearchScope[] = ["semua", "pesanan", "resi"];
 
 type SearchState = {
   scope: SearchScope;

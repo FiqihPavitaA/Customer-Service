@@ -16,6 +16,7 @@ import {
   useSearch,
   type SearchScope,
 } from "@/lib/search";
+import { bukaPapan } from "@/lib/croscek";
 
 /* ===========================================================
    TopBar — pengganti <header class="topbar"> di HTML lama.
@@ -27,7 +28,11 @@ import {
    Resi" yang membuka Pencarian Massal.
    =========================================================== */
 
-const SCOPES: SearchScope[] = ["nama", "pesanan", "resi", "chat", "produk"];
+/* "semua" di depan, dan itu wajib: ia lingkup bawaan. Tanpa
+   masuk daftar ini, dropdown menampilkan pilihan yang BUKAN yang
+   sedang berlaku — <select> akan tampak memilih "Nama Pembeli"
+   sementara pencariannya mencakup semua bidang. */
+const SCOPES: SearchScope[] = ["semua", "nama", "pesanan", "resi", "chat", "produk"];
 
 function IconButton({
   title,
@@ -69,7 +74,15 @@ function MassModal({
 }) {
   const toast = useToast();
   const [raw, setRaw] = useState("");
-  const isPesanan = scope === "pesanan";
+  /* Lingkup "semua" mencari nomor pesanan MAUPUN resi, jadi
+     judulnya tidak boleh memilih salah satu. Sebelum lingkup itu
+     ada, dua cabang sudah cukup; sekarang tidak. */
+  const labelNomor =
+    scope === "pesanan"
+      ? "Nomor Pesanan"
+      : scope === "resi"
+        ? "Nomor Resi"
+        : "Nomor Pesanan / Resi";
 
   const cari = () => {
     const terms = setTerms(raw);
@@ -77,7 +90,12 @@ function MassModal({
       toast("Tempel minimal satu nomor dulu, Kak");
       return;
     }
-    toast(`${terms.length} ${isPesanan ? "no. pesanan" : "resi"} dicari`);
+    /* Papan croscek dibuka otomatis. Alasannya: yang dibutuhkan
+       setelah menempel 30 nomor bukan daftar percakapan tersaring,
+       melainkan daftar tugas — dan nomor yang TIDAK ketemu hanya
+       terlihat di papan itu, tidak pernah di daftar tersaring. */
+    bukaPapan(true);
+    toast(`${terms.length} nomor dicari — papan croscek dibuka 📋`);
     onClose();
   };
 
@@ -100,7 +118,7 @@ function MassModal({
       >
         <div className="mb-2 flex items-start justify-between gap-3">
           <h3 className="m-0 text-[1.1rem] font-bold">
-            Pencarian Massal — {isPesanan ? "Nomor Pesanan" : "Nomor Resi"}
+            Pencarian Massal — {labelNomor}
           </h3>
           <button
             type="button"
@@ -113,7 +131,7 @@ function MassModal({
           </button>
         </div>
         <p className="mt-0 mb-4 text-[0.86rem] leading-relaxed text-muted">
-          Tempel beberapa {isPesanan ? "nomor pesanan" : "nomor resi"} — satu per baris
+          Tempel beberapa nomor — satu per baris
           atau dipisah koma — untuk mencari banyak sekaligus (maks. 50).
         </p>
         <textarea

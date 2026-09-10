@@ -92,3 +92,87 @@ export function cocokKata(nilai: string, kunci: string): boolean {
 
   return berbentukNomor(n) && k.includes(n);
 }
+
+/* ===========================================================
+   Daftar croscek — hasil pencarian massal
+   ===========================================================
+   Tim gudang mengirim daftar nomor pesanan yang perlu diperiksa
+   ulang CS. Yang dibutuhkan CS bukan "percakapan mana yang cocok",
+   melainkan sebaliknya: NOMOR MANA YANG BELUM DIA TANGANI.
+
+   Bedanya menentukan bentuk datanya. Daftar percakapan yang
+   tersaring menyembunyikan nomor yang TIDAK ketemu — padahal
+   nomor yang tidak ketemu justru yang paling perlu dilihat: entah
+   salah ketik, entah pesanannya memang belum pernah masuk chat.
+   Karena itu susunan di bawah berangkat dari daftar nomornya, dan
+   setiap nomor selalu muncul satu baris apa pun hasilnya.
+   =========================================================== */
+
+/** Percakapan seminimal yang dibutuhkan — sengaja bukan tipe penuh. */
+export type CalonCroscek = {
+  id: string;
+  nama: string;
+  nomorPesanan: string;
+  nomorResi: string;
+};
+
+export type BarisCroscek = {
+  /** Nomor apa adanya seperti ditempel, untuk ditampilkan lagi. */
+  nomor: string;
+  /** null bila tidak ada percakapan yang cocok. */
+  conversationId: string | null;
+  nama: string | null;
+  sudah: boolean;
+};
+
+/**
+ * Susun daftar croscek dari nomor yang ditempel.
+ *
+ * @param nomor  daftar nomor apa adanya (sudah dipisah pemanggil)
+ * @param calon  seluruh percakapan yang mungkin cocok
+ * @param sudah  nomor-nomor yang sudah ditandai selesai
+ *
+ * Urutannya mengikuti urutan tempelan, BUKAN diurutkan ulang. Tim
+ * gudang mengirim daftarnya dalam urutan tertentu, dan CS akan
+ * membandingkan layar dengan pesan aslinya baris demi baris.
+ * Mengurutkan ulang membuat perbandingan itu mustahil.
+ */
+export function susunCroscek(
+  nomor: readonly string[],
+  calon: readonly CalonCroscek[],
+  sudah: ReadonlySet<string>,
+): BarisCroscek[] {
+  return nomor.map((n) => {
+    const cocok = calon.find(
+      (c) => cocokKata(c.nomorPesanan, n) || cocokKata(c.nomorResi, n),
+    );
+    return {
+      nomor: n,
+      conversationId: cocok?.id ?? null,
+      nama: cocok?.nama ?? null,
+      sudah: sudah.has(kunciCroscek(n)),
+    };
+  });
+}
+
+/**
+ * Kunci penyimpanan tanda "sudah dicek".
+ *
+ * Dinormalkan supaya "#240617XXXX" dan "240617XXXX" dianggap nomor
+ * yang sama. Tanpa itu, CS yang menempel ulang daftar dengan format
+ * sedikit berbeda akan melihat seluruh tandanya hilang — dan
+ * pekerjaan setengah jam terlihat seperti belum pernah dilakukan.
+ */
+export function kunciCroscek(nomor: string): string {
+  return normalkan(nomor);
+}
+
+/** Berapa yang sudah dicek dari total. */
+export function hitungCroscek(baris: readonly BarisCroscek[]) {
+  return {
+    total: baris.length,
+    sudah: baris.filter((b) => b.sudah).length,
+    ketemu: baris.filter((b) => b.conversationId).length,
+    hilang: baris.filter((b) => !b.conversationId).length,
+  };
+}

@@ -49,7 +49,7 @@ pemilik proyek menjawab.
 | `npm run uji-handover` | 41 kasus aturan jeda AI setelah handover: batas 24 jam, offset WIB vs Z, dan nilai rusak yang bisa membisukan AI selamanya |
 | `npm run uji-ringkasan` | 21 kasus angka nyata Beranda & Statistik: antrean tertua (bukan rata-rata), rentang waktu, dan nol yang berbeda dari "belum ada data" |
 | `npm run uji-pesanan` | 26 kasus pesanan contoh di tab Pesanan: nomor tidak pernah berubah (kalau berubah, pencarian diam-diam gagal), data asli tidak ditimpa, katalog kosong tidak mengarang nama produk |
-| `npm run uji-cari` | 32 kasus pencocokan pencarian: nomor bertanda baca tetap ketemu, nomor berlabel tetap ketemu, dan nama pendek TIDAK melebar |
+| `npm run uji-cari` | 46 kasus pencocokan pencarian & papan croscek: nomor bertanda baca tetap ketemu, nama pendek TIDAK melebar, nomor yang tidak ketemu tidak pernah hilang dari daftar |
 | `npm run periksa-sumber` | Apakah tabel `templates` & `pustaka_router()` siap dipakai router (membaca Supabase, tidak menulis) |
 | `npm run periksa-aturan` | Aturan pemicu di tabel masih sepadan dengan berkas .md — menangkap `also`/`unless` yang hilang |
 | `POST /api/pengenal/bangun` tanpa `jalankan` | Berapa contoh yang belum bervektor & perkiraan biayanya |

@@ -17,7 +17,9 @@
    siapa pun, dan karena itu tidak pernah diperbaiki.
    =========================================================== */
 
-const { cocokKata, normalkan } = await import("../lib/cocok.ts");
+const { cocokKata, normalkan, susunCroscek, hitungCroscek, kunciCroscek } = await import(
+  "../lib/cocok.ts"
+);
 
 let lulus = 0;
 let gagal = 0;
@@ -111,6 +113,60 @@ periksa(
   "digabung -> nomor berlabel TIDAK ketemu (alasan bidang dipisah)",
   !cocokKata(digabung, "Pesanan: 260909KMTPRWX"),
 );
+
+console.log("\n8. Papan croscek — daftar tugas dari tim gudang");
+/* Bentuk tempelan yang sungguhan dikirim tim gudang. */
+const DARI_GUDANG = ["#584590031216740091", "#240611AB12", "#240617XXXX"];
+const CALON = [
+  {
+    id: "c1",
+    nama: "budi.santoso",
+    nomorPesanan: "240617XXXX",
+    nomorResi: "JNT112233445",
+  },
+  {
+    id: "c2",
+    nama: "yoga.pratama",
+    nomorPesanan: "260909KMTPRWX",
+    nomorResi: "584590031216740091",
+  },
+];
+
+const daftar = susunCroscek(DARI_GUDANG, CALON, new Set());
+periksa("tiap nomor tetap satu baris", daftar.length === 3, `${daftar.length}`);
+periksa("urutan tempelan dipertahankan", daftar[0].nomor === DARI_GUDANG[0]);
+periksa("nomor berpagar tetap ketemu", daftar[0].conversationId === "c2");
+periksa("ketemu lewat resi, bukan hanya pesanan", daftar[0].nama === "yoga.pratama");
+periksa("nomor pesanan ketemu", daftar[2].conversationId === "c1");
+
+/* Yang paling penting: nomor yang TIDAK ketemu tidak boleh hilang.
+   Justru itu yang menuntut tindakan lain — konfirmasi ulang ke
+   gudang, bukan membaca chat. Daftar percakapan yang tersaring
+   menyembunyikannya; papan ini tidak. */
+periksa("nomor tak dikenal TETAP muncul", daftar[1].nomor === "#240611AB12");
+periksa("dan ditandai tidak ketemu", daftar[1].conversationId === null);
+
+const h = hitungCroscek(daftar);
+periksa("hitungan: 3 total, 2 ketemu, 1 hilang", h.total === 3 && h.ketemu === 2 && h.hilang === 1);
+periksa("belum ada yang dicek", h.sudah === 0);
+
+console.log("\n9. Tanda 'sudah dicek' bertahan lintas format");
+/* CS menandai dari daftar berpagar, lalu gudang mengirim ulang
+   daftar tanpa pagar. Tandanya harus tetap ada — kalau tidak,
+   pekerjaan setengah jam terlihat seperti belum pernah dilakukan. */
+const ditandai = new Set([kunciCroscek("#240617XXXX")]);
+const lagi = susunCroscek(["240617XXXX"], CALON, ditandai);
+periksa("tanpa pagar tetap dianggap sudah dicek", lagi[0].sudah === true);
+periksa(
+  "kunci berpagar dan tanpa pagar sama",
+  kunciCroscek("#240617XXXX") === kunciCroscek("240617xxxx"),
+);
+periksa("nomor lain tidak ikut tertandai", susunCroscek(["#240611AB12"], CALON, ditandai)[0].sudah === false);
+
+console.log("\n10. Daftar kosong");
+const nol = susunCroscek([], CALON, new Set());
+periksa("tidak ada baris", nol.length === 0);
+periksa("hitungan nol semua, bukan NaN", hitungCroscek(nol).total === 0);
 
 console.log(`\n${"-".repeat(52)}`);
 console.log(`Pencocokan cari : ${gagal === 0 ? "LULUS" : "GAGAL"} ${lulus}/${lulus + gagal}`);

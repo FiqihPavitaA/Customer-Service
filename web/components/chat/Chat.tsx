@@ -34,6 +34,7 @@ import { actionTagClass } from "@/components/ai/actionTag";
 import { DemoNotice } from "@/components/ui/Bits";
 import IntegrateModal, { type PlatformName } from "./IntegrateModal";
 import SimulasiPesan from "./SimulasiPesan";
+import PapanCroscek from "./PapanCroscek";
 import {
   appendMessage,
   markRead,
@@ -894,6 +895,26 @@ export default function Chat() {
     (c.customer_id ?? "").startsWith("sim_"),
   ).length;
 
+  /* Calon untuk papan croscek — dari SELURUH percakapan, tanpa
+     memedulikan toko yang dipilih maupun tab yang aktif.
+
+     Daftar dari tim gudang tidak mengenal pembagian itu: satu
+     nomor bisa milik toko mana pun. Kalau calonnya ikut tersaring,
+     nomor yang sebenarnya ada akan dilaporkan "tidak ada
+     percakapan" hanya karena CS kebetulan sedang membuka toko
+     lain — dan CS akan menghubungi gudang untuk mengonfirmasi
+     sesuatu yang tidak pernah salah. */
+  const calonCroscek = useMemo(
+    () =>
+      conversations.map((c) => ({
+        id: c.id,
+        nama: c.customer_name ?? "(tanpa nama)",
+        nomorPesanan: idPesananDummy(c) ?? "",
+        nomorResi: resiDummy(c) ?? "",
+      })),
+    [conversations],
+  );
+
   const pick = (id: string) => {
     setActiveId(id);
     setOverlay(null);
@@ -1257,6 +1278,20 @@ export default function Chat() {
           )}
         </div>
       )}
+
+      {/* Papan croscek — mengapung di atas seluruh halaman, dan
+          sengaja DI LUAR keempat panel. Isinya daftar tugas milik
+          CS, bukan bagian dari percakapan mana pun; menaruhnya di
+          dalam salah satu panel berarti ia ikut tergeser setiap
+          kali panel itu berubah. */}
+      <PapanCroscek
+        nomor={search.terms}
+        calon={calonCroscek}
+        onPilih={(id) => {
+          pick(id);
+          setOverlay(null);
+        }}
+      />
 
       {modal && (
         <IntegrateModal
