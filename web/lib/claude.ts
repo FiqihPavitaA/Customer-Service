@@ -34,8 +34,24 @@ export const MAX_TOKENS = Number(process.env.MAX_TOKENS || 600);
  * kapan modul di-cache.
  */
 export function aiTerkunci(): boolean {
-  const v = (process.env.AI_TEST_LOCK || '').trim().toLowerCase();
-  return v === '1' || v === 'true' || v === 'ya';
+  const ya = (v: string | undefined) => {
+    const t = (v || '').trim().toLowerCase();
+    return t === '1' || t === 'true' || t === 'ya';
+  };
+  // AI_TEST_LOCK adalah saklar induk: mengunci Claude DAN Voyage
+  // sekaligus (lihat voyageTerkunci() di lib/voyage.ts). CLAUDE_LOCK
+  // mengunci Claude sendirian.
+  //
+  // Kombinasi ketiga inilah yang menyebabkannya ada. Saat
+  // memperagakan ke tim, Gerbang 2 justru harus BEKERJA — itu
+  // bagian yang mau ditunjukkan — sementara Claude harus tetap
+  // mati. Sebelum ini tidak ada cara menyatakannya: AI_TEST_LOCK
+  // mematikan keduanya, dan melepasnya menyalakan keduanya.
+  //
+  //   AI_TEST_LOCK=1   Claude mati, Voyage mati    (paling aman)
+  //   CLAUDE_LOCK=1    Claude mati, Voyage jalan   (untuk peragaan)
+  //   VOYAGE_LOCK=1    Claude jalan, Voyage mati
+  return ya(process.env.AI_TEST_LOCK) || ya(process.env.CLAUDE_LOCK);
 }
 
 let client: Anthropic | null = null;
