@@ -346,7 +346,12 @@ export default function TopBar() {
     ? `${search.terms.length} nomor dicari — ketik untuk mengganti`
     : isMass
       ? `Cari ${SCOPE_LABEL[search.scope].toLowerCase()} — klik 2× untuk pencarian massal…`
-      : `Cari ${SCOPE_LABEL[search.scope].toLowerCase()}…`;
+      : search.scope === "semua"
+        ? // "Cari semua…" tidak memberi tahu apa pun. Bidangnya
+          // disebutkan supaya orang tahu nomor pesanan boleh
+          // langsung ditempel tanpa mengubah dropdown dulu.
+          "Cari nama, nomor pesanan, resi, atau isi chat…"
+        : `Cari ${SCOPE_LABEL[search.scope].toLowerCase()}…`;
 
   return (
     <>

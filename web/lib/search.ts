@@ -16,9 +16,10 @@
 
 import { useSyncExternalStore } from "react";
 
-export type SearchScope = "nama" | "pesanan" | "resi" | "chat" | "produk";
+export type SearchScope = "semua" | "nama" | "pesanan" | "resi" | "chat" | "produk";
 
 export const SCOPE_LABEL: Record<SearchScope, string> = {
+  semua: "Semua",
   nama: "Nama Pembeli",
   pesanan: "Nomor Pesanan",
   resi: "Nomor Resi",
@@ -37,7 +38,20 @@ type SearchState = {
   terms: string[];
 };
 
-let state: SearchState = { scope: "nama", single: "", terms: [] };
+/**
+ * Lingkup awal "semua", BUKAN "nama".
+ *
+ * Sebelum ini pencarian terkunci pada satu bidang: dropdown
+ * berbunyi "Nama Pembeli", lalu CS menempelkan nomor pesanan dan
+ * hasilnya kosong. Tidak ada galat, tidak ada petunjuk — layarnya
+ * hanya mengatakan "tidak ada percakapan yang cocok", yang terbaca
+ * sebagai "pesanan itu tidak ada di sini" padahal ada.
+ *
+ * Kegagalan seperti itu mahal justru karena tampak seperti jawaban.
+ * Lingkup sempit tetap disediakan untuk yang sengaja mempersempit,
+ * tetapi bukan lagi keadaan awal yang harus ditebak orang.
+ */
+let state: SearchState = { scope: "semua", single: "", terms: [] };
 const listeners = new Set<() => void>();
 
 function emit() {

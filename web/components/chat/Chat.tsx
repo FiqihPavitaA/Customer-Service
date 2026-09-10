@@ -46,6 +46,7 @@ import type { ActionCode, Conversation } from "@/lib/db/types";
 import { catalogStatusText, searchProducts, useCatalog } from "@/lib/catalog";
 import { inisial, jam, stempel, tanggalPanjang } from "@/lib/format";
 import { useSearch, type SearchScope } from "@/lib/search";
+import { cocokKata } from "@/lib/cocok";
 import {
   cocokToko,
   DAFTAR_TOKO,
@@ -119,6 +120,28 @@ function fieldValue(c: Conversation, scope: SearchScope) {
       return c.customer_name ?? "";
   }
 }
+
+/** Bidang yang dicoba saat lingkupnya "Semua". */
+const BIDANG_SEMUA: SearchScope[] = ["nama", "pesanan", "resi", "chat"];
+
+/**
+ * Cocokkan satu percakapan terhadap kata kunci pada lingkup tertentu.
+ *
+ * Lingkup "semua" mencoba tiap bidang SATU PER SATU, bukan
+ * menggabungkannya jadi satu teks panjang. Bedanya bukan gaya:
+ * cocokKata() punya aturan khusus untuk nilai yang berbentuk nomor
+ * — yang membuat "Pesanan: 260909KMTPRWX" tetap ketemu — dan
+ * aturan itu hanya berlaku kalau nilainya memang nomor itu
+ * sendiri. Digabung dengan nama, toko, dan seluruh isi chat, nilai
+ * itu berhenti berbentuk nomor dan aturannya mati diam-diam.
+ */
+function cocokLingkup(c: Conversation, scope: SearchScope, kunci: string): boolean {
+  if (scope === "semua") {
+    return BIDANG_SEMUA.some((s) => cocokKata(fieldValue(c, s), kunci));
+  }
+  return cocokKata(fieldValue(c, scope), kunci);
+}
+
 
 /** Kutipan pesan terakhir untuk baris daftar (dulu field `snippet`). */
 function snippet(c: Conversation) {
@@ -358,8 +381,8 @@ function ConversationsPanel({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Cari percakapan…"
-          aria-label="Cari percakapan"
+          placeholder="Cari nama atau nomor pesanan…"
+          aria-label="Cari percakapan berdasarkan nama, nomor pesanan, resi, atau isi chat"
           className="w-full border-none text-[0.88rem] outline-none"
         />
       </div>
@@ -791,7 +814,9 @@ export default function Chat() {
   }, [escalations]);
 
   const rows = useMemo(() => {
-    const q = panelQuery.trim().toLowerCase();
+    // Tidak dikecilkan di sini: cocokKata() yang mengurus huruf
+    // besar-kecil DAN tanda baca sekaligus.
+    const q = panelQuery.trim();
     const tersaring = conversations.filter((c) => {
       /* Penyaringan toko — sampai 10 Sep 2026 baris ini TIDAK ADA.
          `activeShop` disimpan, warnanya berubah saat diklik, tetapi
@@ -803,17 +828,19 @@ export default function Chat() {
       if (filter === "unread" && !c.unread) return false;
       if (filter === "cs" && !menungguSejak.has(c.id)) return false;
 
-      if (q) {
-        const nama = (c.customer_name ?? "").toLowerCase();
-        if (!nama.includes(q) && !snippet(c).toLowerCase().includes(q)) return false;
-      }
+      /* Kotak "Cari percakapan…" di panel ini mencari SEMUA bidang,
+         bukan hanya nama dan cuplikan pesan terakhir seperti
+         sebelumnya. Kotak yang bertuliskan "cari percakapan" lalu
+         diam saja saat diberi nomor pesanan adalah janji yang tidak
+         ditepati — dan CS tidak punya cara menebak bahwa yang salah
+         adalah bidangnya, bukan nomornya. */
+      if (q && !cocokLingkup(c, "semua", q)) return false;
 
       // Pencarian topbar (lingkup + massal), sama seperti dashboard.js
-      const v = fieldValue(c, search.scope).toLowerCase();
       if (search.terms.length) {
-        if (!search.terms.some((t) => v.includes(t))) return false;
+        if (!search.terms.some((t) => cocokLingkup(c, search.scope, t))) return false;
       } else if (search.single.trim()) {
-        if (!v.includes(search.single.trim().toLowerCase())) return false;
+        if (!cocokLingkup(c, search.scope, search.single.trim())) return false;
       }
       return true;
     });

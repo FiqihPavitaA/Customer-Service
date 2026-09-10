@@ -13,6 +13,7 @@
     "uji-handover": "node --experimental-strip-types scripts/uji-handover.mjs",
     "uji-ringkasan": "node --experimental-strip-types scripts/uji-ringkasan.mjs",
     "uji-pesanan": "node --experimental-strip-types scripts/uji-pesanan.mjs",
+    "uji-cari": "node --experimental-strip-types scripts/uji-cari.mjs",
     "periksa-sumber": "node --env-file-if-exists=.env.local scripts/periksa-sumber.mjs",
     "periksa-aturan": "node --env-file-if-exists=.env.local scripts/periksa-aturan.mjs",
     "seed-sql": "node --experimental-strip-types scripts/buat-seed-sql.mjs",
