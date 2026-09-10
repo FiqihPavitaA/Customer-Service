@@ -48,6 +48,7 @@ pemilik proyek menjawab.
 | `npm run uji-mutu` | 39 kasus pemeriksa mutu contoh pertanyaan: kalimat rapi ditandai, kalimat pelanggan tidak, ragam tingkat singkatan |
 | `npm run uji-handover` | 41 kasus aturan jeda AI setelah handover: batas 24 jam, offset WIB vs Z, dan nilai rusak yang bisa membisukan AI selamanya |
 | `npm run uji-ringkasan` | 21 kasus angka nyata Beranda & Statistik: antrean tertua (bukan rata-rata), rentang waktu, dan nol yang berbeda dari "belum ada data" |
+| `npm run uji-pesanan` | 26 kasus pesanan contoh di tab Pesanan: nomor tidak pernah berubah (kalau berubah, pencarian diam-diam gagal), data asli tidak ditimpa, katalog kosong tidak mengarang nama produk |
 | `npm run periksa-sumber` | Apakah tabel `templates` & `pustaka_router()` siap dipakai router (membaca Supabase, tidak menulis) |
 | `npm run periksa-aturan` | Aturan pemicu di tabel masih sepadan dengan berkas .md — menangkap `also`/`unless` yang hilang |
 | `POST /api/pengenal/bangun` tanpa `jalankan` | Berapa contoh yang belum bervektor & perkiraan biayanya |

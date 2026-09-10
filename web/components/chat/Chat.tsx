@@ -58,6 +58,12 @@ import {
 } from "@/lib/toko";
 import { headerBerSesi } from "@/lib/supabase/header";
 import {
+  buatPesananDummy,
+  idPesananDummy,
+  resiDummy,
+  rupiah,
+} from "@/lib/pesananDummy";
+import {
   MENIT_GENTING,
   menitMenunggu,
   sedangDijeda,
@@ -93,10 +99,18 @@ const STATUS_DOT: Record<Shop["status"], string> = {
 /** Nilai yang dicari sesuai lingkup dropdown (fieldValue di dashboard.js). */
 function fieldValue(c: Conversation, scope: SearchScope) {
   switch (scope) {
+    /* Nomor pesanan dan resi mundur ke nilai contoh bila kolomnya
+       masih kosong. Tanpa ini, nomor yang JELAS terbaca di panel
+       kanan tidak ditemukan saat diketik di kotak pencarian — dan
+       kegagalan seperti itu membuat orang berhenti memercayai
+       pencariannya sama sekali, termasuk untuk data yang sungguhan.
+
+       Keduanya sengaja memakai fungsi yang sama dengan yang
+       merender panel, bukan salinan logikanya. */
     case "pesanan":
-      return c.order_id ?? "";
+      return idPesananDummy(c) ?? "";
     case "resi":
-      return c.tracking_no ?? "";
+      return resiDummy(c) ?? "";
     case "chat":
       return c.messages.map((m) => m.content).join(" ");
     case "produk":
@@ -444,6 +458,15 @@ function InfoPanel({
   const [q, setQ] = useState(c.product_query);
   const catalog = useCatalog();
 
+  /* Dihitung ulang hanya saat percakapan atau katalog berganti.
+     Isinya deterministik dari id percakapan, jadi hasilnya sama
+     setiap kali — nomor pesanan yang dicari CS tidak akan berpindah
+     di antara dua render. */
+  const pesanan = useMemo(
+    () => buatPesananDummy(c, catalog.products),
+    [c, catalog.products],
+  );
+
   const matches = useMemo(
     () => searchProducts(catalog.products, q, 20),
     [catalog.products, q],
@@ -503,21 +526,78 @@ function InfoPanel({
 
       <div className="min-h-0 flex-1 p-3.5">
         {tab === "pesanan" &&
-          (c.order_status ? (
-            <div className="rounded-2xl border border-line p-3.5">
-              <div className="mb-2 font-bold">Pesanan #{c.order_id}</div>
-              <div className="flex justify-between py-1 text-[0.82rem]">
-                <span className="text-muted">Status</span>
-                <b>{c.order_status}</b>
+          (pesanan ? (
+            <div className="flex flex-col gap-3">
+              {/* Ditandai TEGAS. Data pesanan belum tersambung ke API
+                  marketplace sama sekali; CS yang mengira angka di
+                  bawah nyata bisa menjanjikan pengiriman yang tidak
+                  pernah ada. */}
+              <DemoNotice
+                sumber="contoh"
+                detail="Pesanan contoh, dihitung dari id percakapan. Belum tersambung ke API marketplace."
+              />
+
+              <div className="rounded-2xl border border-line p-3.5">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-mono text-[0.86rem] font-bold break-all">
+                      #{pesanan.id}
+                    </div>
+                    <div className="mt-0.5 text-[0.72rem] text-muted">
+                      {tanggalPanjang(pesanan.tanggal)}
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-md bg-green-mint px-1.5 py-0.5 text-[0.66rem] font-extrabold text-green-dark">
+                    {pesanan.status}
+                  </span>
+                </div>
+
+                <div className="flex justify-between py-1 text-[0.82rem]">
+                  <span className="text-muted">Kurir</span>
+                  <b>{pesanan.kurir}</b>
+                </div>
+                <div className="flex justify-between gap-3 py-1 text-[0.82rem]">
+                  <span className="shrink-0 text-muted">Resi</span>
+                  <b className="truncate font-mono">{pesanan.resi}</b>
+                </div>
               </div>
-              <div className="flex justify-between py-1 text-[0.82rem]">
-                <span className="text-muted">Kurir</span>
-                <b>{c.order_courier}</b>
-              </div>
-              <div className="flex justify-between py-1 text-[0.82rem]">
-                <span className="text-muted">Resi</span>
-                <b className="font-mono">{c.tracking_no}</b>
-              </div>
+
+              {pesanan.item.length > 0 && (
+                <div className="rounded-2xl border border-line p-3.5">
+                  <div className="mb-2 text-[0.82rem] font-bold">Rincian Barang</div>
+                  <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+                    {pesanan.item.map((it) => (
+                      <li key={it.sku} className="flex items-start gap-2.5">
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-green-mint">
+                          🌱
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[0.8rem] leading-snug font-semibold">
+                            {it.nama}
+                          </span>
+                          <span className="mt-0.5 block text-[0.7rem] text-muted">
+                            {it.sku} · {it.qty} × {rupiah(it.harga)}
+                          </span>
+                        </span>
+                        <b className="shrink-0 text-[0.78rem] tabular-nums">
+                          {rupiah(it.harga * it.qty)}
+                        </b>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-3 border-t border-line pt-2.5">
+                    <div className="flex justify-between py-0.5 text-[0.78rem]">
+                      <span className="text-muted">Ongkir</span>
+                      <span className="tabular-nums">{rupiah(pesanan.ongkir)}</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 text-[0.88rem] font-extrabold">
+                      <span>Total</span>
+                      <span className="tabular-nums">{rupiah(pesanan.total)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid place-items-center py-10 text-center">
@@ -527,6 +607,14 @@ function InfoPanel({
               <p className="mt-2 mb-0 text-[0.84rem] text-muted">
                 Tidak Ada Pesanan dalam 1 Bulan Terakhir
               </p>
+              {/* Percakapan simulasi memang tidak punya pesanan, dan
+                  itu perlu dikatakan — kalau tidak, tab kosong di sini
+                  terbaca sebagai fitur yang rusak. */}
+              {(c.customer_id ?? "").startsWith("sim_") && (
+                <p className="mt-1 mb-0 text-[0.72rem] text-muted">
+                  Percakapan simulasi tidak dibuatkan pesanan.
+                </p>
+              )}
             </div>
           ))}
 
