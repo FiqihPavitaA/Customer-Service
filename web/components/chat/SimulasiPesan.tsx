@@ -3,9 +3,10 @@
 /* ===========================================================
    Tombol peragaan: berpura-pura ada pesan masuk dari pelanggan.
 
-   Hanya tampil di luar produksi — endpoint-nya sendiri menjawab
-   404 di produksi, jadi tombol ini tidak pernah bisa jadi pintu
-   belakang yang tertinggal.
+   Hanya tampil pada deployment yang menyalakan NEXT_PUBLIC_SIMULASI
+   — dan endpoint-nya dijaga saklar yang SAMA, jadi tombol ini tidak
+   pernah bisa jadi pintu belakang yang tertinggal. Lihat
+   lib/simulasi.ts untuk alasan saklarnya bukan NODE_ENV lagi.
 
    KENAPA KALIMATNYA DISEDIAKAN, BUKAN DIKETIK BEBAS
 
@@ -22,6 +23,7 @@
    sistem yang selalu punya jawaban.
    =========================================================== */
 
+import Link from "next/link";
 import { useState } from "react";
 import { useToast } from "@/components/Toast";
 import { headerBerSesi } from "@/lib/supabase/header";
@@ -145,6 +147,28 @@ export default function SimulasiPesan({ jumlahSimulasi }: { jumlahSimulasi: numb
       </button>
     );
 
+  /* Jalan ke layar pembeli — halaman /simulasi.
+     Sampai 10 Sep 2026 TIDAK ADA satu pun tautan ke halaman itu di
+     seluruh aplikasi; satu-satunya cara membukanya adalah mengetik
+     URL-nya sendiri. Di localhost itu masih mungkin; di URL Vercel
+     yang dibagikan ke tim CS, halaman tanpa tautan sama saja dengan
+     halaman yang tidak ada.
+
+     target="_blank" disengaja, bukan kebiasaan. Seluruh alasan
+     halaman itu dibuat terpisah adalah supaya pembeli dan CS berada
+     di dua layar yang berbeda secara fisik — menggantikan isi tab
+     yang sama justru menghapus hal yang sedang diperagakan. */
+  const tautanLayarPembeli = (
+    <Link
+      href="/simulasi"
+      target="_blank"
+      rel="noreferrer noopener"
+      className="w-full cursor-pointer rounded-lg border border-line bg-white px-2.5 py-1.5 text-center text-[0.74rem] font-semibold text-text-2 no-underline transition hover:border-green hover:text-green-dark"
+    >
+      🛍️ Buka layar pembeli ↗
+    </Link>
+  );
+
   if (!buka) {
     return (
       <div className="flex flex-col gap-1.5 border-b border-line-soft px-2 py-2">
@@ -155,6 +179,7 @@ export default function SimulasiPesan({ jumlahSimulasi }: { jumlahSimulasi: numb
         >
           📨 Simulasi pesan masuk
         </button>
+        {tautanLayarPembeli}
         {tombolBersih}
       </div>
     );
@@ -217,7 +242,10 @@ export default function SimulasiPesan({ jumlahSimulasi }: { jumlahSimulasi: numb
           />
         </div>
 
-        {tombolBersih && <div className="mt-2">{tombolBersih}</div>}
+        <div className="mt-2 flex flex-col gap-1.5">
+          {tautanLayarPembeli}
+          {tombolBersih}
+        </div>
 
         {hasil && (
           <div
