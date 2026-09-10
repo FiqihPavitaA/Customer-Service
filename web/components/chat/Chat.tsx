@@ -473,18 +473,27 @@ function InfoPanel({
   );
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto border-l border-line bg-white">
+    /* TIGA BAGIAN: kepala tetap, isi menggulir, ringkasan tetap.
+       Sebelum ini akar panel yang diberi overflow-y-auto, sementara
+       isi tab diberi `min-h-0 flex-1` TANPA gulir sendiri. Di dalam
+       wadah yang menggulir, kombinasi itu menyuruh isinya menyusut
+       ke tinggi yang tersedia sambil isinya sendiri melimpah keluar
+       tanpa dipotong — dan daftar produk yang panjang tercetak
+       menimpa blok Ringkasan Internal CS di bawahnya.
+
+       Yang menggulir sekarang HANYA bagian tengah. Akarnya tidak. */
+    <div className="flex h-full min-h-0 flex-col border-l border-line bg-white">
       {onClose && (
         <button
           type="button"
           onClick={onClose}
-          className="m-2 cursor-pointer rounded-xl border border-line bg-white px-3 py-2 font-bold text-text-2"
+          className="m-2 shrink-0 cursor-pointer rounded-xl border border-line bg-white px-3 py-2 font-bold text-text-2"
         >
           ✕ Tutup
         </button>
       )}
 
-      <div className="flex items-center gap-3 border-b border-line p-3.5">
+      <div className="flex shrink-0 items-center gap-3 border-b border-line p-3.5">
         <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-green text-[0.95rem] font-bold text-white">
           {inisial(c.customer_name)}
         </span>
@@ -499,7 +508,7 @@ function InfoPanel({
         </div>
       </div>
 
-      <div className="flex gap-1 border-b border-line px-2 pt-2">
+      <div className="flex shrink-0 gap-1 border-b border-line px-2 pt-2">
         {(
           [
             { key: "pesanan", label: "Pesanan" },
@@ -524,7 +533,8 @@ function InfoPanel({
         ))}
       </div>
 
-      <div className="min-h-0 flex-1 p-3.5">
+      {/* Satu-satunya bagian yang menggulir. */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
         {tab === "pesanan" &&
           (pesanan ? (
             <div className="flex flex-col gap-3">
@@ -674,8 +684,14 @@ function InfoPanel({
         )}
       </div>
 
-      {/* Ringkasan handover internal — format dari claude.md */}
-      <div className="border-t border-line p-3.5">
+      {/* Ringkasan handover internal — format dari claude.md.
+
+          Dibatasi 38% tinggi panel dan menggulir sendiri. Tanpa
+          batas itu, ringkasan handover yang panjang mendesak bagian
+          tengah sampai tinggal beberapa piksel — daftar produknya
+          tetap ada dan tetap bisa digulir, tapi jendelanya menyempit
+          sampai tidak ada gunanya. */}
+      <div className="max-h-[38%] shrink-0 overflow-y-auto border-t border-line p-3.5">
         <div className="mb-2 text-[0.82rem] font-bold">📝 Ringkasan Internal CS</div>
 
         {/* Keadaan jeda ditampilkan terpisah dari ringkasan, karena
