@@ -33,6 +33,7 @@ import { useToast } from "@/components/Toast";
 import { actionTagClass } from "@/components/ai/actionTag";
 import { DemoNotice } from "@/components/ui/Bits";
 import IntegrateModal, { type PlatformName } from "./IntegrateModal";
+import SimulasiPesan from "./SimulasiPesan";
 import {
   appendMessage,
   markRead,
@@ -306,6 +307,8 @@ function ConversationsPanel({
       <div className="border-b border-line-soft px-2 py-2">
         <DemoNotice detail="Balasan tersimpan selama sesi ini." />
       </div>
+
+      <SimulasiPesan />
 
       <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
         {rows.length === 0 && (
