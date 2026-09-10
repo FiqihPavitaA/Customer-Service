@@ -273,6 +273,7 @@ function ConversationsPanel({
   setQuery,
   counts,
   menungguSejak,
+  jumlahSimulasi,
   onPick,
   onClose,
 }: {
@@ -285,6 +286,8 @@ function ConversationsPanel({
   counts: { unread: number; cs: number };
   /** id percakapan -> sejak kapan eskalasinya terbuka. */
   menungguSejak: Map<string, string>;
+  /** Berapa percakapan buatan simulasi yang bisa dibersihkan. */
+  jumlahSimulasi: number;
   onPick: (id: string) => void;
   onClose?: () => void;
 }) {
@@ -353,7 +356,7 @@ function ConversationsPanel({
         <DemoNotice detail="Balasan tersimpan selama sesi ini." />
       </div>
 
-      <SimulasiPesan />
+      <SimulasiPesan jumlahSimulasi={jumlahSimulasi} />
 
       <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
         {rows.length === 0 && (
@@ -752,6 +755,14 @@ export default function Chat() {
     cs: dalamToko.filter((c) => menungguSejak.has(c.id)).length,
   };
 
+  /* Dihitung atas SELURUH percakapan, bukan atas toko yang sedang
+     dipilih. Tombol bersih-bersih menghapus semuanya sekaligus, jadi
+     angkanya harus menyebut yang sebenarnya akan terhapus — bukan
+     yang kebetulan sedang terlihat. */
+  const jumlahSimulasi = conversations.filter((c) =>
+    (c.customer_id ?? "").startsWith("sim_"),
+  ).length;
+
   const pick = (id: string) => {
     setActiveId(id);
     setOverlay(null);
@@ -875,6 +886,7 @@ export default function Chat() {
           setQuery={setPanelQuery}
           counts={counts}
           menungguSejak={menungguSejak}
+          jumlahSimulasi={jumlahSimulasi}
           onPick={pick}
         />
       </section>
@@ -1104,6 +1116,7 @@ export default function Chat() {
               setQuery={setPanelQuery}
               counts={counts}
               menungguSejak={menungguSejak}
+              jumlahSimulasi={jumlahSimulasi}
               onPick={pick}
               onClose={() => setOverlay(null)}
             />

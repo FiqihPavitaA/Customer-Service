@@ -44,15 +44,46 @@ type Hasil = {
   error?: string;
 };
 
-export default function SimulasiPesan() {
+export default function SimulasiPesan({ jumlahSimulasi }: { jumlahSimulasi: number }) {
   const [buka, setBuka] = useState(false);
   const [teks, setTeks] = useState("");
   const [nama, setNama] = useState("");
   const [sibuk, setSibuk] = useState(false);
   const [hasil, setHasil] = useState<Hasil | null>(null);
+  /* Konfirmasi dua langkah, bukan window.confirm().
+     Ini penghapusan permanen, jadi tidak boleh terjadi karena satu
+     klik yang meleset. Dialog bawaan peramban ditolak karena mudah
+     ditekan reflek dan tidak bisa menyebutkan angka yang akan
+     terhapus — padahal angkanya justru yang menahan orang. */
+  const [konfirmasi, setKonfirmasi] = useState(false);
   const toast = useToast();
 
   if (process.env.NODE_ENV === "production") return null;
+
+  const bersihkan = async () => {
+    if (sibuk) return;
+    setSibuk(true);
+    setHasil(null);
+    try {
+      const r = await fetch("/api/simulasi", {
+        method: "DELETE",
+        headers: await headerBerSesi(),
+      });
+      const d = (await r.json()) as { dihapus?: number; error?: string; catatan?: string };
+      if (d.error) {
+        toast(d.error);
+        setHasil({ error: d.error });
+      } else {
+        toast(`${d.dihapus} chat simulasi dihapus 🧹`);
+        if (d.catatan) setHasil({ error: d.catatan });
+      }
+    } catch (e) {
+      toast("Gagal menghapus: " + (e as Error).message);
+    } finally {
+      setSibuk(false);
+      setKonfirmasi(false);
+    }
+  };
 
   const kirim = async (isi: string, dari: string) => {
     if (sibuk || !isi.trim()) return;
@@ -79,9 +110,43 @@ export default function SimulasiPesan() {
     }
   };
 
+  /* Tombol bersih-bersih dipakai di dua keadaan panel (terbuka dan
+     tertutup), jadi disusun sekali di sini. Sengaja hanya muncul
+     kalau memang ADA yang bisa dihapus: tombol hapus yang selalu
+     terlihat mengundang klik iseng, dan angkanya adalah satu-satunya
+     hal yang membuat orang berhenti sejenak. */
+  const tombolBersih =
+    jumlahSimulasi === 0 ? null : konfirmasi ? (
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          disabled={sibuk}
+          onClick={() => void bersihkan()}
+          className="flex-1 cursor-pointer rounded-lg border border-[#b91c1c] bg-[#fee2e2] px-2.5 py-1.5 text-[0.74rem] font-bold text-[#b91c1c] disabled:opacity-50"
+        >
+          {sibuk ? "Menghapus…" : `Ya, hapus ${jumlahSimulasi} chat`}
+        </button>
+        <button
+          type="button"
+          onClick={() => setKonfirmasi(false)}
+          className="cursor-pointer rounded-lg border border-line bg-white px-2.5 py-1.5 text-[0.74rem] font-bold text-text-2"
+        >
+          Batal
+        </button>
+      </div>
+    ) : (
+      <button
+        type="button"
+        onClick={() => setKonfirmasi(true)}
+        className="w-full cursor-pointer rounded-lg border border-line bg-white px-2.5 py-1.5 text-[0.74rem] font-semibold text-muted transition hover:border-[#b91c1c] hover:text-[#b91c1c]"
+      >
+        🧹 Hapus {jumlahSimulasi} chat simulasi
+      </button>
+    );
+
   if (!buka) {
     return (
-      <div className="border-b border-line-soft px-2 py-2">
+      <div className="flex flex-col gap-1.5 border-b border-line-soft px-2 py-2">
         <button
           type="button"
           onClick={() => setBuka(true)}
@@ -89,6 +154,7 @@ export default function SimulasiPesan() {
         >
           📨 Simulasi pesan masuk
         </button>
+        {tombolBersih}
       </div>
     );
   }
@@ -149,6 +215,8 @@ export default function SimulasiPesan() {
             className="w-full rounded-lg border border-line px-2 py-1.5 text-[0.74rem] outline-none"
           />
         </div>
+
+        {tombolBersih && <div className="mt-2">{tombolBersih}</div>}
 
         {hasil && (
           <div

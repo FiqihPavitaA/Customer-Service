@@ -9,7 +9,10 @@ import "@/lib/templates";
 import { routeToCategory } from "@/content/knowledge-base/router.js";
 
 /* ===========================================================
-   POST /api/simulasi — berpura-pura ada pesan masuk dari pelanggan.
+   /api/simulasi
+
+     POST    berpura-pura ada pesan masuk dari pelanggan
+     DELETE  bersihkan seluruh percakapan buatan simulasi
 
    UNTUK PERAGAAN, TAPI BUKAN SANDIWARA
 
@@ -61,6 +64,17 @@ import { routeToCategory } from "@/content/knowledge-base/router.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/**
+ * Penanda percakapan buatan simulasi.
+ *
+ * Ditaruh di `customer_id`, bukan di kolom baru: kolomnya sudah ada,
+ * tidak dipakai untuk apa pun yang bertabrakan, dan tidak menuntut
+ * migrasi. Konsekuensinya awalan ini menjadi kontrak — mengubahnya
+ * berarti percakapan simulasi lama berhenti bisa dihapus, dan tidak
+ * ada layar yang akan memberi tahu.
+ */
+const AWALAN_SIMULASI = "sim_";
 
 /* Toko diterima sebagai NAMA, bukan platform.
    Versi pertama endpoint ini hanya menerima platform dan menulis
@@ -195,7 +209,7 @@ export async function POST(req: Request) {
     .insert({
       id,
       platform: toko.platform,
-      customer_id: `sim_${id.slice(0, 8)}`,
+      customer_id: AWALAN_SIMULASI + id.slice(0, 8),
       customer_name: nama,
       shop_name: susunShopName(toko.nama, toko.platform),
       action: actionTemplate ?? (balasanPengenal ? "AUTO_REPLY" : null),
@@ -280,5 +294,82 @@ export async function POST(req: Request) {
     biaya: pengenal
       ? `Voyage ${pengenal.token} token ≈ Rp ${(perkiraanBiaya(pengenal.token).usd * 16500).toFixed(3)} · Claude tidak dipanggil`
       : "Rp 0 — Claude maupun Voyage tidak dipanggil",
+  });
+}
+
+/* ===========================================================
+   DELETE /api/simulasi — bersihkan percakapan buatan simulasi.
+
+   KENAPA PERLU ADA
+
+   Mencoba peragaan beberapa kali meninggalkan belasan percakapan
+   karangan di daftar, bercampur dengan yang sungguhan. Layar yang
+   kotor bukan sekadar tidak enak dilihat: angka Beranda dan
+   Statistik ikut menghitungnya, dan itu persis masalah "angka
+   karangan bercampur angka nyata" yang baru diperbaiki di commit
+   f89ee86.
+
+   YANG DIHAPUS, DAN YANG TIDAK
+
+   HANYA percakapan yang customer_id-nya berawalan "sim_", yaitu
+   yang dibuat POST di atas. Yang TIDAK ikut terhapus:
+
+     - percakapan sungguhan dari pelanggan
+     - data contoh bawaan (seed-demo.sql)
+     - data peragaan handover (demo-handover.sql, id d0000000…)
+
+   Yang terakhir sengaja dikecualikan. Berkas itu disiapkan dengan
+   waktu tunggu yang diatur khusus untuk demo; menghapusnya lewat
+   tombol yang sama berarti satu klik keliru menghancurkan
+   persiapan setengah jam sebelum demo dimulai. Pembersihannya ada
+   di bagian akhir demo-handover.sql, terpisah dan disengaja.
+
+   Eskalasi ikut terhapus sendiri lewat `on delete cascade` pada
+   escalations.conversation_id — tidak perlu dihapus terpisah, dan
+   menghapusnya terpisah justru membuka celah gagal separuh jalan.
+   =========================================================== */
+
+export async function DELETE(req: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Tidak tersedia." }, { status: 404 });
+  }
+
+  const sb = getSupabaseSebagai(tokenDariHeader(req));
+  if (!sb) {
+    return NextResponse.json(
+      { error: "Butuh sesi login. Penghapusan berjalan sebagai pengguna yang sedang masuk." },
+      { status: 401 },
+    );
+  }
+
+  const { data, error } = await sb
+    .from("conversations")
+    .delete()
+    .like("customer_id", `${AWALAN_SIMULASI}%`)
+    .select("id");
+
+  if (error) {
+    console.error("[simulasi] gagal menghapus:", error.message);
+    return NextResponse.json(
+      { error: "Gagal menghapus percakapan simulasi.", detail: error.message },
+      { status: 500 },
+    );
+  }
+
+  const jumlah = data?.length ?? 0;
+  console.log(`[simulasi] ${jumlah} percakapan simulasi dihapus.`);
+
+  return NextResponse.json({
+    ok: true,
+    dihapus: jumlah,
+    // Dibalikkan apa adanya supaya sisi peramban tidak perlu menebak
+    // apa yang barusan terjadi bila jumlahnya nol — nol bisa berarti
+    // "memang tidak ada" ATAU "RLS menolak diam-diam", dan keduanya
+    // menuntut tindakan yang berbeda.
+    catatan:
+      jumlah === 0
+        ? "Tidak ada percakapan simulasi untuk dihapus. Kalau Anda yakin ada, " +
+          "periksa apakah RLS menolak — penghapusan berjalan sebagai pengguna yang login."
+        : null,
   });
 }
