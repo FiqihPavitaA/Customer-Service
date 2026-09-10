@@ -24,7 +24,7 @@ import { DemoNotice, GhostButton } from "@/components/ui/Bits";
 import { actionTagClass } from "@/components/ai/actionTag";
 import { saveSettings, useSettings } from "@/lib/db";
 import { useAuth } from "@/lib/auth";
-import TemplateManager from "./TemplateManager";
+import Link from "next/link";
 import { inisial } from "@/lib/format";
 
 type SectionId =
@@ -432,7 +432,7 @@ function KbRow({
    menjawab pertanyaan yang berbeda. Panel berkas menjawab "apa saja
    yang dibaca AI"; halaman template menjawab "kalimat apa yang
    dikirim ke pelanggan". */
-type SubKb = "berkas" | "template" | "mode";
+type SubKb = "berkas" | "mode";
 
 function PanelKb({ onSave }: { onSave: () => void }) {
   const toast = useToast();
@@ -443,20 +443,40 @@ function PanelKb({ onSave }: { onSave: () => void }) {
     </span>
   );
 
-  /* Panel template butuh ruang untuk split-view, jadi batas lebar
-     760px hanya berlaku untuk dua sub-tab lainnya. */
   return (
-    <div className={sub === "template" ? "max-w-full" : "max-w-[760px]"}>
+    <div className="max-w-[760px]">
       <PanelHead
         title="Knowledge Base"
         desc="Sumber jawaban AI. Urutan prioritas: data sistem → Knowledge Base → SOP → riwayat percakapan."
       />
 
+      {/* Penunjuk, bukan penghapusan diam-diam.
+
+          Sub-tab "Template Jawaban" pindah ke halaman /knowledge di
+          rail utama pada 10 Sep 2026. Orang yang sudah hafal jalan
+          lamanya akan datang ke sini lebih dulu — membiarkannya
+          menghilang tanpa keterangan berarti mereka menyimpulkan
+          fiturnya dihapus. */}
+      <div className="mt-4 rounded-2xl border border-green/40 bg-green-mint px-4 py-3">
+        <div className="text-[0.88rem] font-bold text-green-dark">
+          📚 Template Jawaban kini punya halamannya sendiri
+        </div>
+        <p className="mt-1 mb-2 text-[0.82rem] leading-relaxed text-text-2">
+          Pindah ke rail utama supaya tim CS bisa menjangkaunya dengan satu klik —
+          menulis contoh pertanyaan adalah pekerjaan harian, bukan pengaturan.
+        </p>
+        <Link
+          href="/knowledge"
+          className="inline-block rounded-xl bg-green px-4 py-2 text-[0.84rem] font-bold text-white no-underline transition hover:bg-green-hover"
+        >
+          Buka Knowledge Base →
+        </Link>
+      </div>
+
       <div className="mt-4 mb-4 flex items-center gap-2 border-b border-line">
         {(
           [
             ["berkas", "Berkas"],
-            ["template", "Template Jawaban"],
             ["mode", "Mode KB"],
           ] as const
         ).map(([key, label]) => (
@@ -476,7 +496,6 @@ function PanelKb({ onSave }: { onSave: () => void }) {
         ))}
       </div>
 
-      {sub === "template" && <TemplateManager />}
 
       {sub === "berkas" && (
         <>
@@ -522,7 +541,11 @@ function PanelKb({ onSave }: { onSave: () => void }) {
       </SetCard>
       )}
 
-      {sub !== "template" && <SaveBar label="Simpan" onSave={onSave} />}
+      {/* Syaratnya dulu `sub !== "template"` — penjaga agar tombol
+          Simpan tidak muncul di bawah pengelola template, yang
+          menyimpan sendiri per baris. Sub-tab itu sudah pindah ke
+          /knowledge, jadi penjaganya tidak punya kasus lagi. */}
+      <SaveBar label="Simpan" onSave={onSave} />
     </div>
   );
 }
