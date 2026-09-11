@@ -7,6 +7,7 @@ import {
   statusSumberTemplate,
 } from "@/lib/db/templatesServer";
 import { siapkanSumberSatpam, statusSumberSatpam } from "@/lib/db/satpamServer";
+import { siapkanJadwalAI, statusJadwalAI } from "@/lib/db/jadwalServer";
 
 /* ===========================================================
    GET /api/health — port dari app.get('/api/health') di server.js.
@@ -23,7 +24,7 @@ export async function GET() {
   // bukan sisa pemuatan terakhir yang mungkin belum pernah terjadi.
   // Keduanya berjalan bersamaan: keduanya sekadar satu perjalanan
   // baca ke Supabase dan tidak saling bergantung.
-  await Promise.all([siapkanSumberTemplate(), siapkanSumberSatpam()]);
+  await Promise.all([siapkanSumberTemplate(), siapkanSumberSatpam(), siapkanJadwalAI()]);
 
   const { stats } = getKnowledge();
   const missing = Object.entries(stats.files)
@@ -58,5 +59,10 @@ export async function GET() {
     // seharusnya dialihkan malah dijawab mesin. `ditolak` memuat
     // aturan yang polanya tidak sah, bila ada.
     sumberSatpam: statusSumberSatpam(),
+    // Keadaan AI sekarang beserta alasannya. Dilaporkan di sini
+    // supaya "kenapa pelanggan tidak dijawab" bisa dijawab dari
+    // luar, tanpa membuka console dan tanpa menebak jam berapa
+    // server mengira sekarang.
+    jadwalAI: statusJadwalAI(),
   });
 }

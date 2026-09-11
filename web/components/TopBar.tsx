@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import SaklarAI from "./SaklarAI";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useToast } from "./Toast";
@@ -440,6 +441,16 @@ export default function TopBar() {
               </button>
             )}
           </div>
+
+          {/* Penanda keadaan AI — sebelah kotak pencarian, sesuai
+              permintaan tim CS 11 Sep 2026: keadaannya harus terlihat
+              dari halaman mana pun tanpa membuka Pengaturan.
+
+              Ditaruh DI DALAM kelompok pencarian, bukan di kelompok
+              kanan bersama ikon akun, supaya di layar sempit ia ikut
+              turun bersama kotak pencarian dan tetap terbaca —
+              bukan terjepit di antara ikon-ikon kecil. */}
+          <SaklarAI />
         </div>
 
         <div className="flex items-center gap-1.5">

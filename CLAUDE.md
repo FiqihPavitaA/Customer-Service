@@ -51,9 +51,11 @@ pemilik proyek menjawab.
 | `node knowledge-base/peraga-kemiripan.mjs` | Dari mana angka skor kemiripan datang — rumus kosinus dihitung ulang atas vektor yang sudah ada |
 | `npm run uji-mutu` | 39 kasus pemeriksa mutu contoh pertanyaan: kalimat rapi ditandai, kalimat pelanggan tidak, ragam tingkat singkatan |
 | `npm run uji-handover` | 41 kasus aturan jeda AI setelah handover: batas 24 jam, offset WIB vs Z, dan nilai rusak yang bisa membisukan AI selamanya |
+| `npm run uji-jadwal-ai` | 54 kasus aturan kapan AI boleh menjawab: jam WIB vs jam server, jendela yang melewati tengah malam, override dua arah, dan nilai rusak yang bisa membisukan AI selamanya |
 | `npm run uji-ringkasan` | 21 kasus angka nyata Beranda & Statistik: antrean tertua (bukan rata-rata), rentang waktu, dan nol yang berbeda dari "belum ada data" |
 | `npm run uji-pesanan` | 26 kasus pesanan contoh di tab Pesanan: nomor tidak pernah berubah (kalau berubah, pencarian diam-diam gagal), data asli tidak ditimpa, katalog kosong tidak mengarang nama produk |
 | `npm run uji-cari` | 46 kasus pencocokan pencarian & papan croscek: nomor bertanda baca tetap ketemu, nama pendek TIDAK melebar, nomor yang tidak ketemu tidak pernah hilang dari daftar |
+| `npm run periksa-jadwal` | Apakah gerbang jadwal siap: fungsi `jadwal_ai()` ada, jam WIB yang sedang berlaku, keputusan AI sekarang, dan bukti anon TIDAK bisa membaca tabel settings (membaca Supabase, tidak menulis) |
 | `npm run periksa-sumber` | Apakah tabel `templates`, `satpam_rules`, `pustaka_router()` & `satpam_router()` siap dipakai router — termasuk uji cegat Gerbang 0 dan bukti anon TIDAK bisa membaca tabelnya (membaca Supabase, tidak menulis) |
 | `npm run periksa-aturan` | Aturan pemicu di tabel masih sepadan dengan berkas .md — menangkap `also`/`unless` yang hilang |
 | `POST /api/pengenal/bangun` tanpa `jalankan` | Berapa contoh yang belum bervektor & perkiraan biayanya |

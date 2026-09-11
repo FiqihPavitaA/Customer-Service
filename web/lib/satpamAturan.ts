@@ -276,7 +276,7 @@ export function ukurCakupan(pola: string, contohPertanyaan: string[]): Cakupan {
  * Berjarak 10 supaya masih ada ruang menyisipkan di antaranya
  * tanpa menomori ulang seluruh tabel.
  */
-export function prioritasBaru(aturan: AturanSatpam[], _kategori?: string): number {
+export function prioritasBaru(aturan: AturanSatpam[]): number {
   if (!aturan.length) return 10;
   return Math.max(...aturan.map((a) => a.priority)) + 10;
 }

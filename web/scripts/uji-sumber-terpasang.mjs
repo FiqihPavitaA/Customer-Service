@@ -61,6 +61,25 @@ const MENYIAPKAN = /\bsiapkanSumberSatpam\s*\(/;
 const MENILAI_TEMPLATE = /\b(matchTemplate|routeToCategory)\s*\(/;
 const MENYIAPKAN_TEMPLATE = /\bsiapkanSumberTemplate\s*\(/;
 
+/* Gerbang jadwal — ditambahkan 11 Sep 2026, setelah kesalahan yang
+   SAMA terulang.
+
+   Gerbang kata sensitif sempat dipasang di /api/chat dan lupa di
+   /api/simulasi. Penjaga ini ditulis untuk menangkapnya. Lalu
+   gerbang JADWAL dipasang, juga hanya di /api/chat — dan penjaga
+   ini tidak menangkapnya, karena ia hanya tahu tentang dua gerbang
+   yang sudah ada.
+
+   Pelajarannya bukan "tambahkan satu pemeriksaan lagi", melainkan
+   bahwa daftar tertutup akan selalu tertinggal satu langkah. Karena
+   itu aturannya sekarang berbentuk kewajiban MENULIS: rute yang
+   menjalankan Gerbang 2 harus memuat jadwalnya, ATAU menuliskan
+   pengecualiannya. Rute baru tidak bisa diam-diam lolos — ia harus
+   memilih salah satu, dan pilihannya terbaca orang berikutnya. */
+const MENILAI_JADWAL = /\bkenaliMaksud\s*\(/;
+const MENYIAPKAN_JADWAL = /\bsiapkanJadwalAI\s*\(/;
+const DIKECUALIKAN_JADWAL = /JADWAL-AI:\s*DIKECUALIKAN\s*—\s*\S/;
+
 let lulus = 0;
 let gagal = 0;
 const laporan = [];
@@ -83,9 +102,16 @@ for (const berkas of cariRute(API)) {
 
   const perluSatpam = MENILAI.test(kode);
   const perluTemplate = MENILAI_TEMPLATE.test(kode);
-  if (!perluSatpam && !perluTemplate) continue;
+  const perluJadwal = MENILAI_JADWAL.test(kode);
+  if (!perluSatpam && !perluTemplate && !perluJadwal) continue;
 
   const masalah = [];
+  if (perluJadwal && !MENYIAPKAN_JADWAL.test(kode) && !DIKECUALIKAN_JADWAL.test(isi)) {
+    masalah.push(
+      "menjalankan Gerbang 2 tanpa siapkanJadwalAI() — saklar AI TIDAK berlaku di rute ini.\n" +
+        '      Kalau memang disengaja, tulis komentar: "JADWAL-AI: DIKECUALIKAN — <alasannya>"',
+    );
+  }
   if (perluSatpam && !MENYIAPKAN.test(kode)) {
     masalah.push(
       "menilai Gerbang 0 tanpa siapkanSumberSatpam() — kata sensitif dari tabel TIDAK berlaku di rute ini",

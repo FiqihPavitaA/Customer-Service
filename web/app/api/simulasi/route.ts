@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { catatHandover } from "@/lib/db/handoverServer";
 import { siapkanSumberTemplate } from "@/lib/db/templatesServer";
 import { siapkanSumberSatpam } from "@/lib/db/satpamServer";
+import { siapkanJadwalAI, statusJadwalAI } from "@/lib/db/jadwalServer";
 import { kenaliMaksud, MODE_PENGENAL } from "@/lib/pengenal";
 import { getSupabaseSebagai, tokenDariHeader } from "@/lib/supabase/server";
 import { perkiraanBiaya } from "@/lib/voyage";
@@ -149,7 +150,9 @@ export async function POST(req: Request) {
      yang terbaca sebagai "katanya tidak berfungsi" — padahal yang
      rusak adalah alat ujinya, bukan pengamannya. Orang lalu
      mengubah kata yang sebenarnya sudah benar. */
-  await Promise.all([siapkanSumberTemplate(), siapkanSumberSatpam()]);
+  await Promise.all([siapkanSumberTemplate(), siapkanSumberSatpam(), siapkanJadwalAI()]);
+  const jadwal = statusJadwalAI();
+  const aiBoleh = jadwal.keputusan.boleh;
   const keputusan = routeToCategory(teks);
 
   /* Keputusan router bertipe union: varian "ai" memang TIDAK punya
@@ -165,9 +168,32 @@ export async function POST(req: Request) {
   const adaJawabanTemplate =
     !adaFoto &&
     (keputusan.jenis === "handover" || keputusan.jenis === "template");
-  const teksTemplate = adaJawabanTemplate ? keputusan.teks : null;
-  const actionTemplate = adaJawabanTemplate ? keputusan.action : null;
-  const kodeTemplate = adaJawabanTemplate ? keputusan.kode : null;
+
+  /* Saat AI mati, Gerbang 0 dan Gerbang 1 diperlakukan BERBEDA —
+     sama seperti di /api/chat:
+
+       Gerbang 0 (handover)  penandaannya tetap. Chat refund dan
+                             keracunan harus tetap masuk antrean
+                             "Perlu CS"; itu gratis dan justru
+                             menolong tim CS yang sedang bertugas.
+                             Yang hilang hanya kalimat balasannya.
+
+       Gerbang 1 (template)  hilang seluruhnya. Mencatat action
+                             AUTO_REPLY tanpa satu pun balasan
+                             terkirim berarti barisnya BERBOHONG —
+                             CS akan membaca "sudah dijawab otomatis"
+                             pada percakapan yang belum dijawab
+                             siapa pun. */
+  const gerbang0 = adaJawabanTemplate && keputusan.jenis === "handover";
+  const balasOtomatis = adaJawabanTemplate && aiBoleh;
+
+  const teksTemplate = balasOtomatis ? keputusan.teks : null;
+  const actionTemplate = balasOtomatis
+    ? keputusan.action
+    : gerbang0
+      ? "HANDOVER_TO_CS"
+      : null;
+  const kodeTemplate = balasOtomatis || gerbang0 ? keputusan.kode : null;
 
   /* ---------- Gerbang 2, kalau Gerbang 0 dan template meleset ----
 
@@ -196,7 +222,20 @@ export async function POST(req: Request) {
   let balasanPengenal: string | null = null;
   let kodePengenal: string | null = null;
 
-  const perluGerbang2 = !adaFoto && !adaJawabanTemplate;
+  /* Gerbang jadwal ikut berlaku DI SINI, bukan hanya di /api/chat.
+
+     Kalau tidak, simulator memperagakan sistem yang berbeda dari
+     yang sungguhan — dan bedanya justru pada hal yang sedang
+     diperagakan. Tim CS mematikan AI, mengujinya di layar ini,
+     melihat Gerbang 2 tetap berjalan, lalu menyimpulkan saklarnya
+     tidak berfungsi. Padahal yang tidak berfungsi alat ujinya.
+
+     Ini kesalahan yang SAMA yang menimpa kata sensitif pada 11 Sep
+     2026: gerbang baru dipasang di /api/chat dan lupa di sini.
+     scripts/uji-sumber-terpasang.mjs sekarang menuntut setiap rute
+     yang menjalankan Gerbang 2 memuat jadwalnya lebih dulu, atau
+     menuliskan pengecualiannya secara terang-terangan. */
+  const perluGerbang2 = !adaFoto && !adaJawabanTemplate && aiBoleh;
   if (perluGerbang2) {
     const kenal = await kenaliMaksud(teks);
     if (kenal.jenis === "lewat") {
@@ -235,7 +274,7 @@ export async function POST(req: Request) {
 
   /* Lampiran memakai kalimat handover yang SAMA dengan Gerbang 0,
      lewat fungsi yang sama — bukan salinannya. */
-  const balasanLampiran = adaFoto ? teksHandover() : null;
+  const balasanLampiran = adaFoto && aiBoleh ? teksHandover() : null;
 
   const sekarang = new Date().toISOString();
   const id = crypto.randomUUID();
@@ -281,7 +320,14 @@ export async function POST(req: Request) {
       // bukan sekadar "sedang diproses". CS yang menunggu jawaban
       // yang tidak akan pernah datang lebih buruk daripada CS yang
       // tahu sejak awal bahwa gilirannya sekarang.
-      ai_suggestion: diluarJangkauan
+      /* Tiga sebab berbeda kenapa sebuah chat belum dijawab, dan
+         CS butuh tahu YANG MANA. "Belum dijawab" saja membuat orang
+         menunggu jawaban yang tidak akan pernah datang. */
+      ai_suggestion: !aiBoleh
+        ? `🔕 ${jadwal.teks}. Pesan ini sengaja TIDAK dijawab otomatis ` +
+          "— giliran tim CS. Gerbang 0 tetap berjalan, jadi chat yang " +
+          "genting tetap masuk antrean Perlu CS."
+        : diluarJangkauan
         ? "⏳ Di luar jangkauan Gerbang 0, template, dan Gerbang 2. " +
           "Di sistem sungguhan pertanyaan ini diteruskan ke Claude. " +
           "Pada peragaan ini Claude TIDAK dipanggil (penguncian saldo " +

@@ -19,6 +19,7 @@ import {
   statusSumberTemplate,
 } from "@/lib/db/templatesServer";
 import { siapkanSumberSatpam, statusSumberSatpam } from "@/lib/db/satpamServer";
+import { siapkanJadwalAI, statusJadwalAI } from "@/lib/db/jadwalServer";
 import {
   bacaJeda,
   catatHandover,
@@ -144,6 +145,25 @@ export async function POST(req: Request) {
     }
   }
 
+  /* ---------- Jadwal kerja: boleh menjawab atau tidak? ----------
+
+     Dibaca DI SINI, sebelum gerbang mana pun, karena jawabannya
+     mengubah perilaku tiga gerbang sekaligus — termasuk yang
+     biasanya mengirim kalimat penerimaan.
+
+     TIDAK langsung pulang di baris ini, dan itu bagian terpenting
+     dari rancangannya. Gerbang 0 tetap harus berjalan supaya chat
+     refund dan keracunan tetap masuk antrean "Perlu CS"; biayanya
+     Rp 0 dan justru itu yang menolong tim CS saat mereka sedang
+     bertugas. Yang dimatikan adalah BALASANNYA, bukan
+     penandaannya. */
+  await siapkanJadwalAI();
+  const jadwal = statusJadwalAI();
+  const aiBoleh = jadwal.keputusan.boleh;
+
+  /** Kalimat penerimaan — kosong saat AI sedang diam. */
+  const balasanJika = (teks: string) => (aiBoleh ? teks : "");
+
   /* ---------- Gerbang -0.5: ada lampiran ----------
 
      KEHADIRAN LAMPIRAN SUDAH CUKUP. Isinya tidak diperiksa, dan
@@ -162,7 +182,9 @@ export async function POST(req: Request) {
      Ditaruh sebelum Gerbang 0 dan sebelum pustaka template dibaca,
      jadi tidak pernah menyentuh Voyage maupun Claude. */
   if (berkas.length) {
-    const teksBalasan = teksHandover();
+    // Pengalihannya tetap terjadi dan tetap tercatat; yang hilang
+    // saat AI diam hanyalah kalimat penerimaannya.
+    const teksBalasan = balasanJika(teksHandover());
     const handover = await catat({
       sumber: "lampiran",
       kategori: null,
@@ -227,11 +249,11 @@ export async function POST(req: Request) {
       kode: keputusan.kode,
       kategori: keputusan.kategori,
       pesan: teksMasuk,
-      balasan: keputusan.teks,
+      balasan: balasanJika(keputusan.teks),
     });
     return NextResponse.json({
       action: keputusan.action, // HANDOVER_TO_CS
-      reply: keputusan.teks,
+      reply: balasanJika(keputusan.teks),
       model: null,
       usage: null,
       source: "satpam",
@@ -249,6 +271,48 @@ export async function POST(req: Request) {
       // null bila permintaan ini tidak menempel pada percakapan
       // sungguhan — bukan tanda kegagalan.
       handover,
+    });
+  }
+
+  /* ---------- Gerbang jadwal: tim CS sedang bertugas ----------
+
+     Berhenti DI SINI, sesudah Gerbang 0 dan sebelum Lapisan 1.
+     Letaknya adalah seluruh rancangannya:
+
+       sesudah Gerbang 0  chat refund dan keracunan tetap ditandai
+                          dan tetap masuk antrean "Perlu CS". Itu
+                          gratis, dan justru menolong tim CS yang
+                          sedang bertugas.
+
+       sebelum Lapisan 1  tidak ada balasan otomatis sama sekali —
+                          bukan hanya yang berbiaya. Template pun
+                          Rp 0, tetapi tim CS meminta AI tidak
+                          MENGINTERUPSI, bukan sekadar tidak mahal.
+
+     TIDAK memanggil catat(). Setiap pesan yang masuk pada jam kerja
+     bukan eskalasi; kalau semuanya dicatat, antrean "Perlu CS" akan
+     berisi seluruh isi inbox dan berhenti berarti apa-apa. Yang
+     memang eskalasi sudah dicatat Gerbang 0 di atas. */
+  if (!aiBoleh) {
+    return NextResponse.json({
+      // Sama dengan jalur "dijeda": bukan AUTO_REPLY, dan tidak ada
+      // balasan untuk pelanggan. Halaman Chat sudah tahu bentuk ini.
+      action: "HANDOVER_TO_CS",
+      reply: "",
+      model: null,
+      usage: null,
+      source: "jadwal",
+      sumberTemplate,
+      sumberSatpam,
+      // Kenapa AI diam, dalam kalimat yang sama dengan yang dibaca
+      // tim CS di header. Dua tempat yang menyusun kalimat
+      // sendiri-sendiri akan berselisih, dan berselisih tentang "AI
+      // nyala atau mati" adalah hal terakhir yang boleh terjadi.
+      jadwal: {
+        sebab: jadwal.keputusan.sebab,
+        teks: jadwal.teks,
+        sumber: jadwal.sumber,
+      },
     });
   }
 

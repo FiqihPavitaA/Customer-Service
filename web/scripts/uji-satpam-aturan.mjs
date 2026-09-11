@@ -312,36 +312,51 @@ console.log("\n5. Nomor urut aturan baru");
   ];
   const terpakai = new Set(SEPERTI_TABEL.map((a) => a.priority));
 
-  // Inti persoalannya: priority unik untuk SELURUH tabel, jadi nomor
-  // yang diusulkan tidak boleh sudah dipakai kategori mana pun.
-  let bentrok = 0;
-  for (const kategori of new Set(SEPERTI_TABEL.map((a) => a.kategori))) {
-    if (terpakai.has(prioritasBaru(SEPERTI_TABEL, kategori))) bentrok++;
-  }
+  /* Inti persoalannya: priority unik untuk SELURUH tabel.
+     Versi pertama menghitung max+10 di dalam kategori, dan pada blok
+     rapat seperti ini nomor sesudah blok mana pun sudah dipakai blok
+     berikutnya — 6 dari 7 kategori langsung ditolak database dengan
+     "duplicate key". Sekarang fungsinya tidak lagi menerima kategori
+     sama sekali, jadi bentuk kegagalan itu mustahil menurut
+     rancangan; yang tetap diuji adalah akibatnya. */
   periksa(
-    "tidak bentrok untuk SEMUA kategori",
-    bentrok === 0,
-    `${bentrok} kategori mendapat nomor yang sudah dipakai — database akan menolak dengan duplicate key`,
+    "nomor yang diusulkan belum dipakai siapa pun",
+    !terpakai.has(prioritasBaru(SEPERTI_TABEL)),
+    `mengusulkan ${prioritasBaru(SEPERTI_TABEL)}, yang sudah ada di tabel`,
   );
 
   periksa(
     "selalu di belakang aturan terakhir",
-    prioritasBaru(SEPERTI_TABEL, "refund_retur") === 220,
-    `dapat ${prioritasBaru(SEPERTI_TABEL, "refund_retur")}`,
+    prioritasBaru(SEPERTI_TABEL) === 220,
+    `dapat ${prioritasBaru(SEPERTI_TABEL)}`,
   );
-  periksa(
-    "kategori mana pun mendapat nomor yang sama",
-    new Set(
-      [...new Set(SEPERTI_TABEL.map((a) => a.kategori))].map((k) =>
-        prioritasBaru(SEPERTI_TABEL, k),
-      ),
-    ).size === 1,
-    "nomornya milik tabel, bukan milik kategori",
-  );
-  periksa("tabel kosong mulai dari 10", prioritasBaru([], "apa pun") === 10);
+  // Nomornya milik TABEL, bukan kategori — jadi fungsinya memang
+  // tidak lagi menerima kategori sama sekali. Yang diuji di sini:
+  // menambah aturan berkali-kali tidak pernah menghasilkan nomor
+  // yang sudah dipakai, berapa pun kategorinya.
+  {
+    const berjalan = [...SEPERTI_TABEL];
+    let bentrokBeruntun = 0;
+    for (const kategori of ["refund_retur", "keamanan", "kategori_baru"]) {
+      const p = prioritasBaru(berjalan);
+      if (berjalan.some((a) => a.priority === p)) bentrokBeruntun++;
+      berjalan.push({ kategori, priority: p });
+    }
+    periksa(
+      "tiga penambahan beruntun tidak pernah bentrok",
+      bentrokBeruntun === 0,
+      `${bentrokBeruntun} bentrok`,
+    );
+    periksa(
+      "nomornya naik terus: 220, 230, 240",
+      berjalan.slice(-3).map((a) => a.priority).join(",") === "220,230,240",
+      berjalan.slice(-3).map((a) => a.priority).join(","),
+    );
+  }
+  periksa("tabel kosong mulai dari 10", prioritasBaru([]) === 10);
   periksa(
     "tidak pernah menyisipkan di depan",
-    prioritasBaru(SEPERTI_TABEL, "refund_retur") > Math.max(...terpakai),
+    prioritasBaru(SEPERTI_TABEL) > Math.max(...terpakai),
   );
 }
 

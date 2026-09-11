@@ -255,7 +255,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const priority = prioritasBaru(sebagaiDaftarAturan(adaAturan), kategori);
+  const priority = prioritasBaru(sebagaiDaftarAturan(adaAturan));
 
   const { data, error } = await sb
     .from("satpam_rules")

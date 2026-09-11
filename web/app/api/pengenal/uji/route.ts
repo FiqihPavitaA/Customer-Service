@@ -17,6 +17,20 @@
    AI_TEST_LOCK dan VOYAGE_LOCK seperti jalur lain — bandingkan
    dengan /api/templates/uji yang benar-benar Rp 0 karena hanya
    regex dan berkas lokal.
+
+   JADWAL-AI: DIKECUALIKAN — endpoint ini bukan jalur pelanggan.
+
+   Saklar jadwal menjawab satu pertanyaan: "bolehkah AI menjawab
+   PELANGGAN sekarang". Di sini tidak ada pelanggan; yang ada adalah
+   seorang admin yang sengaja menempel satu kalimat untuk mengukur
+   skor kemiripannya. Menolaknya saat AI sedang dimatikan berarti
+   perkakas diagnosa mati justru ketika paling dibutuhkan — yaitu
+   saat seseorang sedang menelusuri kenapa sesuatu tidak berjalan.
+
+   Biayanya juga bukan alasan untuk ikut mematikannya: ~Rp 0,003
+   per penekanan, dan penekanannya disengaja. Bandingkan dengan
+   /api/simulasi yang MEMANG memperagakan pesan pelanggan dan
+   karena itu wajib tunduk pada jadwal.
    =========================================================== */
 
 import { NextResponse } from "next/server";
