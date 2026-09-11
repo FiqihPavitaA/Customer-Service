@@ -12,10 +12,12 @@
    (claude.md → STANDAR RESPONSIVITAS poin 2).
 
    Perilaku yang dipertahankan dari dashboard.js:
-   - Filter tab Semua / Belum dibaca / Perlu CS + pencarian panel.
+   - Filter tab Semua / Belum dibaca / Perlu CS.
    - Pencarian topbar berlingkup (nama, pesanan, resi, isi chat,
      produk) termasuk hasil pencarian massal — kini lewat
-     lib/search.ts karena TopBar ada di layout terpisah.
+     lib/search.ts karena TopBar ada di layout terpisah. Sejak
+     11 Sep 2026 inilah SATU-SATUNYA pencarian di halaman ini;
+     kotak kedua di kepala panel daftar sudah dihapus.
    - Membuka percakapan menandainya sudah dibaca (badge rail ikut
      turun karena keduanya membaca store yang sama).
    - Panel AI Assist: Gunakan / Edit dulu / Alihkan ke CS, dan
@@ -308,8 +310,6 @@ function ConversationsPanel({
   activeId,
   filter,
   setFilter,
-  query,
-  setQuery,
   counts,
   menungguSejak,
   jumlahSimulasi,
@@ -324,8 +324,6 @@ function ConversationsPanel({
   activeId: string;
   filter: FilterKey;
   setFilter: (f: FilterKey) => void;
-  query: string;
-  setQuery: (q: string) => void;
   counts: { unread: number; cs: number };
   /** id percakapan -> sejak kapan eskalasinya terbuka. */
   menungguSejak: Map<string, string>;
@@ -393,18 +391,18 @@ function ConversationsPanel({
         ))}
       </div>
 
-      <div className="flex items-center gap-2 border-b border-line px-3 py-2">
-        <span aria-hidden className="opacity-50">
-          🔍
-        </span>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Cari nama atau nomor pesanan…"
-          aria-label="Cari percakapan berdasarkan nama, nomor pesanan, resi, atau isi chat"
-          className="w-full border-none text-[0.88rem] outline-none"
-        />
-      </div>
+      {/* Kotak "Cari nama atau nomor pesanan…" DIHAPUS 11 Sep 2026.
+
+          Ia mencari bidang yang sama persis dengan kotak pencarian di
+          topbar — nama, nomor pesanan, resi, isi chat, produk — hanya
+          dengan lingkup terkunci "semua". Dua kotak pencarian di satu
+          layar bukan sekadar berlebihan: keduanya menyaring daftar
+          yang sama secara bersamaan, jadi mengetik di salah satunya
+          sementara yang lain masih terisi memberi hasil yang tidak
+          bisa dijelaskan tanpa memeriksa dua tempat.
+
+          Yang di topbar yang dipertahankan karena ia bisa lebih:
+          punya pemilih lingkup dan pencarian massal. */}
 
       {/* Penanda mode demo — di kepala daftar, bukan melayang di atas
           composer (versi melayang menutupi tombol Kirim). */}
@@ -826,7 +824,6 @@ export default function Chat() {
 
   const [activeId, setActiveId] = useState<string>(conversations[0]?.id ?? "");
   const [filter, setFilter] = useState<FilterKey>("all");
-  const [panelQuery, setPanelQuery] = useState("");
   const [draft, setDraft] = useState("");
   const [shops, setShops] = useState<Shop[]>(DAFTAR_TOKO);
   const [activeShop, setActiveShop] = useState<string>(SEMUA_TOKO);
@@ -886,9 +883,6 @@ export default function Chat() {
      angkanya naik, percakapannya tidak pernah muncul. Sekarang
      mustahil berselisih, karena sumbernya satu. */
   const dasar = useMemo(() => {
-    // Tidak dikecilkan di sini: cocokKata() yang mengurus huruf
-    // besar-kecil DAN tanda baca sekaligus.
-    const q = panelQuery.trim();
     return conversations.filter((c) => {
       /* Penyaringan toko — sampai 10 Sep 2026 baris ini TIDAK ADA.
          `activeShop` disimpan, warnanya berubah saat diklik, tetapi
@@ -897,15 +891,12 @@ export default function Chat() {
          ada galat apa pun yang menunjukkan bahwa itu keliru. */
       if (!cocokToko(c.shop_name, activeShop)) return false;
 
-      /* Kotak "Cari percakapan…" di panel ini mencari SEMUA bidang,
-         bukan hanya nama dan cuplikan pesan terakhir seperti
-         sebelumnya. Kotak yang bertuliskan "cari percakapan" lalu
-         diam saja saat diberi nomor pesanan adalah janji yang tidak
-         ditepati — dan CS tidak punya cara menebak bahwa yang salah
-         adalah bidangnya, bukan nomornya. */
-      if (q && !cocokLingkup(c, "semua", q)) return false;
-
-      // Pencarian topbar (lingkup + massal), sama seperti dashboard.js
+      /* Pencarian topbar (lingkup + massal), sama seperti dashboard.js
+         — dan sejak 11 Sep 2026 inilah SATU-SATUNYA pencarian yang
+         menyaring daftar ini. Kotak kedua di kepala panel sudah
+         dihapus; ia mencari bidang yang sama dengan lingkup terkunci
+         "semua", jadi dua kotak terisi sekaligus memberi hasil yang
+         tidak bisa dijelaskan tanpa memeriksa dua tempat. */
       if (search.terms.length) {
         if (!search.terms.some((t) => cocokLingkup(c, search.scope, t))) return false;
       } else if (search.single.trim()) {
@@ -913,7 +904,7 @@ export default function Chat() {
       }
       return true;
     });
-  }, [conversations, panelQuery, search, activeShop]);
+  }, [conversations, search, activeShop]);
 
   /** Apakah sebuah percakapan masuk tab yang sedang dibuka. */
   const cocokTab = useCallback(
@@ -982,7 +973,6 @@ export default function Chat() {
 
   const adaPenyaring =
     activeShop !== SEMUA_TOKO ||
-    panelQuery.trim().length > 0 ||
     search.terms.length > 0 ||
     search.single.trim().length > 0;
 
@@ -992,8 +982,7 @@ export default function Chat() {
      pencarian. */
   const adaCarian =
     search.terms.length > 0 ||
-    search.single.trim().length > 0 ||
-    panelQuery.trim().length > 0;
+    search.single.trim().length > 0;
   const sebabTersembunyi =
     activeShop !== SEMUA_TOKO && adaCarian
       ? `pilihan toko "${activeShop}" dan pencarian`
@@ -1004,7 +993,6 @@ export default function Chat() {
   /** Kembalikan daftar ke keadaan "tidak menyaring apa pun". */
   const bersihkanPenyaring = () => {
     setActiveShop(SEMUA_TOKO);
-    setPanelQuery("");
     clearSearch();
   };
 
@@ -1155,8 +1143,6 @@ export default function Chat() {
           activeId={active.id}
           filter={filter}
           setFilter={setFilter}
-          query={panelQuery}
-          setQuery={setPanelQuery}
           counts={counts}
           menungguSejak={menungguSejak}
           jumlahSimulasi={jumlahSimulasi}
@@ -1418,8 +1404,6 @@ export default function Chat() {
               activeId={active.id}
               filter={filter}
               setFilter={setFilter}
-              query={panelQuery}
-              setQuery={setPanelQuery}
               counts={counts}
               menungguSejak={menungguSejak}
               jumlahSimulasi={jumlahSimulasi}
