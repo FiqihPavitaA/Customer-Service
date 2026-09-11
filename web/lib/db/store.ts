@@ -58,6 +58,7 @@ import type {
   Review,
   SettingsRow,
 } from "./types";
+import { belumTerjawab } from "../tunggakan";
 
 type DbState = {
   conversations: Conversation[];
@@ -270,6 +271,23 @@ export function useConversations() {
 export function useUnreadCount() {
   return useDb(
     useCallback((s: DbState) => s.conversations.filter((c) => c.unread).length, []),
+  );
+}
+
+/**
+ * Jumlah percakapan yang menunggu balasan — dipakai peringatan di
+ * penanda AI, sebelum jendela jam kerja ditutup.
+ *
+ * Berbeda dari useUnreadCount(). "Belum dibaca" berubah begitu
+ * seseorang MEMBUKA percakapannya; yang dihitung di sini baru
+ * berubah kalau benar-benar ada yang MEMBALAS. Chat yang dibuka,
+ * dibaca, lalu ditinggalkan tetap terhitung di sini — dan justru
+ * chat seperti itulah yang paling mudah tertinggal saat jam kerja
+ * habis.
+ */
+export function useBelumTerjawabCount() {
+  return useDb(
+    useCallback((s: DbState) => s.conversations.filter((c) => belumTerjawab(c.messages)).length, []),
   );
 }
 

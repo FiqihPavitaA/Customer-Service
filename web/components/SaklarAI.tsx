@@ -37,6 +37,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { useBelumTerjawabCount } from "@/lib/db";
+import { peringatanTunggakan } from "@/lib/tunggakan";
 import { useToast } from "@/components/Toast";
 import { headerBerSesi } from "@/lib/supabase/header";
 import {
@@ -71,6 +73,10 @@ const WARNA = {
 export default function SaklarAI() {
   const { isAdmin, isDemo } = useAuth();
   const bolehUbah = isDemo || isAdmin;
+  /* Chat yang menunggu balasan. Dibaca dari store yang sama dengan
+     daftar di halaman Chat, jadi angka di sini dan panjang daftar di
+     sana tidak bisa berselisih. */
+  const tunggakan = useBelumTerjawabCount();
   const toast = useToast();
 
   const [pengaturan, setPengaturan] = useState<PengaturanJadwal | null>(null);
@@ -183,8 +189,22 @@ export default function SaklarAI() {
     );
   }
 
-  const keputusan = putusanAI(pengaturan, new Date());
+  const sekarang = new Date();
+  const keputusan = putusanAI(pengaturan, sekarang);
   const teks = teksKeadaanAI(keputusan);
+
+  /* ---- Peringatan sebelum jam kerja habis ----
+
+     Saklar jadwal menciptakan satu lubang yang tidak ada sebelumnya:
+     pesan yang datang pukul 15.55 tidak dijawab AI (masih jam kerja)
+     dan tidak dijawab orang (jamnya sudah habis). Kalau pelanggannya
+     kemudian diam, pesan itu tidak pernah dijawab siapa pun.
+
+     Yang dilakukan di sini bukan mengejar ketertinggalan melainkan
+     mencegahnya terbentuk — dan karena itu ia harus muncul di
+     PENANDANYA, bukan hanya di dalam panel. Peringatan yang baru
+     terlihat sesudah diklik tidak memperingatkan siapa-siapa. */
+  const peringatan = peringatanTunggakan(keputusan, tunggakan, sekarang);
 
   /* Gerbang di /api/chat tidak bisa membaca jadwal ini, jadi apa pun
      yang tertulis di penanda TIDAK berlaku bagi pelanggan.
@@ -269,10 +289,20 @@ export default function SaklarAI() {
           gerbangButa ? WARNA.buta : keputusan.boleh ? WARNA.nyala : WARNA.mati
         }`}
       >
-        <span aria-hidden>{gerbangButa ? "⚠️" : keputusan.boleh ? "🟢" : "🔴"}</span>
-        <span className="max-mini:hidden">{gerbangButa ? "AI · belum terpasang" : teks}</span>
+        <span aria-hidden>
+          {gerbangButa ? "⚠️" : peringatan ? "⏳" : keputusan.boleh ? "🟢" : "🔴"}
+        </span>
+        <span className="max-mini:hidden">
+          {gerbangButa ? "AI · belum terpasang" : (peringatan ?? teks)}
+        </span>
         <span className="mini:hidden">
-          {gerbangButa ? "AI ⚠" : keputusan.boleh ? "AI" : "AI mati"}
+          {gerbangButa
+            ? "AI ⚠"
+            : peringatan
+              ? `${tunggakan} belum`
+              : keputusan.boleh
+                ? "AI"
+                : "AI mati"}
         </span>
       </button>
 
@@ -291,6 +321,24 @@ export default function SaklarAI() {
           )}
 
           <b className="text-[0.85rem]">{teks}</b>
+
+          {/* Sengaja menyebut apa yang TIDAK akan terjadi.
+
+              Dugaan paling wajar saat membaca "AI nyala 15 menit
+              lagi" adalah bahwa AI akan menyapu tunggakannya. Ia
+              tidak — dan tim yang mengira begitu akan pulang
+              meninggalkan chat yang tidak pernah dijawab siapa pun.
+              Kalimat ini yang menahannya. */}
+          {peringatan && (
+            <div className="mt-1.5 rounded-lg border border-[#f59e0b] bg-[#fffbeb] px-2.5 py-2">
+              <b className="text-[0.78rem] text-[#92400e]">{peringatan}</b>
+              <p className="mt-1 mb-0 text-[0.73rem] leading-relaxed text-[#92400e]">
+                AI hanya menangani pesan <b>baru</b> sesudah menyala — yang
+                menunggu sekarang tidak ikut dijawab. Buka tab{" "}
+                <b>Menunggu balasan</b> di halaman Chat selagi masih sempat.
+              </p>
+            </div>
+          )}
 
           {/* Tiga keadaan, bukan dua.
 

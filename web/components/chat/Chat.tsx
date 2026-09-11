@@ -50,6 +50,7 @@ import { catalogStatusText, searchProducts, useCatalog } from "@/lib/catalog";
 import { inisial, jam, stempel, tanggalPanjang } from "@/lib/format";
 import { clearSearch, useSearch, type SearchScope } from "@/lib/search";
 import { cocokKata } from "@/lib/cocok";
+import { belumTerjawab } from "@/lib/tunggakan";
 import { bukaPapan, useCroscek } from "@/lib/croscek";
 import {
   cocokToko,
@@ -303,7 +304,7 @@ function BadgeMenunggu({ sejak }: { sejak: string }) {
 
 /* ---------------- Panel: daftar percakapan ---------------- */
 
-type FilterKey = "all" | "unread" | "cs";
+type FilterKey = "all" | "unread" | "cs" | "menunggu";
 
 function ConversationsPanel({
   rows,
@@ -324,7 +325,7 @@ function ConversationsPanel({
   activeId: string;
   filter: FilterKey;
   setFilter: (f: FilterKey) => void;
-  counts: { unread: number; cs: number };
+  counts: { unread: number; menunggu: number; cs: number };
   /** id percakapan -> sejak kapan eskalasinya terbuka. */
   menungguSejak: Map<string, string>;
   /** Berapa percakapan buatan simulasi yang bisa dibersihkan. */
@@ -357,11 +358,23 @@ function ConversationsPanel({
         </button>
       )}
 
-      <div className="flex gap-1 border-b border-line px-2 pt-2">
+      {/* overflow-x-auto sejak tab keempat. Empat label tidak muat di
+          layar sempit, dan tab yang terpotong tanpa cara menggulirnya
+          sama saja dengan tab yang tidak ada. */}
+      <div className="flex gap-1 overflow-x-auto border-b border-line px-2 pt-2">
         {(
           [
             { key: "all", label: "Semua", n: 0, warn: false },
             { key: "unread", label: "Belum dibaca", n: counts.unread, warn: false },
+            /* "Menunggu balasan", bukan "Belum terjawab".
+
+               Tab di sebelahnya sudah berbunyi "Belum dibaca", dan dua
+               label yang sama-sama diawali "Belum" akan tertukar
+               justru saat sedang buru-buru — yaitu saat tab ini paling
+               dibutuhkan. Keduanya memang berbeda: "belum dibaca"
+               berubah begitu ada yang MEMBUKA, yang ini baru berubah
+               kalau ada yang MEMBALAS. */
+            { key: "menunggu", label: "Menunggu balasan", n: counts.menunggu, warn: true },
             { key: "cs", label: "Perlu CS", n: counts.cs, warn: true },
           ] as const
         ).map((t) => (
@@ -461,7 +474,9 @@ function ConversationsPanel({
                 ? "Tidak ada percakapan yang cocok dengan penyaring ini."
                 : filter === "cs"
                   ? "Tidak ada yang menunggu CS 🎉"
-                  : "Tidak ada percakapan yang cocok."}
+                  : filter === "menunggu"
+                    ? "Semua chat sudah dibalas 🎉"
+                    : "Tidak ada percakapan yang cocok."}
           </li>
         )}
         {rows.map((c) => (
@@ -910,6 +925,7 @@ export default function Chat() {
   const cocokTab = useCallback(
     (c: Conversation) => {
       if (filter === "unread") return c.unread;
+      if (filter === "menunggu") return belumTerjawab(c.messages);
       if (filter === "cs") return menungguSejak.has(c.id);
       return true;
     },
@@ -924,6 +940,16 @@ export default function Chat() {
        menaruh yang PALING LAMA MENUNGGU di atas, karena aturan
        balasan di bawah 15 menit hanya bisa dijaga kalau yang paling
        terancam melanggar terlihat lebih dulu. */
+    /* Alasan yang sama berlaku untuk "Menunggu balasan", hanya
+       jamnya diambil dari tempat berbeda: tab Perlu CS punya baris
+       eskalasi dengan created_at sendiri, sedangkan di sini yang
+       menandai lamanya menunggu adalah pesan terakhir pelanggan. */
+    if (filter === "menunggu") {
+      return [...tersaring].sort(
+        (a, b) => Date.parse(a.last_message_at) - Date.parse(b.last_message_at),
+      );
+    }
+
     if (filter !== "cs") return tersaring;
     return [...tersaring].sort(
       (a, b) =>
@@ -952,6 +978,7 @@ export default function Chat() {
      baris yang benar-benar bisa dilihat dan diklik. */
   const counts = {
     unread: dasar.filter((c) => c.unread).length,
+    menunggu: dasar.filter((c) => belumTerjawab(c.messages)).length,
     cs: dasar.filter((c) => menungguSejak.has(c.id)).length,
   };
 

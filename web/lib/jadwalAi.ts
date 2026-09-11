@@ -84,6 +84,14 @@ export function jamWib(saat: Date): number {
   return new Date(saat.getTime() + WIB_OFFSET_MENIT * 60_000).getUTCHours();
 }
 
+/** Menit dalam jam WIB (0-59). Sama saja dengan menit UTC selama
+    offsetnya bulat jam — tetapi ditulis lewat jalur yang sama
+    dengan jamWib() supaya keduanya tidak bisa berselisih kalau
+    suatu saat offsetnya diubah. */
+export function menitWib(saat: Date): number {
+  return new Date(saat.getTime() + WIB_OFFSET_MENIT * 60_000).getUTCMinutes();
+}
+
 /** Hari WIB dalam penomoran ISO: 1 = Senin … 7 = Minggu. */
 export function hariWib(saat: Date): number {
   const h = new Date(saat.getTime() + WIB_OFFSET_MENIT * 60_000).getUTCDay();

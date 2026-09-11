@@ -29,7 +29,8 @@
     "contoh": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/bangun-contoh.mjs",
     "tes0": "node --env-file-if-exists=.env.local scripts/tes0.mjs",
     "uji-input-type": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/uji-input-type.mjs",
-    "tes-ambang": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/tes-ambang.mjs"
+    "tes-ambang": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/tes-ambang.mjs",
+    "uji-tunggakan": "node --experimental-strip-types scripts/uji-tunggakan.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
