@@ -51,6 +51,16 @@ const AMBIL_ULANG_MS = 5 * 60_000;
 /** Seberapa sering keputusannya dihitung ulang dari jam peramban. */
 const HITUNG_ULANG_MS = 30_000;
 
+/** Nama hari menurut ISO: 1 = Senin. Dipendekkan jadi tiga huruf
+    supaya tujuh tombolnya muat satu baris di panel selebar 320px. */
+const HARI = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
+
+const JAM_PILIHAN = Array.from({ length: 24 }, (_, j) => j);
+
+const dua = (n: number) => String(n).padStart(2, "0");
+
+type Draf = { mulai: number; selesai: number; hari: number[] };
+
 const WARNA = {
   nyala: "border-green bg-green-soft text-green-dark",
   mati: "border-[#f59e0b] bg-[#fffbeb] text-[#92400e]",
@@ -72,6 +82,13 @@ export default function SaklarAI() {
   const [gerbang, setGerbang] = useState<{ sumber: string; alasan: string | null } | null>(null);
   const [buka, setBuka] = useState(false);
   const [sibuk, setSibuk] = useState(false);
+  /* Draf penyuntingan jadwal; null berarti penyuntingnya tertutup.
+
+     Sengaja TIDAK ada boolean "sedang menyunting" di sebelahnya.
+     Dua keadaan yang harus selalu sepakat adalah dua keadaan yang
+     suatu saat akan berselisih, dan yang tersisa sesudahnya adalah
+     penyunting terbuka tanpa isi — atau isi yang tidak terlihat. */
+  const [draf, setDraf] = useState<Draf | null>(null);
   /* Dinaikkan tiap HITUNG_ULANG_MS semata untuk memaksa render
      ulang. Keputusannya sendiri dihitung dari jam saat render, jadi
      nilainya tidak pernah dipakai — yang dibutuhkan cuma
@@ -117,7 +134,14 @@ export default function SaklarAI() {
   useEffect(() => {
     if (!buka) return;
     const keluar = (e: MouseEvent) => {
-      if (kotak.current && !kotak.current.contains(e.target as Node)) setBuka(false);
+      if (kotak.current && !kotak.current.contains(e.target as Node)) {
+        setBuka(false);
+        // Draf ikut dibuang. Kalau tidak, panel yang dibuka lagi
+        // besok menampilkan angka yang pernah diketik lalu
+        // ditinggalkan — terbaca sebagai jadwal yang berlaku,
+        // padahal tidak pernah tersimpan.
+        setDraf(null);
+      }
     };
     document.addEventListener("mousedown", keluar);
     return () => document.removeEventListener("mousedown", keluar);
@@ -137,6 +161,7 @@ export default function SaklarAI() {
       setPengaturan(d.pengaturan as PengaturanJadwal);
       toast(d.teks as string);
       setBuka(false);
+      setDraf(null);
     } catch (e) {
       // Panjang dan perlu dibaca pelan-pelan (pesan penolakan RLS
       // memuat perintah SQL), jadi ditahan di panel, bukan toast.
@@ -171,11 +196,73 @@ export default function SaklarAI() {
      sesuatu yang mereka kira sudah dimatikan. */
   const gerbangButa = gerbang?.sumber === "bawaan";
 
+  /* filter(Boolean) bukan hiasan: ai_hari datang dari database, dan
+     nilai di luar 1-7 akan menghasilkan undefined yang tercetak apa
+     adanya sebagai kata "undefined" di tengah kalimat. */
+  const hariTerpilih = pengaturan.ai_hari.map((h) => HARI[h - 1]).filter(Boolean);
+
+  /* Ditulis sesudah penjagaan !pengaturan di atas, supaya draf
+     selalu lahir dari jadwal yang SEDANG berlaku — bukan dari nol
+     yang kebetulan berarti tengah malam. */
+  const bukaPenyunting = () =>
+    setDraf({
+      mulai: pengaturan.ai_jam_mulai,
+      selesai: pengaturan.ai_jam_selesai,
+      hari: [...pengaturan.ai_hari],
+    });
+
+  const geserHari = (h: number) =>
+    setDraf((d) =>
+      !d
+        ? d
+        : {
+            ...d,
+            hari: d.hari.includes(h)
+              ? d.hari.filter((x) => x !== h)
+              : [...d.hari, h].sort((a, b) => a - b),
+          },
+    );
+
+  /* Ditahan SEBELUM dikirim, bukan sesudah database menolak.
+
+     Yang berwenang tetap server — dua batas yang sama juga ditulis
+     sebagai CHECK constraint, dan itulah yang benar-benar menjaga
+     tabelnya. Yang di sini hanya membuat salah ketik yang sudah
+     pasti ditolak tidak perlu menempuh perjalanan pulang-pergi
+     dulu, dan menjelaskan sebabnya dengan kalimat yang bisa dibaca
+     orang. */
+  const salahDraf = !draf
+    ? null
+    : draf.mulai === draf.selesai
+      ? "Jam mulai dan selesai tidak boleh sama. Untuk mendiamkan AI sepanjang waktu, pakai saklar induk — bukan jadwal."
+      : !draf.hari.length
+        ? "Pilih minimal satu hari."
+        : null;
+
+  const simpanDraf = () => {
+    if (!draf || salahDraf) return;
+    void kirim({
+      ai_jam_mulai: draf.mulai,
+      ai_jam_selesai: draf.selesai,
+      ai_hari: draf.hari,
+      /* Menyunting jadwal berarti bermaksud memakainya. Menyimpan
+         jam baru lalu mendapati AI tetap menjawab sepanjang hari
+         adalah kebingungan yang tidak perlu ada.
+
+         Supaya tidak diam-diam, tombolnya berbunyi "Simpan &
+         nyalakan" ketika jadwalnya memang sedang mati. */
+      ai_jadwal_aktif: true,
+    });
+  };
+
   return (
     <div ref={kotak} className="relative shrink-0">
       <button
         type="button"
-        onClick={() => setBuka((b) => !b)}
+        onClick={() => {
+          setBuka((b) => !b);
+          setDraf(null);
+        }}
         aria-expanded={buka}
         title={bolehUbah ? "Klik untuk mengubah" : "Hanya Admin yang bisa mengubah"}
         className={`flex cursor-pointer items-center gap-1.5 rounded-xl border px-2.5 py-2 text-[0.78rem] font-bold transition ${
@@ -205,12 +292,23 @@ export default function SaklarAI() {
 
           <b className="text-[0.85rem]">{teks}</b>
 
+          {/* Tiga keadaan, bukan dua.
+
+              Jadwal yang MENYALA tetapi tidak punya satu hari pun
+              adalah jadwal yang tidak pernah berlaku: putusanAI()
+              membuangnya dan AI menjawab kapan saja. Kalau kalimat
+              di sini tetap berbunyi "AI diam 08.00-16.00", ia
+              menyebutkan aturan yang sedang tidak dijalankan — dan
+              orang yang membacanya akan mencari sebab di tempat
+              yang salah. */}
           <p className="mt-1 mb-2 text-[0.76rem] leading-relaxed text-muted">
-            {pengaturan.ai_jadwal_aktif
-              ? `Jadwal: AI diam ${String(pengaturan.ai_jam_mulai).padStart(2, "0")}.00–${String(
-                  pengaturan.ai_jam_selesai,
-                ).padStart(2, "0")}.00 WIB pada hari yang dipilih.`
-              : "Jadwal belum dinyalakan — AI menjawab kapan saja."}
+            {!pengaturan.ai_jadwal_aktif
+              ? "Jadwal belum dinyalakan — AI menjawab kapan saja."
+              : hariTerpilih.length
+                ? `Jadwal: AI diam ${dua(pengaturan.ai_jam_mulai)}.00–${dua(
+                    pengaturan.ai_jam_selesai,
+                  )}.00 WIB pada ${hariTerpilih.join(", ")}.`
+                : "Jadwal menyala tetapi belum ada hari yang dipilih, jadi tidak ada yang berlaku — AI menjawab kapan saja."}
           </p>
 
           {!bolehUbah && (
@@ -275,6 +373,117 @@ export default function SaklarAI() {
                 >
                   Batalkan, kembali ikut jadwal
                 </button>
+              )}
+
+              {/* ---- Menyunting jadwal, di panel ini juga ----
+
+                  Semula penyuntingan jam hendak diletakkan di
+                  Pengaturan, dengan alasan panel selebar 320px
+                  terlalu sempit untuk sebuah borang. Pemilik proyek
+                  memilih sebaliknya, dan alasannya lebih kuat: yang
+                  mengubah jadwal adalah orang yang baru saja
+                  MELIHAT jadwalnya di penanda ini. Menyuruhnya
+                  pindah halaman untuk menyentuh angka yang sedang
+                  ia baca cuma menambah satu langkah, dan satu
+                  langkah itulah yang membuat orang menundanya.
+
+                  Yang menyesuaikan diri karena itu bukan tempatnya,
+                  melainkan bentuknya: dua pilihan jam dan tujuh
+                  tombol hari sependek nama harinya — bukan borang
+                  bertumpuk yang memaksa panel ini tumbuh ke bawah
+                  layar. */}
+              {!draf ? (
+                <button
+                  type="button"
+                  disabled={sibuk}
+                  onClick={bukaPenyunting}
+                  className="mt-2 cursor-pointer rounded-lg border border-line bg-white px-2 py-1.5 text-[0.74rem] font-semibold text-text-2 disabled:opacity-50"
+                >
+                  Ubah jam &amp; hari
+                </button>
+              ) : (
+                <div className="mt-2 rounded-lg border border-line bg-[#f4fbf6] p-2">
+                  <b className="text-[0.72rem] tracking-wider text-muted uppercase">AI diam pada</b>
+
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <select
+                      aria-label="Jam mulai"
+                      value={draf.mulai}
+                      disabled={sibuk}
+                      onChange={(e) => setDraf({ ...draf, mulai: Number(e.target.value) })}
+                      className="cursor-pointer rounded-lg border border-line bg-white px-1.5 py-1 text-[0.76rem] font-semibold"
+                    >
+                      {JAM_PILIHAN.map((j) => (
+                        <option key={j} value={j}>
+                          {dua(j)}.00
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-[0.74rem] text-muted">sampai</span>
+                    <select
+                      aria-label="Jam selesai"
+                      value={draf.selesai}
+                      disabled={sibuk}
+                      onChange={(e) => setDraf({ ...draf, selesai: Number(e.target.value) })}
+                      className="cursor-pointer rounded-lg border border-line bg-white px-1.5 py-1 text-[0.76rem] font-semibold"
+                    >
+                      {JAM_PILIHAN.map((j) => (
+                        <option key={j} value={j}>
+                          {dua(j)}.00
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-[0.74rem] text-muted">WIB</span>
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {HARI.map((nama, i) => {
+                      const h = i + 1;
+                      const dipilih = draf.hari.includes(h);
+                      return (
+                        <button
+                          key={nama}
+                          type="button"
+                          disabled={sibuk}
+                          aria-pressed={dipilih}
+                          onClick={() => geserHari(h)}
+                          className={`min-w-9 flex-1 cursor-pointer rounded-lg border px-1 py-1 text-[0.7rem] font-bold disabled:opacity-50 ${
+                            dipilih
+                              ? "border-green bg-green-soft text-green-dark"
+                              : "border-line bg-white text-muted"
+                          }`}
+                        >
+                          {nama}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {salahDraf && (
+                    <p className="mt-2 mb-0 text-[0.72rem] leading-relaxed text-[#92400e]">
+                      {salahDraf}
+                    </p>
+                  )}
+
+                  <div className="mt-2 flex gap-1.5">
+                    <button
+                      type="button"
+                      disabled={sibuk || !!salahDraf}
+                      onClick={simpanDraf}
+                      className="flex-1 cursor-pointer rounded-lg border border-green bg-green-soft px-2 py-1.5 text-[0.74rem] font-bold text-green-dark disabled:opacity-50"
+                    >
+                      {pengaturan.ai_jadwal_aktif ? "Simpan" : "Simpan & nyalakan"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={sibuk}
+                      onClick={() => setDraf(null)}
+                      className="cursor-pointer rounded-lg border border-line bg-white px-2 py-1.5 text-[0.74rem] font-semibold text-text-2 disabled:opacity-50"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </div>
               )}
 
               <button
