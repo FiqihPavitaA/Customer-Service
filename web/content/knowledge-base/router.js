@@ -499,6 +499,147 @@ const SATPAM = [
   },
 ];
 
+/* ===========================================================
+   SATPAM DARI TABEL — sumber kedua untuk Gerbang 0
+   ===========================================================
+   Ditambahkan 11 Sep 2026. Tim CS menemukan sendiri bahwa "chat
+   penjual" tidak pernah tertangkap: pola minta_manusia hanya
+   mengenal cs/admin/orang/manusia/petugas. Memperbaikinya dulu
+   berarti commit + deploy, jadi daftarnya dipindahkan ke tabel
+   `satpam_rules` yang bisa disunting admin.
+
+   BEDANYA DENGAN setSumberLuar() DI ATAS, DAN KENAPA BERBEDA
+
+   Untuk templates, "tabel kosong" berarti kembali membaca berkas
+   .md — dua sumber yang setara isinya. Di sini tidak ada berkas;
+   yang jadi cadangan adalah daftar SATPAM di kode ini. Maka:
+
+     tabel terisi  -> tabel yang berlaku, kode diabaikan
+     tabel kosong  -> daftar di kode, LENGKAP
+     tabel gagal   -> daftar di kode, LENGKAP
+
+   "Tidak ada pengaman" bukan salah satu kemungkinannya, dan itu
+   disengaja. Gerbang 0 adalah satu-satunya hal yang menahan
+   permintaan refund dan pertanyaan keracunan supaya tidak dijawab
+   mesin; ia tidak boleh bisa dimatikan oleh sebuah tabel kosong,
+   sebuah salah ketik, atau Supabase yang sedang tidak bisa
+   dihubungi. */
+
+/** Aturan hasil susun ulang dari tabel; null berarti pakai SATPAM. */
+let satpamLuar = null;
+
+/** Dari mana Gerbang 0 sedang membaca: "kode" atau "supabase". */
+let sumberSatpam = "kode";
+
+/**
+ * Pasang aturan Gerbang 0 dari tabel Supabase.
+ *
+ * @param {Array<{
+ *   kategori: string, priority?: number|null,
+ *   when_patterns?: string[]|null, also_pattern?: string|null,
+ *   unless_patterns?: string[]|null, flags?: string|null, why?: string|null
+ * }>} baris keluaran fungsi public.satpam_router()
+ * @returns {{aturan: number, ditolak: string[]}}
+ */
+export function setSatpamLuar(baris) {
+  if (!Array.isArray(baris) || baris.length === 0) {
+    return bersihkanSatpamLuar();
+  }
+
+  const aturan = [];
+  const ditolak = [];
+
+  for (const b of baris) {
+    const kategori = String(b?.kategori ?? "").trim();
+    if (!kategori) continue;
+
+    const bendera = String(b.flags ?? "i") || "i";
+    const susun = (sumber) => new RegExp(String(sumber), bendera);
+
+    try {
+      const when = (b.when_patterns ?? []).map(susun);
+      if (!when.length) {
+        ditolak.push(`[${kategori}] aturan tanpa pola`);
+        continue;
+      }
+      aturan.push({
+        kategori,
+        when,
+        also: b.also_pattern ? susun(b.also_pattern) : null,
+        unless: (b.unless_patterns ?? []).map(susun),
+        why: b.why ?? "",
+        priority: Number(b.priority ?? 0),
+      });
+    } catch (e) {
+      // Satu pola rusak membuang SATU aturan, bukan seluruh
+      // pengaman — sama seperti setSumberLuar(). Tetapi di sini
+      // akibatnya lebih tajam: aturan yang hilang berarti satu
+      // kelas pesan berbahaya lolos. Karena itu yang dibuang
+      // dikembalikan ke pemanggil, bukan sekadar dicatat di log,
+      // supaya /api/health bisa menunjukkannya.
+      ditolak.push(`[${kategori}] pola tidak sah: ${e.message}`);
+    }
+  }
+
+  if (aturan.length === 0) {
+    // Seluruh isi tabel ditolak. Berjalan tanpa satu pun aturan
+    // jauh lebih buruk daripada memakai daftar bawaan yang sudah
+    // teruji, jadi ini diperlakukan sama dengan tabel kosong.
+    console.warn(
+      `[KB-ROUTER] Gerbang 0: seluruh ${baris.length} baris tabel ditolak — ` +
+        `kembali ke daftar di kode. ${ditolak.join("; ")}`,
+    );
+    const hasil = bersihkanSatpamLuar();
+    return { ...hasil, ditolak };
+  }
+
+  // Urutan aturan adalah logika: pesan yang cocok dua kategori
+  // dilaporkan sebagai kategori yang dinilai lebih dulu, dan itulah
+  // yang dibaca tim CS. Ditegakkan di sini, bukan disandarkan pada
+  // urutan baris yang kebetulan datang dari jaringan.
+  aturan.sort((a, b) => a.priority - b.priority);
+
+  satpamLuar = aturan;
+  sumberSatpam = "supabase";
+
+  if (ditolak.length) {
+    console.warn(
+      `[KB-ROUTER] Gerbang 0: ${ditolak.length} aturan dibuang: ${ditolak.join("; ")}`,
+    );
+  }
+  return { aturan: aturan.length, ditolak };
+}
+
+/** Kembali memakai daftar SATPAM di kode. */
+export function bersihkanSatpamLuar() {
+  satpamLuar = null;
+  sumberSatpam = "kode";
+  return { aturan: 0, ditolak: [] };
+}
+
+/**
+ * Sumber yang sedang dipakai Gerbang 0: "kode" atau "supabase".
+ *
+ * Dilaporkan ke /api/health. Alasannya sama dengan
+ * getSumberAktif(): perpindahan sumber yang tidak terlihat adalah
+ * kegagalan paling mahal di sini — admin menambah kata di halaman
+ * Kata Sensitif, router diam-diam masih memakai daftar di kode, dan
+ * tidak ada satu pun pesan galat yang menjelaskannya.
+ */
+export function getSumberSatpam() {
+  return sumberSatpam;
+}
+
+/** Aturan Gerbang 0 yang berlaku sekarang — tabel bila ada, kode bila tidak. */
+function satpamAktif() {
+  return satpamLuar ?? SATPAM;
+}
+
+/** Berapa aturan Gerbang 0 yang sedang berlaku — untuk pengujian & health. */
+export function jumlahSatpam() {
+  return satpamAktif().length;
+}
+
 /**
  * Gerbang 0. Apakah pesan ini wajib langsung ke CS manusia?
  *
@@ -510,7 +651,7 @@ export function periksaSatpam(pesanPelanggan) {
   const pesan = String(pesanPelanggan ?? "");
   if (!pesan.trim()) return null;
 
-  for (const s of SATPAM) {
+  for (const s of satpamAktif()) {
     if (s.unless && s.unless.some((p) => p.test(pesan))) continue;
     if (s.also && !s.also.test(pesan)) continue;
     const kena = s.when.find((p) => p.test(pesan));
@@ -526,9 +667,24 @@ export function periksaSatpam(pesanPelanggan) {
   return null;
 }
 
-/** Daftar kategori satpam — untuk UI dan pengujian. */
+/**
+ * Daftar kategori satpam — untuk UI dan pengujian.
+ *
+ * Dibaca dari sumber yang sedang berlaku, bukan selalu dari kode.
+ * Sejak aturan bisa datang dari tabel, satu kategori diwakili
+ * beberapa baris aturan, jadi di sini dikerucutkan kembali menjadi
+ * satu entri per kategori — `why` yang dipakai adalah milik aturan
+ * yang dinilai paling dulu, sama seperti yang akan dilaporkan
+ * periksaSatpam() bila kategori itu yang mencegat.
+ */
 export function getKategoriSatpam() {
-  return SATPAM.map((s) => ({ kategori: s.kategori, why: s.why }));
+  const terlihat = new Map();
+  for (const s of satpamAktif()) {
+    if (!terlihat.has(s.kategori)) {
+      terlihat.set(s.kategori, { kategori: s.kategori, why: s.why });
+    }
+  }
+  return [...terlihat.values()];
 }
 
 /**

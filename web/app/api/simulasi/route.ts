@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { catatHandover } from "@/lib/db/handoverServer";
 import { siapkanSumberTemplate } from "@/lib/db/templatesServer";
+import { siapkanSumberSatpam } from "@/lib/db/satpamServer";
 import { kenaliMaksud, MODE_PENGENAL } from "@/lib/pengenal";
 import { getSupabaseSebagai, tokenDariHeader } from "@/lib/supabase/server";
 import { perkiraanBiaya } from "@/lib/voyage";
@@ -133,8 +134,22 @@ export async function POST(req: Request) {
   const toko =
     (typeof body.toko === "string" ? cariToko(body.toko.trim()) : undefined) ?? TOKO_BAWAAN;
 
-  // Router memutuskan persis seperti pada /api/chat.
-  await siapkanSumberTemplate();
+  /* Router memutuskan persis seperti pada /api/chat — dan "persis"
+     di sini termasuk SUMBER yang dibacanya, bukan hanya fungsi yang
+     dipanggilnya.
+
+     Sampai 11 Sep 2026 baris ini hanya menyiapkan sumber template.
+     Akibatnya Gerbang 0 di simulator tetap memakai daftar bawaan di
+     kode, sementara /api/chat sudah memakai tabel — jadi kata yang
+     baru ditambahkan admin lewat halaman Kata Sensitif tertangkap
+     pada pelanggan sungguhan tetapi TIDAK pada layar peragaan.
+
+     Bentuk kegagalannya paling buruk justru karena arahnya terbalik
+     dari dugaan: simulator melaporkan "di luar jangkauan template",
+     yang terbaca sebagai "katanya tidak berfungsi" — padahal yang
+     rusak adalah alat ujinya, bukan pengamannya. Orang lalu
+     mengubah kata yang sebenarnya sudah benar. */
+  await Promise.all([siapkanSumberTemplate(), siapkanSumberSatpam()]);
   const keputusan = routeToCategory(teks);
 
   /* Keputusan router bertipe union: varian "ai" memang TIDAK punya

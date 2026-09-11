@@ -166,6 +166,145 @@ if (galatVek) {
 }
 
 /* -----------------------------------------------------------
+   1c. Fungsi satpam_router() — schema-satpam.sql
+   -----------------------------------------------------------
+   Gerbang 0 punya satu sifat yang membuat pemeriksaan ini berbeda
+   dari pemeriksaan template di atas: kegagalannya TIDAK PERNAH
+   terlihat. Kalau tabel templates tidak terbaca, pelanggan dijawab
+   isi berkas .md — salah sumber, tapi tetap dijawab. Kalau tabel
+   satpam tidak terbaca, yang berlaku adalah daftar bawaan di kode,
+   dan itu berarti setiap kata yang ditambahkan admin lewat halaman
+   Kata Sensitif diam-diam tidak berlaku.
+
+   Tidak ada galat, tidak ada log, dan halamannya tetap
+   menampilkan kata itu dengan tenang. Satu-satunya gejalanya
+   adalah pesan yang seharusnya dialihkan ternyata dijawab mesin —
+   ketahuan setelah terjadi. ------------------------------------- */
+const { data: satpam, error: galatSatpam } = await sb.rpc("satpam_router");
+
+console.log("");
+if (galatSatpam) {
+  siap = false;
+  const hilang = /does not exist|schema cache/i.test(galatSatpam.message);
+  console.log("1c. satpam_router()      : GAGAL");
+  console.log(`   ${galatSatpam.message}`);
+  console.log(
+    hilang
+      ? "   -> Jalankan supabase/schema-satpam.sql di SQL Editor."
+      : "   -> Periksa hak akses; fungsinya butuh grant execute ke anon.",
+  );
+} else {
+  const aturan = satpam ?? [];
+  const kategori = [...new Set(aturan.map((b) => b.kategori))];
+  const berfrasa = aturan.filter((b) => b.when_patterns?.length);
+
+  console.log("1c. satpam_router()      : ADA");
+  console.log(`   aturan aktif          : ${aturan.length}`);
+  console.log(`   kategori terwakili    : ${kategori.length}`);
+
+  if (aturan.length === 0) {
+    siap = false;
+    console.log(
+      "   -> Tabel `satpam_rules` kosong atau seluruh barisnya nonaktif.\n" +
+        "      Router memakai daftar bawaan di kode — pengamannya TETAP\n" +
+        "      berjalan penuh, tetapi kata tambahan dari halaman Kata\n" +
+        "      Sensitif tidak berlaku.",
+    );
+  } else {
+    // Polanya disusun ulang di sini, persis seperti yang dilakukan
+    // setSatpamLuar(). Pola yang tidak sah tidak akan menggagalkan
+    // pembacaan tabel — ia dibuang diam-diam oleh router — jadi
+    // inilah satu-satunya tempat ia bisa terlihat sebelum
+    // pengamannya berkurang tanpa ada yang tahu.
+    const rusak = [];
+    for (const a of aturan) {
+      for (const p of a.when_patterns ?? []) {
+        try {
+          new RegExp(p, a.flags || "i");
+        } catch (e) {
+          rusak.push(`[${a.kategori}] ${p} -> ${e.message}`);
+        }
+      }
+    }
+    console.log(`   pola sah              : ${berfrasa.length - rusak.length}/${berfrasa.length}`);
+    if (rusak.length) {
+      siap = false;
+      console.log("   -> POLA RUSAK, akan dibuang router (pengaman berkurang):");
+      for (const r of rusak) console.log(`      ${r}`);
+    }
+
+    // Uji satu kalimat per kategori bawaan. Bukan sekadar
+    // "tabelnya terisi" — apakah isinya benar-benar MENCEGAT.
+    const UJI = [
+      ["mau refund dong", "refund_retur"],
+      ["barangnya rusak", "barang_bermasalah"],
+      ["apa ini bisa keracunan", "keamanan"],
+      ["mau bicara dengan cs", "minta_manusia"],
+    ];
+    const meleset = [];
+    for (const [pesan, harusnya] of UJI) {
+      const kena = aturan.find((a) =>
+        (a.when_patterns ?? []).some((p) => {
+          try {
+            if (!new RegExp(p, a.flags || "i").test(pesan)) return false;
+          } catch {
+            return false;
+          }
+          if (a.also_pattern) {
+            try {
+              if (!new RegExp(a.also_pattern, a.flags || "i").test(pesan)) return false;
+            } catch {
+              return false;
+            }
+          }
+          return true;
+        }),
+      );
+      if (kena?.kategori !== harusnya) {
+        meleset.push(`"${pesan}" -> ${kena?.kategori ?? "(lolos)"} , harusnya ${harusnya}`);
+      }
+    }
+    if (meleset.length) {
+      siap = false;
+      console.log("   -> ISI TABEL TIDAK MENCEGAT seperti seharusnya:");
+      for (const m of meleset) console.log(`      ${m}`);
+    } else {
+      console.log(`   uji cegat             : ${UJI.length}/${UJI.length} benar`);
+    }
+  }
+}
+
+/* -----------------------------------------------------------
+   1d. Tabel satpam_rules dari sisi anon — HARUS ditolak
+   -----------------------------------------------------------
+   Seluruh maksud satpam_router() yang security definer adalah
+   membuka ATURANNYA tanpa membuka TABELNYA. Kalau anon bisa
+   membaca tabelnya langsung, fungsi itu kehilangan gunanya — dan
+   yang bocor bukan sekadar daftar kata, melainkan peta lengkap
+   cara melewati pengaman: siapa pun yang memegang anon key bisa
+   membaca persis kata apa yang harus dihindari agar pesannya
+   tidak dialihkan ke manusia. ---------------------------------- */
+const { data: tabelSatpam, error: galatTabelSatpam } = await sb
+  .from("satpam_rules")
+  .select("kategori")
+  .limit(3);
+
+console.log("");
+if (galatTabelSatpam) {
+  console.log("1d. select satpam (anon) : ditolak — INI YANG BENAR");
+} else if ((tabelSatpam ?? []).length > 0) {
+  siap = false;
+  console.log("1d. select satpam (anon) : TERBACA — ini MASALAH KEAMANAN");
+  console.log(
+    "   Anon seharusnya tidak punya hak apa pun atas tabel ini.\n" +
+      "   Yang bocor adalah peta cara melewati Gerbang 0. Cabut\n" +
+      "   kebijakan RLS yang membuka select untuk anon.",
+  );
+} else {
+  console.log("1d. select satpam (anon) : nol baris (wajar — RLS menahan)");
+}
+
+/* -----------------------------------------------------------
    2. Tabel templates dari sisi anon — HARUS ditolak
    ----------------------------------------------------------- */
 const { data: tabel, error: galatTabel } = await sb
@@ -195,9 +334,12 @@ if (galatTabel) {
    ----------------------------------------------------------- */
 console.log(`\n${"-".repeat(60)}`);
 if (siap) {
-  console.log("Router SIAP membaca dari tabel templates.");
-  console.log("Pastikan juga /api/health menyebut sumberTemplate.sumber = supabase.");
+  console.log("Router SIAP membaca dari tabel templates DAN tabel satpam.");
+  console.log(
+    "Pastikan juga /api/health menyebut sumberTemplate.sumber = supabase\n" +
+      "dan sumberSatpam.sumber = supabase.",
+  );
 } else {
-  console.log("Router MASIH memakai berkas .md. Ikuti petunjuk di atas.");
+  console.log("Ada yang MASIH memakai cadangan. Ikuti petunjuk di atas.");
   process.exitCode = 1;
 }

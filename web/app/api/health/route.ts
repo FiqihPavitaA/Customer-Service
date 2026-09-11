@@ -6,6 +6,7 @@ import {
   siapkanSumberTemplate,
   statusSumberTemplate,
 } from "@/lib/db/templatesServer";
+import { siapkanSumberSatpam, statusSumberSatpam } from "@/lib/db/satpamServer";
 
 /* ===========================================================
    GET /api/health — port dari app.get('/api/health') di server.js.
@@ -20,7 +21,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   // Panggil dulu supaya yang dilaporkan adalah keadaan sekarang,
   // bukan sisa pemuatan terakhir yang mungkin belum pernah terjadi.
-  await siapkanSumberTemplate();
+  // Keduanya berjalan bersamaan: keduanya sekadar satu perjalanan
+  // baca ke Supabase dan tidak saling bergantung.
+  await Promise.all([siapkanSumberTemplate(), siapkanSumberSatpam()]);
 
   const { stats } = getKnowledge();
   const missing = Object.entries(stats.files)
@@ -48,5 +51,12 @@ export async function GET() {
     // pelanggan — sumber yang berganti diam-diam tidak akan pernah
     // muncul sebagai galat.
     sumberTemplate: statusSumberTemplate(),
+    // Dari mana Gerbang 0 membaca kata sensitif: "supabase" atau
+    // "kode". Lebih penting daripada sumberTemplate di atas, karena
+    // jatuh ke "kode" berarti kata yang baru ditambahkan admin
+    // TIDAK berlaku — dan satu-satunya gejalanya adalah pesan yang
+    // seharusnya dialihkan malah dijawab mesin. `ditolak` memuat
+    // aturan yang polanya tidak sah, bila ada.
+    sumberSatpam: statusSumberSatpam(),
   });
 }

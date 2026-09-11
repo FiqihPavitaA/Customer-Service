@@ -32,21 +32,67 @@
    `to authenticated using (true)` sejak awal.
    =========================================================== */
 
+import { useState } from "react";
 import TemplateManager from "@/components/settings/TemplateManager";
+import KataSensitif from "./KataSensitif";
+
+/* KENAPA KATA SENSITIF JADI TAB DI SINI, BUKAN IKON RAIL SENDIRI
+
+   Dua alasan, dan yang kedua yang menentukan.
+
+   Pertama, rail sudah memuat 7 ikon; menambah yang kedelapan
+   membuat baris bawah di mobile mulai perlu digulir mendatar.
+
+   Kedua, keduanya menjawab pertanyaan yang sama — "apa yang
+   menentukan balasan pelanggan" — hanya pada lapisan berbeda.
+   Template menentukan APA yang dijawab; kata sensitif menentukan
+   APA YANG TIDAK BOLEH dijawab mesin sama sekali. Orang yang
+   sedang menelusuri kenapa sebuah pesan dibalas begitu perlu
+   melihat keduanya, dan memisahkannya ke dua halaman berarti ia
+   harus sudah tahu lebih dulu di lapisan mana jawabannya berada —
+   padahal itulah yang sedang ia cari. */
+
+type Tab = "template" | "sensitif";
 
 export default function KnowledgeBase() {
+  const [tab, setTab] = useState<Tab>("template");
+
+  const tombol = (id: Tab, label: string) => (
+    <button
+      key={id}
+      type="button"
+      onClick={() => setTab(id)}
+      aria-current={tab === id}
+      className={`cursor-pointer whitespace-nowrap border-none bg-transparent px-1 pb-2 text-[0.92rem] font-bold transition ${
+        tab === id
+          ? "border-b-2 border-solid border-green text-green-dark"
+          : "text-muted hover:text-text-2"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
   return (
     <div className="h-full min-h-0 overflow-y-auto bg-page p-5 px-6 pb-10 max-mobile:p-3.5 max-mobile:pb-8">
-      <div className="mb-4">
+      <div className="mb-3">
         <h2 className="m-0 mb-1 text-[1.4rem] font-bold">📚 Knowledge Base</h2>
         <p className="m-0 text-[0.88rem] leading-relaxed text-muted">
-          Sumber jawaban AI. Pilih sebuah template untuk melihat balasannya dan
-          menambahkan contoh pertanyaan — semakin banyak ragam kalimat pelanggan
-          yang ditulis, semakin sering AI menjawab tanpa biaya.
+          {tab === "template"
+            ? "Sumber jawaban AI. Pilih sebuah template untuk melihat balasannya dan menambahkan contoh pertanyaan — semakin banyak ragam kalimat pelanggan yang ditulis, semakin sering AI menjawab tanpa biaya."
+            : "Kata yang membuat pesan langsung dialihkan ke CS manusia, sebelum AI dipanggil sama sekali. Diperiksa paling awal, jadi biayanya Rp 0."}
         </p>
       </div>
 
-      <TemplateManager />
+      {/* flex-wrap + overflow-x: dua tab masih muat di layar sempit,
+          tapi aturannya ditegakkan sejak sekarang supaya tab ketiga
+          tidak memotong tata letak di mobile. */}
+      <div className="mb-4 flex gap-4 overflow-x-auto border-0 border-b border-solid border-line-soft">
+        {tombol("template", "🗂️ Template Jawaban")}
+        {tombol("sensitif", "🛡️ Kata Sensitif")}
+      </div>
+
+      {tab === "template" ? <TemplateManager /> : <KataSensitif />}
     </div>
   );
 }

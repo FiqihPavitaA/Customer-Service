@@ -43,6 +43,10 @@ pemilik proyek menjawab.
 | `node knowledge-base/router.test.mjs` | 48 kasus pencocokan template |
 | `node knowledge-base/periksa-katalog.mjs` | Tidak ada kode kembar, index.json sinkron, semua balasan <= 600 karakter |
 | `node knowledge-base/uji-sumber-luar.mjs` | 23 kasus lapisan sumber tabel: tabel menang atas berkas, tabel kosong kembali ke berkas, pola rusak dibuang satuan |
+| `node knowledge-base/uji-satpam-seed.mjs` | Seed Gerbang 0 di `supabase/schema-satpam.sql` setara dengan daftar SATPAM di router.js: 128 pesan, kategori yang benar, invarian frasa→pola |
+| `node knowledge-base/uji-satpam-sumber.mjs` | 39 kasus lapisan sumber Gerbang 0: tabel menang atas kode, tabel kosong kembali ke kode UTUH, seluruh pola rusak tidak pernah berarti tanpa pengaman |
+| `npm run uji-satpam-aturan` | 40 kasus aturan halaman Kata Sensitif: frasa dibersihkan, pola tidak bisa jadi regex jahat, dan peringatan kata terlalu lebar |
+| `npm run uji-sumber-terpasang` | Setiap rute API yang menilai Gerbang 0 / template benar-benar memuat sumber tabelnya dulu — menangkap rute yang diam-diam masih membaca daftar di kode |
 | `node knowledge-base/audit-voyage.mjs` | Audit kesiapan data Gerbang 2: jumlah contoh, gaya bahasa, kode ganda, kemiripan antar-template |
 | `node knowledge-base/peraga-kemiripan.mjs` | Dari mana angka skor kemiripan datang — rumus kosinus dihitung ulang atas vektor yang sudah ada |
 | `npm run uji-mutu` | 39 kasus pemeriksa mutu contoh pertanyaan: kalimat rapi ditandai, kalimat pelanggan tidak, ragam tingkat singkatan |
@@ -50,7 +54,7 @@ pemilik proyek menjawab.
 | `npm run uji-ringkasan` | 21 kasus angka nyata Beranda & Statistik: antrean tertua (bukan rata-rata), rentang waktu, dan nol yang berbeda dari "belum ada data" |
 | `npm run uji-pesanan` | 26 kasus pesanan contoh di tab Pesanan: nomor tidak pernah berubah (kalau berubah, pencarian diam-diam gagal), data asli tidak ditimpa, katalog kosong tidak mengarang nama produk |
 | `npm run uji-cari` | 46 kasus pencocokan pencarian & papan croscek: nomor bertanda baca tetap ketemu, nama pendek TIDAK melebar, nomor yang tidak ketemu tidak pernah hilang dari daftar |
-| `npm run periksa-sumber` | Apakah tabel `templates` & `pustaka_router()` siap dipakai router (membaca Supabase, tidak menulis) |
+| `npm run periksa-sumber` | Apakah tabel `templates`, `satpam_rules`, `pustaka_router()` & `satpam_router()` siap dipakai router — termasuk uji cegat Gerbang 0 dan bukti anon TIDAK bisa membaca tabelnya (membaca Supabase, tidak menulis) |
 | `npm run periksa-aturan` | Aturan pemicu di tabel masih sepadan dengan berkas .md — menangkap `also`/`unless` yang hilang |
 | `POST /api/pengenal/bangun` tanpa `jalankan` | Berapa contoh yang belum bervektor & perkiraan biayanya |
 | `POST /api/templates/uji` | Pesan tertentu kena template mana |

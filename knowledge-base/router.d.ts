@@ -155,6 +155,42 @@ export function periksaSatpam(pesanPelanggan: string): HasilSatpam | null;
 
 export function getKategoriSatpam(): { kategori: string; why: string }[];
 
+/** Satu baris keluaran public.satpam_router(). */
+export type BarisSatpamRouter = {
+  kategori: string;
+  priority: number | null;
+  when_patterns: string[] | null;
+  also_pattern: string | null;
+  unless_patterns: string[] | null;
+  flags: string | null;
+  why: string | null;
+};
+
+export type HasilSatpamLuar = {
+  /** Aturan Gerbang 0 yang berhasil disusun dari tabel. */
+  aturan: number;
+  /** Aturan yang dibuang karena polanya tidak sah, beserta sebabnya. */
+  ditolak: string[];
+};
+
+/**
+ * Pasang aturan Gerbang 0 dari tabel, menggantikan daftar di kode.
+ *
+ * Daftar kosong — atau daftar yang SELURUH polanya tidak sah —
+ * berarti kembali ke daftar di kode secara utuh. Gerbang 0 tidak
+ * pernah berjalan tanpa aturan sama sekali.
+ */
+export function setSatpamLuar(baris: BarisSatpamRouter[]): HasilSatpamLuar;
+
+/** Kembali memakai daftar SATPAM di kode. */
+export function bersihkanSatpamLuar(): HasilSatpamLuar;
+
+/** Sumber yang sedang dipakai Gerbang 0. */
+export function getSumberSatpam(): "kode" | "supabase";
+
+/** Berapa aturan Gerbang 0 yang sedang berlaku. */
+export function jumlahSatpam(): number;
+
 export function routeToCategory(pesanPelanggan: string): Keputusan;
 
 export function bacaBerkasFaq(daftarBerkas: string[]): {

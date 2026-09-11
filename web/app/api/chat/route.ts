@@ -18,6 +18,7 @@ import {
   siapkanSumberTemplate,
   statusSumberTemplate,
 } from "@/lib/db/templatesServer";
+import { siapkanSumberSatpam, statusSumberSatpam } from "@/lib/db/satpamServer";
 import {
   bacaJeda,
   catatHandover,
@@ -183,15 +184,29 @@ export async function POST(req: Request) {
     });
   }
 
-  // ---------- Sumber template ----------
+  // ---------- Sumber template & kata sensitif ----------
   // Pastikan router memakai isi tabel `templates` bila tabelnya
   // sudah terisi; bila tidak, ia tetap membaca berkas .md seperti
   // sebelumnya. Menunggu di sini disengaja: memutuskan balasan
   // dengan pustaka yang setengah berganti lebih buruk daripada
   // menunggu satu perjalanan ke Supabase yang hasilnya di-cache 60
   // detik. Fungsinya tidak pernah melempar.
-  await siapkanSumberTemplate();
+  //
+  // Kata sensitif Gerbang 0 disiapkan di baris yang sama dan HARUS
+  // sudah selesai sebelum routeToCategory() di bawah — gerbang itu
+  // dinilai di dalamnya. Memindahkannya ke belakang akan membuat
+  // pesan pertama setiap 60 detik dinilai dengan daftar lama, yaitu
+  // tanpa kata yang baru ditambahkan admin; kegagalan yang jarang,
+  // sunyi, dan justru menimpa pesan paling berbahaya.
+  //
+  // Promise.all, bukan dua await berurutan: keduanya sekadar satu
+  // perjalanan baca ke Supabase dan tidak saling bergantung, jadi
+  // menjalankannya bergantian hanya menambah jeda sebelum pelanggan
+  // dijawab. Keduanya juga tidak pernah melempar, sehingga
+  // Promise.all di sini tidak bisa gagal sebagian.
+  await Promise.all([siapkanSumberTemplate(), siapkanSumberSatpam()]);
   const sumberTemplate = statusSumberTemplate().sumber;
+  const sumberSatpam = statusSumberSatpam().sumber;
 
   // ---------- Lapisan 1: template baku ----------
   // Dilewati bila pemanggil mengirim useTemplates:false — dipakai
@@ -225,6 +240,11 @@ export async function POST(req: Request) {
       kategori: keputusan.kategori,
       satpam: keputusan.satpam,
       sumberTemplate,
+      // Dari mana aturan yang mencegat ini datang. Tanpa ini,
+      // "kata yang saya tambahkan tidak berfungsi" hanya bisa
+      // ditebak: pesan tercegat dan pesan tidak tercegat terlihat
+      // sama saja dari luar, apa pun sumbernya.
+      sumberSatpam,
       panjang: ukurBalasan(keputusan.teks),
       // null bila permintaan ini tidak menempel pada percakapan
       // sungguhan — bukan tanda kegagalan.

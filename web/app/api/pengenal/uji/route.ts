@@ -26,6 +26,8 @@ import { perkiraanBiaya, VOYAGE_MODEL } from "@/lib/voyage";
 // satpam menahan sebuah pesan, tidak ada gunanya mengukur kemiripan
 // dan tidak ada alasan membayar embedding untuknya.
 import { matchTemplate, periksaSatpam } from "@/lib/templates";
+import { siapkanSumberSatpam } from "@/lib/db/satpamServer";
+import { siapkanSumberTemplate } from "@/lib/db/templatesServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,7 +44,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Pesan masih kosong." }, { status: 400 });
   }
 
-  /* ---- Gerbang 0 ---- */
+  /* ---- Gerbang 0 ----
+     Sumber tabel disiapkan lebih dulu, sama seperti /api/chat.
+     Tanpa ini, endpoint uji memakai daftar bawaan di kode sementara
+     pelanggan sungguhan memakai tabel — dan perkakas uji yang
+     menjawab berbeda dari sistem yang diujinya lebih buruk daripada
+     tidak punya perkakas uji sama sekali.
+
+     Di sini akibatnya juga BERBIAYA: kalimat yang seharusnya
+     ditahan Gerbang 0 akan diteruskan ke Voyage. */
+  await Promise.all([siapkanSumberSatpam(), siapkanSumberTemplate()]);
   const satpam = periksaSatpam(pesan);
   if (satpam) {
     return NextResponse.json({

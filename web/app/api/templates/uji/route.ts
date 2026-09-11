@@ -20,6 +20,7 @@
 import { NextResponse } from "next/server";
 import { jelaskanTidakCocok, matchTemplate, ujiDraf } from "@/lib/templates";
 import type { HasilUji, HasilUjiDraft } from "@/lib/db/templateTypes";
+import { siapkanSumberTemplate } from "@/lib/db/templatesServer";
 
 export async function POST(req: Request) {
   let pesan = "";
@@ -52,7 +53,17 @@ export async function POST(req: Request) {
     return NextResponse.json(hasil);
   }
 
-  /* ---- Mode biasa: aturan yang sudah tersimpan ---- */
+  /* ---- Mode biasa: aturan yang sudah tersimpan ----
+     "Tersimpan" harus berarti tersimpan DI TABEL bila tabelnya
+     terisi — sama seperti yang dibaca /api/chat saat menjawab
+     pelanggan. Tanpa baris ini endpoint uji mencocokkan ke berkas
+     .md, sehingga jawabannya bisa berbeda dari yang sungguhan
+     justru pada aturan yang baru saja disunting tim CS — yaitu
+     aturan yang paling mungkin sedang diuji di sini.
+
+     Ketahuan 11 Sep 2026 oleh scripts/uji-sumber-terpasang.mjs,
+     yang ditulis setelah kesalahan sejenis di /api/simulasi. */
+  await siapkanSumberTemplate();
   const hit = matchTemplate(pesan);
   const hasil: HasilUji = hit
     ? { mode: "tersimpan", cocok: true, code: hit.code, why: hit.why, sebab: null }
