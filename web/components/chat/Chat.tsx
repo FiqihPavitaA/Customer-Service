@@ -48,7 +48,7 @@ import {
 import type { ActionCode, Conversation } from "@/lib/db/types";
 import { catalogStatusText, searchProducts, useCatalog } from "@/lib/catalog";
 import { inisial, jam, stempel, tanggalPanjang } from "@/lib/format";
-import { clearSearch, useSearch, type SearchScope } from "@/lib/search";
+import { useSearch, type SearchScope } from "@/lib/search";
 import { cocokKata } from "@/lib/cocok";
 import { belumTerjawab } from "@/lib/tunggakan";
 import { bukaPapan, useCroscek } from "@/lib/croscek";
@@ -315,9 +315,7 @@ function ConversationsPanel({
   menungguSejak,
   jumlahSimulasi,
   tersembunyi,
-  sebab,
   adaPenyaring,
-  onReset,
   onPick,
   onClose,
 }: {
@@ -332,11 +330,8 @@ function ConversationsPanel({
   jumlahSimulasi: number;
   /** Cocok dengan tab ini, tetapi disembunyikan toko/pencarian. */
   tersembunyi: number;
-  /** Penyaring mana yang menyembunyikannya — "pilihan toko" dsb. */
-  sebab: string;
   /** Ada penyaring yang sedang menyala sama sekali? */
   adaPenyaring: boolean;
-  onReset: () => void;
   onPick: (id: string) => void;
   onClose?: () => void;
 }) {
@@ -361,7 +356,13 @@ function ConversationsPanel({
       {/* overflow-x-auto sejak tab keempat. Empat label tidak muat di
           layar sempit, dan tab yang terpotong tanpa cara menggulirnya
           sama saja dengan tab yang tidak ada. */}
-      <div className="flex gap-1 overflow-x-auto border-b border-line px-2 pt-2">
+      {/* Hanya bergulir ke kanan-kiri (17 Sep 2026). overflow-x-auto saja
+          membuat browser ikut menyalakan sumbu vertikal, dan -mb-px pada
+          tombol tab di bawah melimpah 1px — cukup untuk memunculkan
+          bilah gulir atas-bawah yang mengganggu. overflow-y-hidden
+          mematikan sumbu itu; pb-px memberi ruang 1px itu di dalam
+          kotak, supaya garis bawah tab aktif tidak ikut terpotong. */}
+      <div className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-line px-2 pt-2 pb-px">
         {(
           [
             { key: "all", label: "Semua", n: 0, warn: false },
@@ -441,25 +442,12 @@ function ConversationsPanel({
         </div>
       )}
 
-      {/* Percakapan yang cocok tab ini tetapi tidak terlihat karena
-          toko atau pencarian. Ditaruh di atas daftar, bukan di
-          tempat kosong di bawahnya: saat daftarnya panjang, catatan
-          di bawah tidak pernah terbaca siapa pun. */}
-      {tersembunyi > 0 && (
-        <div className="flex items-center gap-2 border-b border-[#f59e0b]/40 bg-[#fffbeb] px-3 py-2 text-[0.74rem] text-[#92400e]">
-          <span className="min-w-0 flex-1">
-            <b>{tersembunyi}</b> percakapan lain di tab ini disembunyikan {sebab}.
-          </span>
-          <button
-            type="button"
-            onClick={onReset}
-            className="shrink-0 cursor-pointer rounded-lg border border-[#f59e0b]/60 bg-white px-2 py-1 font-bold text-[#92400e]"
-          >
-            Tampilkan semua
-          </button>
-        </div>
-      )}
-
+      {/* Spanduk "N percakapan lain disembunyikan pilihan toko" dihapus
+          17 Sep 2026 atas permintaan pemilik proyek: muncul setiap kali
+          admin memilih satu toko, padahal memilih toko memang berarti
+          ingin menyembunyikan toko lain. Keadaan yang benar-benar
+          berbahaya — daftar KOSONG padahal yang menunggu ada di toko
+          lain — tetap dikatakan lewat kalimat kosong di bawah. */}
       <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
         {rows.length === 0 && (
           <li className="px-4 py-8 text-center text-[0.84rem] text-muted">
@@ -991,8 +979,10 @@ export default function Chat() {
      orang yang benar-benar menunggu. Diam yang menenangkan justru
      lebih berbahaya daripada angka yang salah.
 
-     Jadi yang tersembunyi tetap dihitung — hanya diletakkan
-     terpisah, dengan satu tombol untuk melihatnya. */
+     Jadi yang tersembunyi tetap dihitung. Sejak 17 Sep 2026 angkanya
+     hanya dipakai saat daftar KOSONG — spanduk yang muncul setiap kali
+     satu toko dipilih dihapus karena mengganggu, sedangkan daftar
+     kosong yang diam-diam menyembunyikan antrean tetap dikatakan. */
   const tersembunyi = useMemo(
     () => conversations.filter(cocokTab).length - rows.length,
     [conversations, cocokTab, rows.length],
@@ -1002,26 +992,6 @@ export default function Chat() {
     activeShop !== SEMUA_TOKO ||
     search.terms.length > 0 ||
     search.single.trim().length > 0;
-
-  /* Menyebut penyaring MANA yang menyembunyikannya. "Disembunyikan
-     oleh filter" tidak menolong siapa pun: yang perlu diketahui CS
-     adalah apakah ia harus mengganti toko atau mengosongkan kotak
-     pencarian. */
-  const adaCarian =
-    search.terms.length > 0 ||
-    search.single.trim().length > 0;
-  const sebabTersembunyi =
-    activeShop !== SEMUA_TOKO && adaCarian
-      ? `pilihan toko "${activeShop}" dan pencarian`
-      : activeShop !== SEMUA_TOKO
-        ? `pilihan toko "${activeShop}"`
-        : "pencarian yang sedang aktif";
-
-  /** Kembalikan daftar ke keadaan "tidak menyaring apa pun". */
-  const bersihkanPenyaring = () => {
-    setActiveShop(SEMUA_TOKO);
-    clearSearch();
-  };
 
   /* Dihitung atas SELURUH percakapan, bukan atas toko yang sedang
      dipilih. Tombol bersih-bersih menghapus semuanya sekaligus, jadi
@@ -1174,9 +1144,7 @@ export default function Chat() {
           menungguSejak={menungguSejak}
           jumlahSimulasi={jumlahSimulasi}
           tersembunyi={tersembunyi}
-          sebab={sebabTersembunyi}
           adaPenyaring={adaPenyaring}
-          onReset={bersihkanPenyaring}
           onPick={pick}
         />
       </section>
@@ -1435,9 +1403,7 @@ export default function Chat() {
               menungguSejak={menungguSejak}
               jumlahSimulasi={jumlahSimulasi}
               tersembunyi={tersembunyi}
-              sebab={sebabTersembunyi}
               adaPenyaring={adaPenyaring}
-              onReset={bersihkanPenyaring}
               onPick={pick}
               onClose={() => setOverlay(null)}
             />
