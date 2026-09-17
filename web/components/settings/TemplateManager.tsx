@@ -34,7 +34,7 @@ import {
   type TemplateItem,
 } from "@/lib/db/templateTypes";
 import TemplateBaru from "./TemplateBaru";
-import ContohPertanyaan, { BangunVektor } from "./ContohPertanyaan";
+import ContohPertanyaan, { BangunVektor, kePanelBangunVektor } from "./ContohPertanyaan";
 import { BATAS_BALASAN } from "@/lib/limits";
 import { CONTOH_MINIMUM } from "@/lib/mutuContoh";
 import {
@@ -521,7 +521,24 @@ function Detail({
              yang dijawab template ini, baru tulis pertanyaan apa saja
              yang seharusnya sampai ke sana. */}
         <div className="mb-4">
-          <ContohPertanyaan code={item.code} onBerubah={() => void muatTemplates(true)} />
+          <ContohPertanyaan
+            code={item.code}
+            onBerubah={() => void muatTemplates(true)}
+            onKeBangunVektor={() => {
+              /* Di bawah 980px panel ini overlay layar penuh
+                 (max-tablet:fixed inset-0). Menggulir tanpa menutupnya
+                 berarti menggulir ke spanduk yang tertutup panel ini
+                 sendiri — tombolnya terasa tidak melakukan apa-apa. */
+              if (window.innerWidth < 980) {
+                onTutup();
+                // Tunggu satu bingkai: spanduk baru bisa dijangkau
+                // sesudah overlay benar-benar hilang dari tata letak.
+                requestAnimationFrame(kePanelBangunVektor);
+              } else {
+                kePanelBangunVektor();
+              }
+            }}
+          />
         </div>
 
         <div className="mb-4">
@@ -584,6 +601,12 @@ export default function TemplateManager() {
   const cukupContoh = items.filter((i) => (i.jumlahContoh ?? 0) >= CONTOH_MINIMUM).length;
   const tanpaContoh = items.filter((i) => (i.jumlahContoh ?? 0) === 0).length;
   const persenContoh = items.length ? Math.round((cukupContoh / items.length) * 100) : 0;
+
+  /* Pemicu hitung ulang spanduk bangun vektor. Jumlah seluruh contoh
+     berubah tepat saat contoh ditambah atau dihapus — muatTemplates
+     sudah dipanggil pada saat itu — jadi spanduk ikut segar tanpa
+     jalur pemberitahuan kedua. */
+  const totalContoh = items.reduce((n, i) => n + (i.jumlahContoh ?? 0), 0);
 
   const [cari, setCari] = useState("");
   const [kategori, setKategori] = useState<KategoriTemplate | "semua">("semua");
@@ -683,6 +706,22 @@ export default function TemplateManager() {
         <div className="mb-4 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-3.5 py-2.5 text-[0.8rem] leading-relaxed text-[#b91c1c]">
           ⚠️ {peringatan}
         </div>
+      )}
+
+      {/* ---- Bangun vektor: DI ATAS daftar, bukan di dasar halaman ----
+           Sampai 17 Sep 2026 tombol ini duduk sesudah seluruh daftar
+           template, dan pemilik proyek melaporkan tim CS tidak pernah
+           melihatnya. Yang paling merugikan bukan letak tombolnya,
+           melainkan tidak ada yang memberi tahu bahwa contoh yang
+           baru ditulis belum berpengaruh — jadi yang dipindah ke atas
+           adalah ANGKANYA, dan tombolnya ikut bersama angka itu.
+
+           Tetap satu tombol untuk seluruh antrean, bukan satu per
+           template: akun Voyage dibatasi 3 permintaan per menit, dan
+           tombol per template mengubah satu tekan yang murah jadi
+           banyak tekan kecil yang kena HTTP 429 di tekan keempat. */}
+      {sumber === "supabase" && (
+        <BangunVektor bolehJalan={isAdmin || isDemo} pemicu={totalContoh} />
       )}
 
       {/* ---- Baris pencarian ---- */}
@@ -883,8 +922,6 @@ export default function TemplateManager() {
               setiap hari. Buka sebuah template untuk mengisinya.
             </p>
           </section>
-
-          <BangunVektor bolehJalan={isAdmin || isDemo} />
         </>
       )}
     </div>

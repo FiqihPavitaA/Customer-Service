@@ -48,6 +48,26 @@ export type ContohItem = {
 
 const header = headerBerSesi;
 
+/** Jangkar gulir spanduk bangun vektor di atas daftar template. */
+export const ID_BANGUN_VEKTOR = "bangun-vektor";
+
+/**
+ * Dikirim sesudah vektor dibangun.
+ *
+ * Spanduk dan panel contoh tinggal di dua komponen yang tidak saling
+ * kenal. Tanpa peristiwa ini, lencana "belum bervektor" di panel yang
+ * sedang terbuka tetap menempel sesudah Admin membangunnya — dan orang
+ * yang melihatnya akan mengira tombolnya gagal, lalu menekannya lagi.
+ */
+export const PERISTIWA_VEKTOR_DIBANGUN = "infarm:vektor-dibangun";
+
+/** Gulir ke spanduk bangun vektor. */
+export function kePanelBangunVektor() {
+  document
+    .getElementById(ID_BANGUN_VEKTOR)
+    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 async function pesanGalat(r: Response): Promise<string> {
   try {
     const d = (await r.json()) as { error?: string };
@@ -83,7 +103,7 @@ function Lencana({ item }: { item: ContohItem }) {
       teks: "belum bervektor",
       judul:
         "Sudah tersimpan, tetapi belum ikut menentukan apa pun. " +
-        "Tekan “Bangun vektor” di bawah supaya berpengaruh.",
+        "Admin membangun vektornya lewat spanduk ⚡ di atas daftar template.",
       gaya: "bg-[#fef3c7] text-[#92400e]",
     });
   }
@@ -127,10 +147,13 @@ function Lencana({ item }: { item: ContohItem }) {
 export default function ContohPertanyaan({
   code,
   onBerubah,
+  onKeBangunVektor,
 }: {
   code: string;
   /** Dipanggil setelah daftar berubah, supaya hitungan di luar ikut segar. */
   onBerubah?: () => void;
+  /** Membawa pengguna ke spanduk bangun vektor di atas daftar. */
+  onKeBangunVektor?: () => void;
 }) {
   const toast = useToast();
   const [items, setItems] = useState<ContohItem[]>([]);
@@ -145,6 +168,12 @@ export default function ContohPertanyaan({
      menaikkan angka ini untuk memintanya berjalan lagi. */
   const [versi, setVersi] = useState(0);
   const segarkan = useCallback(() => setVersi((v) => v + 1), []);
+
+  // Vektor dibangun dari spanduk → lencana di panel ini ikut segar.
+  useEffect(() => {
+    window.addEventListener(PERISTIWA_VEKTOR_DIBANGUN, segarkan);
+    return () => window.removeEventListener(PERISTIWA_VEKTOR_DIBANGUN, segarkan);
+  }, [segarkan]);
 
   useEffect(() => {
     let batal = false;
@@ -311,12 +340,23 @@ export default function ContohPertanyaan({
         kumpulan.catatan.map((c, n) => <Catatan key={n} c={c} />)}
 
       {belumBervektor > 0 && (
-        <p className="mt-1.5 mb-0 rounded-[10px] border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-[0.78rem] leading-relaxed text-[#92400e]">
-          ⚠️ {belumBervektor} contoh belum punya vektor, jadi <b>belum
-          berpengaruh sama sekali</b>. Bangun vektornya lewat tombol di bagian
-          bawah halaman ini — langkah itu memotong saldo, jadi sengaja terpisah
-          dan hanya bisa dijalankan Admin.
-        </p>
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-[#fde68a] bg-[#fffbeb] px-3 py-2">
+          <p className="m-0 min-w-0 flex-1 text-[0.78rem] leading-relaxed text-[#92400e]">
+            ⚠️ {belumBervektor} contoh di template ini <b>belum berpengaruh</b>{" "}
+            sampai vektornya dibangun lewat spanduk ⚡ di atas daftar template.
+            Langkah itu memotong saldo, jadi sengaja dikumpulkan dan hanya
+            dijalankan Admin.
+          </p>
+          {onKeBangunVektor && (
+            <button
+              type="button"
+              onClick={onKeBangunVektor}
+              className="min-h-10 shrink-0 cursor-pointer rounded-lg border border-[#f0c36d] bg-white px-3 py-1.5 text-[0.76rem] font-bold text-[#8a5a00] hover:bg-[#fdf3d8]"
+            >
+              Lihat tombolnya ↑
+            </button>
+          )}
+        </div>
       )}
 
       {/* ---- Tambah ---- */}
@@ -361,41 +401,94 @@ type HasilBangun = {
   /** Contoh yang masih antre sesudah sekali jalan. */
   sisa?: number;
   gagal?: string[];
+  /** Seluruh contoh yang belum bervektor — bukan hanya yang muat sekali tekan. */
+  total?: number;
 };
 
 /**
- * Dua langkah, dan langkah pertama TIDAK boleh dilewati.
+ * Spanduk bangun vektor. Tetap dua langkah, dan langkah pertama tetap
+ * tidak bisa dilewati — yang berubah hanya SIAPA yang menjalankannya.
  *
- * Menekan sekali hanya menanyakan berapa contoh yang antre dan berapa
- * biayanya. Baru penekanan kedua yang benar-benar memanggil Voyage.
- * Ini bukan basa-basi keamanan: pemilik proyek pernah kehilangan saldo
- * karena panggilan berbayar berjalan tanpa sepengetahuannya, dan
- * aturan pertama CLAUDE.md lahir dari kejadian itu.
+ * Langkah 1, menghitung antrean dan biayanya, kini berjalan sendiri
+ * saat halaman dibuka dan setiap kali contoh ditambah atau dihapus.
+ * Ia gratis: /api/pengenal/bangun tanpa `jalankan` tidak pernah
+ * menyentuh Voyage. Dan justru angkanya yang paling perlu terlihat —
+ * sampai 17 Sep 2026 angka itu baru muncul sesudah seseorang menggulir
+ * ke dasar halaman lalu menekan "Hitung dulu", sehingga tim CS tidak
+ * pernah tahu contoh yang mereka tulis belum berpengaruh.
  *
- * Angkanya ditampilkan dalam rupiah, bukan token, karena itu satuan
- * yang bisa dinilai orang tanpa menghitung apa pun.
+ * Langkah 2 tetap klik yang disengaja, dan tombolnya menyebut nominal
+ * rupiahnya. Efek di bawah HANYA pernah mengirim badan kosong; tidak
+ * ada jalur otomatis apa pun yang mengirim `jalankan: true`. Pemilik
+ * proyek pernah kehilangan saldo karena panggilan berbayar berjalan
+ * tanpa sepengetahuannya, dan aturan pertama CLAUDE.md lahir dari itu.
  */
-export function BangunVektor({ bolehJalan }: { bolehJalan: boolean }) {
+export function BangunVektor({
+  bolehJalan,
+  pemicu,
+}: {
+  bolehJalan: boolean;
+  /** Nilai apa pun yang berubah saat contoh ditambah atau dihapus. */
+  pemicu: number;
+}) {
   const toast = useToast();
-  const [hasil, setHasil] = useState<HasilBangun | null>(null);
+  const [hitungan, setHitungan] = useState<HasilBangun | null>(null);
+  const [galat, setGalat] = useState<string | null>(null);
+  /** Hasil bangun terakhir: biaya nyata dan baris yang gagal ditulis. */
+  const [terakhir, setTerakhir] = useState<HasilBangun | null>(null);
   const [sibuk, setSibuk] = useState(false);
+  const [versi, setVersi] = useState(0);
 
-  const panggil = async (jalankan: boolean) => {
+  /* ---- Langkah 1: GRATIS, otomatis. Badan kosong = mode perkiraan. ---- */
+  useEffect(() => {
+    let batal = false;
+
+    void (async () => {
+      const h = await header();
+      try {
+        const r = await fetch("/api/pengenal/bangun", {
+          method: "POST",
+          headers: h,
+          body: "{}",
+          cache: "no-store",
+        });
+        const d = (await r.json()) as HasilBangun & { error?: string };
+        if (batal) return;
+        if (!r.ok) {
+          setGalat(d.error ?? `Server menjawab ${r.status}.`);
+          return;
+        }
+        setHitungan(d);
+        setGalat(null);
+      } catch (e) {
+        if (!batal) setGalat((e as Error).message);
+      }
+    })();
+
+    return () => {
+      batal = true;
+    };
+  }, [pemicu, versi]);
+
+  /* ---- Langkah 2: BERBAYAR. Hanya lewat klik. ---- */
+  const bangun = async () => {
     if (sibuk) return;
     setSibuk(true);
     try {
       const r = await fetch("/api/pengenal/bangun", {
         method: "POST",
         headers: await header(),
-        body: JSON.stringify({ jalankan }),
+        body: JSON.stringify({ jalankan: true }),
       });
       const d = (await r.json()) as HasilBangun & { error?: string };
       if (!r.ok) {
         toast(d.error ?? `Server menjawab ${r.status}.`);
         return;
       }
-      setHasil(d);
-      if (jalankan) toast(d.pesan);
+      setTerakhir(d);
+      toast(d.pesan);
+      window.dispatchEvent(new Event(PERISTIWA_VEKTOR_DIBANGUN));
+      setVersi((v) => v + 1);
     } catch (e) {
       toast((e as Error).message);
     } finally {
@@ -403,80 +496,128 @@ export function BangunVektor({ bolehJalan }: { bolehJalan: boolean }) {
     }
   };
 
-  const adaAntrean = (hasil?.perkiraan.contoh ?? 0) > 0;
+  const hasilTerakhir = terakhir && (
+    <div className="mt-2 rounded-[10px] bg-white px-3 py-2 text-[0.78rem] leading-relaxed text-text-2">
+      {terakhir.nyata && (
+        <p className="m-0 font-mono text-[0.76rem] text-green-dark">
+          terakhir dibangun: {terakhir.tersimpan ?? 0} contoh · Rp{" "}
+          {terakhir.nyata.idr.toFixed(4)} · {terakhir.nyata.token} token
+        </p>
+      )}
+      {terakhir.gagal && terakhir.gagal.length > 0 && (
+        <ul className="mt-1.5 mb-0 list-disc pl-4 text-[0.76rem] text-[#b91c1c]">
+          {terakhir.gagal.map((g, n) => (
+            <li key={n}>{g}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 
+  /* ---- Belum ada angka: sedang menghitung, atau gagal ---- */
+  if (!hitungan) {
+    return (
+      <section
+        id={ID_BANGUN_VEKTOR}
+        className="mb-4 scroll-mt-4 rounded-xl border border-line bg-white px-3.5 py-2.5 text-[0.8rem] text-muted"
+      >
+        {galat ? (
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="text-[#b91c1c]">
+              Jumlah contoh yang belum aktif tidak bisa dihitung: {galat}
+            </span>
+            <button
+              type="button"
+              onClick={() => setVersi((v) => v + 1)}
+              className="min-h-10 cursor-pointer rounded-lg border border-line bg-white px-3 py-1 font-semibold text-text-2"
+            >
+              Coba lagi
+            </button>
+          </span>
+        ) : (
+          "Menghitung contoh pertanyaan yang belum aktif…"
+        )}
+      </section>
+    );
+  }
+
+  const { perkiraan } = hitungan;
+  const total = hitungan.total ?? perkiraan.contoh;
+
+  /* ---- Tidak ada antrean: cukup satu baris hijau ----
+     Spanduk kuning yang selalu ada, termasuk saat tidak ada apa-apa,
+     melatih orang mengabaikannya — lalu ia diabaikan juga pada hari
+     ada 40 contoh yang menunggu. */
+  if (total === 0) {
+    return (
+      <section
+        id={ID_BANGUN_VEKTOR}
+        className="mb-4 scroll-mt-4 rounded-xl border border-green/30 bg-green-soft px-3.5 py-2.5"
+      >
+        <p className="m-0 text-[0.8rem] leading-relaxed text-green-dark">
+          ✓ <b>Semua contoh pertanyaan sudah aktif.</b> Contoh yang baru ditulis
+          akan muncul di sini sebagai antrean.
+        </p>
+        {galat && (
+          <p className="mt-1.5 mb-0 text-[0.76rem] text-[#b91c1c]">
+            Hitungan terbaru gagal dimuat: {galat}
+          </p>
+        )}
+        {hasilTerakhir}
+      </section>
+    );
+  }
+
+  /* ---- Ada antrean ---- */
   return (
-    <section className="mt-4 rounded-xl border border-[#f0c36d] bg-[#fdf3d8] p-4">
-      <h4 className="m-0 mb-1 text-[0.9rem] font-bold text-[#8a5a00]">
-        ⚡ Bangun vektor contoh pertanyaan
-      </h4>
-      <p className="mt-0 mb-3 text-[0.8rem] leading-relaxed text-[#8a5a00]">
-        Contoh yang baru ditulis <b>belum berpengaruh</b> sampai vektornya
-        dibangun. Langkah ini memanggil Voyage dan <b>memotong saldo</b>, jadi
-        sengaja terpisah dari tombol simpan — menulis contoh harus tetap gratis
-        berapa kali pun diperbaiki.
-      </p>
+    <section
+      id={ID_BANGUN_VEKTOR}
+      className="mb-4 scroll-mt-4 rounded-xl border border-[#f0c36d] bg-[#fdf3d8] p-3.5"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h4 className="m-0 text-[0.9rem] font-bold text-[#8a5a00]">
+            ⚡ {total} contoh pertanyaan belum aktif
+          </h4>
+          <p className="mt-1 mb-0 text-[0.78rem] leading-relaxed text-[#8a5a00]">
+            Sudah tersimpan, tetapi <b>belum ikut menentukan</b> template mana
+            yang terpilih sampai vektornya dibangun.
+          </p>
+        </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => void panggil(false)}
-          disabled={sibuk}
-          className="cursor-pointer rounded-xl border border-line bg-white px-4 py-2 font-semibold text-text-2 hover:bg-green-soft disabled:opacity-50"
-        >
-          {sibuk ? "…" : "1. Hitung dulu (gratis)"}
-        </button>
-
-        {hasil && adaAntrean && bolehJalan && (
+        {bolehJalan && (
           <button
             type="button"
-            onClick={() => void panggil(true)}
+            onClick={() => void bangun()}
             disabled={sibuk}
-            className="cursor-pointer rounded-xl border-none bg-green px-4 py-2 font-bold text-white hover:bg-green-hover disabled:opacity-50"
+            className="min-h-10 shrink-0 cursor-pointer rounded-xl border-none bg-green px-4 py-2 font-bold text-white hover:bg-green-hover disabled:opacity-50 max-mini:w-full"
           >
-            2. Bangun sekarang — Rp {hasil.perkiraan.idr.toFixed(4)}
+            {sibuk ? "Membangun…" : `Bangun sekarang — Rp ${perkiraan.idr.toFixed(4)}`}
           </button>
         )}
       </div>
 
-      {hasil && (
-        <div className="mt-3 rounded-[10px] bg-white px-3 py-2 text-[0.8rem] leading-relaxed text-text-2">
-          <p className="m-0">{hasil.pesan}</p>
-          {adaAntrean && !hasil.jalan && (
-            <p className="mt-1.5 mb-0 font-mono text-[0.76rem] text-muted">
-              {hasil.perkiraan.contoh} contoh · {hasil.perkiraan.token} token ·{" "}
-              {hasil.perkiraan.model}
-            </p>
-          )}
-          {hasil.nyata && (
-            <p className="mt-1.5 mb-0 font-mono text-[0.76rem] text-green-dark">
-              biaya nyata: Rp {hasil.nyata.idr.toFixed(4)} · {hasil.nyata.token} token
-            </p>
-          )}
-          {typeof hasil.sisa === "number" && hasil.sisa > 0 && (
-            <p className="mt-1.5 mb-0 text-[0.78rem] text-[#8a5a00]">
-              Masih ada <b>{hasil.sisa}</b> contoh yang antre. Batas laju Voyage
-              membuat sekali tekan dibatasi 256 contoh — tekan lagi untuk
-              melanjutkan.
-            </p>
-          )}
-          {hasil.gagal && hasil.gagal.length > 0 && (
-            <ul className="mt-2 mb-0 list-disc pl-4 text-[0.76rem] text-[#b91c1c]">
-              {hasil.gagal.map((g, n) => (
-                <li key={n}>{g}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-
-      {hasil && adaAntrean && !bolehJalan && (
-        <p className="mt-2 mb-0 text-[0.78rem] text-[#8a5a00]">
-          🔒 Membangun vektor hanya bisa dilakukan <b>Admin</b>, karena langkah
-          ini memotong saldo. Menulis contoh pertanyaan tetap boleh dilakukan
-          seluruh tim CS.
+      {bolehJalan ? (
+        <p className="mt-2 mb-0 font-mono text-[0.74rem] text-[#8a5a00]">
+          sekali tekan: {perkiraan.contoh} contoh · {perkiraan.token} token ·{" "}
+          {perkiraan.model}
+          {total > perkiraan.contoh &&
+            ` · ${total - perkiraan.contoh} sisanya perlu tekan lagi (batas laju Voyage)`}
+        </p>
+      ) : (
+        <p className="mt-2 mb-0 text-[0.78rem] leading-relaxed text-[#8a5a00]">
+          🔒 Hanya <b>Admin</b> yang bisa membangunnya, karena langkah ini
+          memotong saldo. Kabari Admin setelah selesai mengisi contoh — menulis
+          contoh tetap boleh dilakukan seluruh tim CS.
         </p>
       )}
+
+      {galat && (
+        <p className="mt-2 mb-0 text-[0.76rem] text-[#b91c1c]">
+          Hitungan terbaru gagal dimuat: {galat}
+        </p>
+      )}
+      {hasilTerakhir}
     </section>
   );
 }

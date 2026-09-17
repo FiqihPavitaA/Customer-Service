@@ -120,9 +120,19 @@ export async function POST(req: Request) {
     idr: biaya.idr,
   };
 
+  /* Seluruh antrean, bukan hanya yang muat sekali tekan.
+
+     `perkiraan.contoh` sengaja berhenti di BATAS_SEKALI karena itulah
+     yang akan dibayar pada penekanan berikutnya. Tetapi spanduk di
+     halaman Knowledge Base menjawab pertanyaan lain — "berapa contoh
+     yang belum berpengaruh?" — dan dengan 300 contoh antre, angka 256
+     menjawabnya salah tanpa satu pun tanda. */
+  const total = count ?? antre.length;
+
   if (antre.length === 0) {
     return NextResponse.json({
       jalan: false,
+      total: 0,
       perkiraan,
       pesan: "Semua contoh sudah punya vektor. Tidak ada yang perlu dibangun.",
     });
@@ -132,11 +142,12 @@ export async function POST(req: Request) {
   if (!jalankan) {
     return NextResponse.json({
       jalan: false,
+      total,
       perkiraan,
       pesan:
-        `${antre.length} contoh belum punya vektor. Perkiraan biaya ` +
-        `Rp ${biaya.idr.toFixed(4)} (${token} token). Kirim ulang dengan ` +
-        `jalankan:true untuk benar-benar membangunnya.`,
+        `${total} contoh belum punya vektor. Perkiraan biaya sekali tekan ` +
+        `Rp ${biaya.idr.toFixed(4)} (${antre.length} contoh, ${token} token). ` +
+        `Kirim ulang dengan jalankan:true untuk benar-benar membangunnya.`,
     });
   }
 
@@ -274,6 +285,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     jalan: true,
+    total: sisa,
     tersimpan,
     sisa,
     gagal,
