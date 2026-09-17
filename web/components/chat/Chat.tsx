@@ -316,6 +316,7 @@ function ConversationsPanel({
   jumlahSimulasi,
   tersembunyi,
   adaPenyaring,
+  tokoDipilih,
   onPick,
   onClose,
 }: {
@@ -332,6 +333,8 @@ function ConversationsPanel({
   tersembunyi: number;
   /** Ada penyaring yang sedang menyala sama sekali? */
   adaPenyaring: boolean;
+  /** Satu toko tertentu sedang dipilih (bukan "Semua toko"). */
+  tokoDipilih: boolean;
   onPick: (id: string) => void;
   onClose?: () => void;
 }) {
@@ -456,8 +459,14 @@ function ConversationsPanel({
                 menunggu sebenarnya ada tetapi tersembunyi penyaring,
                 ucapan selamat itu menyuruh CS pulang dari antrean yang
                 masih terisi. */}
+            {/* Kalimat untuk pilihan toko diganti 17 Sep 2026 atas
+                permintaan pemilik proyek. Pencarian tetap punya
+                kalimatnya sendiri: "untuk toko ini" salah kalau yang
+                menyembunyikan adalah kotak cari, bukan toko. */}
             {tersembunyi > 0
-              ? "Semuanya sedang disembunyikan penyaring di atas."
+              ? tokoDipilih
+                ? "Belum ada pesan masuk untuk toko ini."
+                : "Tidak ada percakapan yang cocok dengan pencarian ini."
               : adaPenyaring
                 ? "Tidak ada percakapan yang cocok dengan penyaring ini."
                 : filter === "cs"
@@ -1145,6 +1154,7 @@ export default function Chat() {
           jumlahSimulasi={jumlahSimulasi}
           tersembunyi={tersembunyi}
           adaPenyaring={adaPenyaring}
+          tokoDipilih={activeShop !== SEMUA_TOKO}
           onPick={pick}
         />
       </section>
@@ -1404,6 +1414,7 @@ export default function Chat() {
               jumlahSimulasi={jumlahSimulasi}
               tersembunyi={tersembunyi}
               adaPenyaring={adaPenyaring}
+              tokoDipilih={activeShop !== SEMUA_TOKO}
               onPick={pick}
               onClose={() => setOverlay(null)}
             />
