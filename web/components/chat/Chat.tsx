@@ -69,6 +69,8 @@ import {
   resiDummy,
   rupiah,
 } from "@/lib/pesananDummy";
+import { usePesananPembeli } from "@/lib/db/usePesananPembeli";
+import PanelPesananNyata from "@/components/chat/PanelPesananNyata";
 import {
   MENIT_GENTING,
   menitMenunggu,
@@ -559,6 +561,11 @@ function InfoPanel({
     [c, catalog.products],
   );
 
+  /* Pesanan NYATA dari tabel orders (sinkronisasi Shopee), dicocokkan
+     lewat order_id, id pembeli, atau nama akun. Bila ada, ini yang
+     tampil; pesanan contoh di atas hanya cadangan. */
+  const nyata = usePesananPembeli(c);
+
   const matches = useMemo(
     () => searchProducts(catalog.products, q, 20),
     [catalog.products, q],
@@ -628,15 +635,21 @@ function InfoPanel({
       {/* Satu-satunya bagian yang menggulir. */}
       <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
         {tab === "pesanan" &&
-          (pesanan ? (
+          (nyata.daftar.length > 0 ? (
+            <PanelPesananNyata daftar={nyata.daftar} />
+          ) : pesanan ? (
             <div className="flex flex-col gap-3">
-              {/* Ditandai TEGAS. Data pesanan belum tersambung ke API
-                  marketplace sama sekali; CS yang mengira angka di
-                  bawah nyata bisa menjanjikan pengiriman yang tidak
-                  pernah ada. */}
+              {/* Ditandai TEGAS. Pembeli ini tidak punya pesanan di tabel
+                  orders, jadi yang tampil adalah contoh; CS yang mengira
+                  angka di bawah nyata bisa menjanjikan pengiriman yang
+                  tidak pernah ada. */}
               <DemoNotice
                 sumber="contoh"
-                detail="Pesanan contoh, dihitung dari id percakapan. Belum tersambung ke API marketplace."
+                detail={
+                  nyata.keadaan === "memuat"
+                    ? "Mencari pesanan pembeli ini di tabel orders…"
+                    : "Pesanan contoh. Pembeli ini belum punya pesanan dari API marketplace — dicocokkan lewat nomor pesanan, id pembeli, dan nama akun."
+                }
               />
 
               <div className="rounded-2xl border border-line p-3.5">
