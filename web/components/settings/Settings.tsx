@@ -18,8 +18,9 @@
      dan ditandai sebagai "belum disimpan" supaya jujur.
    =========================================================== */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/components/Toast";
+import TokoTerhubung from "@/components/settings/TokoTerhubung";
 import { DemoNotice, GhostButton } from "@/components/ui/Bits";
 import { actionTagClass } from "@/components/ai/actionTag";
 import { saveSettings, useSettings } from "@/lib/db";
@@ -672,6 +673,7 @@ function PanelIntegrasi() {
         title="Integrasi Marketplace"
         desc="Toko yang terhubung untuk menerima chat & data pesanan."
       />
+      <TokoTerhubung />
       <SetCard>
         {TOKO.map((t) => (
           <KbRow
@@ -770,6 +772,23 @@ export default function Settings() {
   const [section, setSection] = useState<SectionId>("profil");
   const settings = useSettings();
   const toast = useToast();
+
+  /* /shopee/callback mengembalikan ke /settings?shopee=ok|gagal.
+     Pesannya ada di bagian Integrasi, jadi bagian itulah yang dibuka.
+     Dibaca di effect, bukan saat render, supaya HTML dari server dan
+     dari klien tetap sama (keduanya mulai dari "profil"). */
+  useEffect(() => {
+    /* Di dalam IIFE async, bukan langsung di badan effect — pola yang
+       sama dengan pengambilan data di ContohPertanyaan.tsx, dan yang
+       diterima eslint react-hooks/set-state-in-effect. */
+    void (async () => {
+      try {
+        if (new URLSearchParams(window.location.search).has("shopee")) setSection("integrasi");
+      } catch {
+        /* tanpa window — biarkan */
+      }
+    })();
+  }, []);
 
   const belumTersimpan = () =>
     toast("Bagian ini belum punya kolom di schema.sql — belum ikut tersimpan");
