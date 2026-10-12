@@ -74,9 +74,12 @@ export default function PanelPesananNyata({ daftar }: { daftar: PesananPembeli[]
               </p>
             )}
 
-            <div className="flex justify-between py-1 text-[0.82rem]">
-              <span className="text-muted">Kurir</span>
-              <b>{p.shipping_carrier ?? "—"}</b>
+            {/* gap + shrink-0 + text-right: nama kurir sandbox bisa
+                sepanjang "Sandbox-J&T Express(Don't modify)" dan tanpa
+                ini ia menempel ke labelnya. */}
+            <div className="flex justify-between gap-3 py-1 text-[0.82rem]">
+              <span className="shrink-0 text-muted">Kurir</span>
+              <b className="text-right break-words">{p.shipping_carrier ?? "—"}</b>
             </div>
             <div className="flex justify-between gap-3 py-1 text-[0.82rem]">
               <span className="shrink-0 text-muted">Resi</span>
@@ -84,9 +87,9 @@ export default function PanelPesananNyata({ daftar }: { daftar: PesananPembeli[]
               <b className="truncate font-mono">{p.tracking_number ?? "belum tersedia"}</b>
             </div>
             {p.ship_by_date && !terlambat && (
-              <div className="flex justify-between py-1 text-[0.82rem]">
-                <span className="text-muted">Batas kirim</span>
-                <b>{tanggalPanjang(p.ship_by_date)}</b>
+              <div className="flex justify-between gap-3 py-1 text-[0.82rem]">
+                <span className="shrink-0 text-muted">Batas kirim</span>
+                <b className="text-right">{tanggalPanjang(p.ship_by_date)}</b>
               </div>
             )}
 
