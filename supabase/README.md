@@ -277,3 +277,19 @@ left join public.template_rules r on r.template_id = t.id
 where r.id is null and t.is_active
 order by t.category_slug, t.code;
 ```
+
+## Migrasi bertahap (`migrations/`)
+
+Sejak integrasi Shopee (12 Okt 2026), perubahan skema baru ditaruh di
+[`migrations/`](migrations/) dengan nama `YYYYMMDDHHMMSS_nama.sql`,
+dijalankan **berurutan** sesuai nama. Cara pakainya sama: SQL Editor →
+tempel seluruh isi → Run; semuanya idempoten dan membawa blok CEK di
+dasarnya untuk membuktikan hasilnya.
+
+| Berkas | Isi |
+|---|---|
+| `20261012120000_marketplace_shops.sql` | Toko yang terhubung + tokennya. **Tanpa policy** — hanya service_role |
+| `20261012120100_orders.sql` | Pesanan format internal (dibaca semua akun) + `orders_raw` jawaban mentah (hanya service_role) |
+
+`service_role` dipakai hanya oleh `web/lib/supabase/admin.ts` (server-only).
+Lihat kepala berkas itu untuk batasnya.
