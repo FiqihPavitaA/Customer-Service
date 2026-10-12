@@ -17,6 +17,16 @@
 import { useEffect, useState } from "react";
 import { headerBerSesi } from "@/lib/supabase/header";
 import { stempel } from "@/lib/format";
+import { useAuth } from "@/lib/auth";
+
+type RingkasanToko = {
+  toko: string;
+  ok: boolean;
+  ditemukan: number;
+  disimpan: number;
+  lama_ms: number;
+  galat?: string;
+};
 
 type Toko = {
   id: string;
@@ -46,9 +56,33 @@ const LABEL_SEBAB: Record<string, string> = {
 };
 
 export default function TokoTerhubung() {
+  const { isAdmin } = useAuth();
   const [daftar, setDaftar] = useState<Toko[] | null>(null);
   const [galat, setGalat] = useState<string | null>(null);
   const [hasil, setHasil] = useState<Hasil>(null);
+  const [sinkron, setSinkron] = useState<{ jalan: boolean; ringkasan: RingkasanToko[] | null; galat: string | null }>({
+    jalan: false,
+    ringkasan: null,
+    galat: null,
+  });
+
+  /* Hanya admin yang melihat tombolnya, dan rute di baliknya memeriksa
+     peran admin lagi di server — tombol yang disembunyikan bukan
+     pengaman. Dipakai saat uji manual; cron-lah yang bekerja rutin. */
+  const sinkronSekarang = async () => {
+    setSinkron({ jalan: true, ringkasan: null, galat: null });
+    try {
+      const res = await fetch("/api/sync/shopee-orders", { method: "POST", headers: await headerBerSesi() });
+      const data = await res.json();
+      if (!res.ok) {
+        setSinkron({ jalan: false, ringkasan: null, galat: data?.error ?? `HTTP ${res.status}` });
+        return;
+      }
+      setSinkron({ jalan: false, ringkasan: data.toko as RingkasanToko[], galat: null });
+    } catch (err) {
+      setSinkron({ jalan: false, ringkasan: null, galat: (err as Error).message });
+    }
+  };
 
   useEffect(() => {
     let batal = false;
@@ -95,13 +129,52 @@ export default function TokoTerhubung() {
     <div className="mb-5 rounded-[18px] border border-line bg-white p-5 shadow-[0_8px_30px_rgb(15_23_42/0.04)] max-mini:p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
         <div className="text-[0.95rem] font-bold">Toko Terhubung</div>
-        <a
-          href="/api/shopee/auth-url"
-          className="rounded-[9px] bg-green px-3.5 py-1.5 text-[0.84rem] font-bold text-white no-underline transition hover:bg-green-hover"
-        >
-          Hubungkan Toko Shopee
-        </a>
+        <div className="flex flex-wrap items-center gap-2">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={sinkronSekarang}
+              disabled={sinkron.jalan}
+              className="cursor-pointer rounded-[9px] border border-line bg-white px-3.5 py-1.5 text-[0.84rem] font-bold text-text-2 transition hover:bg-green-soft disabled:cursor-wait disabled:opacity-60"
+            >
+              {sinkron.jalan ? "Menyinkronkan…" : "Sinkronkan sekarang"}
+            </button>
+          )}
+          <a
+            href="/api/shopee/auth-url"
+            className="rounded-[9px] bg-green px-3.5 py-1.5 text-[0.84rem] font-bold text-white no-underline transition hover:bg-green-hover"
+          >
+            Hubungkan Toko Shopee
+          </a>
+        </div>
       </div>
+
+      {sinkron.galat && (
+        <p role="alert" className="mb-4 rounded-xl border border-[#fecaca] bg-[#fef2f2] px-3.5 py-2.5 text-[0.86rem] text-[#b91c1c]">
+          Sinkronisasi gagal dipicu: {sinkron.galat}
+        </p>
+      )}
+      {sinkron.ringkasan && (
+        <div className="mb-4 rounded-xl border border-line bg-green-soft px-3.5 py-2.5 text-[0.82rem]">
+          <div className="mb-1 font-bold">Hasil sinkronisasi</div>
+          {sinkron.ringkasan.length === 0 ? (
+            <div className="text-muted">Tidak ada toko aktif.</div>
+          ) : (
+            <ul className="m-0 list-none p-0">
+              {sinkron.ringkasan.map((r) => (
+                <li key={r.toko} className="flex flex-wrap justify-between gap-2 py-0.5">
+                  <span>{r.toko}</span>
+                  <span className={r.ok ? "text-green-dark" : "text-[#b91c1c]"}>
+                    {r.ok
+                      ? `${r.ditemukan} berubah · ${r.disimpan} tersimpan · ${r.lama_ms} ms`
+                      : `gagal: ${r.galat}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {hasil?.shopee === "ok" && (
         <p

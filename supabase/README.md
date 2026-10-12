@@ -291,6 +291,8 @@ dasarnya untuk membuktikan hasilnya.
 | `20261012120000_marketplace_shops.sql` | Toko yang terhubung + tokennya. **Tanpa policy** — hanya service_role |
 | `20261012120100_orders.sql` | Pesanan format internal (dibaca semua akun) + `orders_raw` jawaban mentah (hanya service_role) |
 | `20261012150000_orders_pembeli.sql` | `buyer_user_id` + index pembeli per toko — penghubung pesanan ke percakapan di panel Chat |
+| `20261012160000_sinkronisasi.sql` | `orders_synced_until` — titik sinkronisasi per toko |
+| `20261012160100_pg_cron.sql` | Jadwal pg_cron + pg_net: pesanan tiap 15 menit, token harian. **Ganti dua placeholder dulu** |
 
 `service_role` dipakai hanya oleh `web/lib/supabase/admin.ts` (server-only).
 Lihat kepala berkas itu untuk batasnya.

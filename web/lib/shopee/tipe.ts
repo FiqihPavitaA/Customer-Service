@@ -106,3 +106,63 @@ export type InfoToko = {
   /** Epoch detik saat OTORISASI toko habis — berbeda dari umur token. */
   expire_time?: number;
 };
+
+/**
+ * Satu barang di get_order_detail -> item_list[]. Hanya field yang
+ * dipakai pemeta; dokumentasinya memuat puluhan field promosi,
+ * bundling, dan resep yang tidak relevan untuk CS.
+ *
+ * Dari: v2.order.get_order_detail, bagian item_list.
+ */
+export type ItemPesananShopee = {
+  item_id?: number;
+  item_name?: string;
+  item_sku?: string;
+  model_id?: number;
+  model_name?: string;
+  model_sku?: string;
+  model_quantity_purchased?: number;
+  model_original_price?: number;
+  model_discounted_price?: number;
+  image_info?: { image_url?: string };
+};
+
+/**
+ * Satu pesanan di get_order_detail -> response.order_list[].
+ *
+ * "Return by default" (tanpa diminta): order_sn, region, currency,
+ * cod, order_status, message_to_seller, create_time, update_time,
+ * days_to_ship, ship_by_date. Sisanya hanya ada bila disebut di
+ * response_optional_fields — daftar yang diminta ada di
+ * sinkronAturan.ts, dan SENGAJA tidak memuat recipient_address.
+ *
+ * tracking_number TIDAK ADA di endpoint ini (lihat pemetaPesanan.ts).
+ *
+ * Dari: v2.order.get_order_detail, bagian Response.
+ */
+export type DetailPesananShopee = {
+  order_sn: string;
+  order_status?: StatusPesananShopee | string;
+  region?: string;
+  currency?: string;
+  cod?: boolean;
+  create_time?: number;
+  update_time?: number;
+  days_to_ship?: number;
+  ship_by_date?: number;
+  message_to_seller?: string;
+  /* --- opsional, hanya bila diminta --- */
+  total_amount?: number;
+  shipping_carrier?: string;
+  pay_time?: number;
+  buyer_user_id?: number;
+  buyer_username?: string;
+  item_list?: ItemPesananShopee[];
+  cancel_by?: string;
+  cancel_reason?: string;
+};
+
+/** Di dalam `response`. */
+export type DaftarDetailPesanan = {
+  order_list: DetailPesananShopee[];
+};

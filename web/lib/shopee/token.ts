@@ -61,7 +61,8 @@ const KOLOM_TOKEN =
 /** Kolom yang BOLEH dilihat peramban — tanpa token. */
 const KOLOM_LAYAR =
   "id, platform, external_shop_id, shop_name, region, is_active, " +
-  "access_token_expires_at, refresh_token_expires_at, authorization_expires_at, updated_at";
+  "access_token_expires_at, refresh_token_expires_at, authorization_expires_at, " +
+  "orders_synced_until, updated_at";
 
 type BarisToken = {
   id: string;
@@ -86,6 +87,8 @@ export type TokoUntukLayar = {
   access_token_expires_at: string | null;
   refresh_token_expires_at: string | null;
   authorization_expires_at: string | null;
+  /** Sampai kapan pesanan toko ini sudah ditarik; null = belum pernah. */
+  orders_synced_until: string | null;
   updated_at: string;
 };
 
