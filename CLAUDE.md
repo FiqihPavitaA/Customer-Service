@@ -54,6 +54,9 @@ pemilik proyek menjawab.
 | `npm run uji-jadwal-ai` | 54 kasus aturan kapan AI boleh menjawab: jam WIB vs jam server, jendela yang melewati tengah malam, override dua arah, dan nilai rusak yang bisa membisukan AI selamanya |
 | `npm run uji-tunggakan` | 33 kasus aturan tunggakan: siapa yang bicara terakhir, role asing yang condong ke arah aman, jendela yang melewati tengah malam, dan kapan tim diperingatkan sebelum jam kerja habis |
 | `npm run uji-sesi` | 48 kasus batas umur sesi login: sesi 12 jam, penghitung diam 60 menit, dan — yang paling penting — nilai waktu yang tidak terbaca TIDAK pernah mengeluarkan siapa pun |
+| `npm run uji-shopee-sign` | 26 kasus tanda tangan & parameter Shopee: nilai tetap yang diverifikasi silang dengan OpenSSL, bagian disambung tanpa pemisah, spasi di ujung kunci mengubah hasilnya total, dan `order_status` yang harus diminta eksplisit |
+| `npm run uji-shopee-klien` | 44 kasus klien HTTP Shopee tanpa jaringan: parameter umum selalu di query string, `error` terisi berarti gagal walau HTTP 200, dan pesan galat TIDAK PERNAH memuat URL, sign, token, atau partner key |
+| `npm run uji-shopee-otorisasi` | Aturan umur token Shopee: expire_in yang kadang detik kadang epoch (dua contoh resmi yang bertentangan), margin 10 menit, kunci penyegaran yang kedaluwarsa dianggap bebas, dan kode galat mana yang boleh menonaktifkan toko |
 | `npm run uji-ringkasan` | 21 kasus angka nyata Beranda & Statistik: antrean tertua (bukan rata-rata), rentang waktu, dan nol yang berbeda dari "belum ada data" |
 | `npm run uji-pesanan` | 26 kasus pesanan contoh di tab Pesanan: nomor tidak pernah berubah (kalau berubah, pencarian diam-diam gagal), data asli tidak ditimpa, katalog kosong tidak mengarang nama produk |
 | `npm run uji-cari` | 46 kasus pencocokan pencarian & papan croscek: nomor bertanda baca tetap ketemu, nama pendek TIDAK melebar, nomor yang tidak ketemu tidak pernah hilang dari daftar |

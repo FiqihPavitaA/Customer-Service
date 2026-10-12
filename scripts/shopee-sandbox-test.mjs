@@ -282,6 +282,9 @@ async function perintahOrders(kred, accessToken, shopId) {
     time_from: sekarang - HARI_KE_BELAKANG * 24 * 60 * 60,
     time_to: sekarang,
     page_size: 20,
+    // Tanpa ini Shopee hanya mengembalikan order_sn; order_status
+    // tergolong "optional field" dan harus diminta eksplisit.
+    response_optional_fields: "order_status",
   });
 
   const data = await kirim("GET", url);

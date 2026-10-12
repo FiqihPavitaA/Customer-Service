@@ -31,14 +31,18 @@
     "uji-input-type": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/uji-input-type.mjs",
     "tes-ambang": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/tes-ambang.mjs",
     "uji-tunggakan": "node --experimental-strip-types scripts/uji-tunggakan.mjs",
-    "uji-sesi": "node --experimental-strip-types scripts/uji-sesi.mjs"
+    "uji-sesi": "node --experimental-strip-types scripts/uji-sesi.mjs",
+    "uji-shopee-sign": "node --conditions=react-server --experimental-strip-types scripts/uji-shopee-sign.mjs",
+    "uji-shopee-klien": "node --conditions=react-server --experimental-strip-types scripts/uji-shopee-klien.mjs",
+    "uji-shopee-otorisasi": "node --conditions=react-server --experimental-strip-types scripts/uji-shopee-otorisasi.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",
     "@supabase/supabase-js": "^2.115.0",
     "next": "16.3.3",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
