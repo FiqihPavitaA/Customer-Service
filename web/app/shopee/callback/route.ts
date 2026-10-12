@@ -25,6 +25,7 @@
 
 import { NextResponse } from "next/server";
 import { GalatKonfigurasi, GalatShopee } from "@/lib/shopee/klien";
+import { GalatKonfigurasiAdmin } from "@/lib/supabase/admin";
 import {
   GalatToko,
   ambilInfoToko,
@@ -77,7 +78,14 @@ export async function GET(req: Request) {
     if (err instanceof GalatShopee) sebab = err.kode;
     else if (err instanceof GalatToko) sebab = err.kode;
     else if (err instanceof GalatKonfigurasi) sebab = "konfigurasi";
-    console.error("[shopee/callback] gagal:", sebab);
+    /* Dilempar getSupabaseAdmin() — SESUDAH Shopee menerbitkan token.
+       Pada 12 Okt 2026 galat ini sempat muncul sebagai "tak_dikenal"
+       karena belum dipetakan, dan itu menyembunyikan fakta bahwa
+       penukaran kodenya sendiri sudah berhasil. */
+    else if (err instanceof GalatKonfigurasiAdmin) sebab = "konfigurasi_supabase";
+    /* Nama kelasnya dicatat supaya "tak_dikenal" berikutnya bisa
+       ditelusuri dari log Vercel. Nama kelas tidak memuat rahasia. */
+    console.error("[shopee/callback] gagal:", sebab, sebab === "tak_dikenal" ? (err as Error).name : "");
     return keSettings(req, { shopee: "gagal", sebab });
   }
 }

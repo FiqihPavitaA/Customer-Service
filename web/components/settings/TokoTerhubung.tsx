@@ -39,6 +39,9 @@ const LABEL_SEBAB: Record<string, string> = {
   error_auth: "Kode otorisasi ditolak Shopee. Coba hubungkan lagi.",
   error_sign: "Tanda tangan ditolak — periksa partner key dan host.",
   konfigurasi: "Variabel lingkungan Shopee belum lengkap di server.",
+  konfigurasi_supabase:
+    "Shopee sudah menerbitkan token, tetapi SUPABASE_SERVICE_ROLE_KEY tidak terlihat oleh " +
+    "deployment ini sehingga tidak bisa disimpan. Periksa variabelnya di Vercel, redeploy, lalu hubungkan lagi.",
   database: "Token diterima Shopee tetapi gagal disimpan. Lihat log server.",
 };
 
